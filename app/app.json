@@ -1,0 +1,14 @@
+{
+  "expo": {
+    "name": "유행수명",
+    "slug": "trend-radar",
+    "scheme": "trendradar",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "ios": { "supportsTablet": false },
+    "android": { "package": "kr.trendstage.app" },
+    "plugins": ["expo-font", "expo-notifications"]
+  }
+}

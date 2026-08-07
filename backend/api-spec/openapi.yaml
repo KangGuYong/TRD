@@ -1,0 +1,1184 @@
+openapi: 3.1.0
+info:
+  title: 트렌드 레이더 API
+  version: 0.1.0
+  description: >
+    앱(api-public, `/v1`)과 관리자 콘솔(api-admin, `/admin`)의 단일 계약.
+    상위 근거: 01-system-design.md §9, 02-admin-console.md, 04-development-plan.md §7.
+    규약: 등급·판정 관련 응답은 산정 근거(`basis`/`breakdown`)를 항상 동봉한다(04 §7.3).
+    판정 결과를 직접 바꾸는 엔드포인트는 존재하지 않는다(R1, 02 ADM-200 금지기능).
+
+servers:
+  - url: https://api.trendstage.kr
+    description: 앱 공개 API
+  - url: https://admin.trendstage.kr/api
+    description: 관리자 콘솔 API
+
+tags:
+  - name: app-trends
+    description: 앱 · 트렌드 조회/판정 열람
+  - name: app-submissions
+    description: 앱 · 제보/동의
+  - name: app-me
+    description: 앱 · 등급/원장/설정/워치
+  - name: admin-queues
+    description: 콘솔 · 큐(병합/어뷰징/이의/신고)
+  - name: admin-trends
+    description: 콘솔 · 트렌드/판정/수집 모니터
+  - name: admin-users
+    description: 콘솔 · 유저 원장/제재
+  - name: admin-governance
+    description: 콘솔 · 파라미터 스튜디오/2인 승인/감사 로그
+
+security:
+  - bearerAuth: []
+
+paths:
+  # ─────────────────────────────  앱 · 트렌드  ─────────────────────────────
+  /v1/trends:
+    get:
+      tags: [app-trends]
+      summary: 트렌드 목록 (홈 "오늘의 5개" / 검색)
+      description: 정렬은 인기순이 아니라 "지금 행동해야 하는 순"이 기본(앱 설계 원칙 05).
+      parameters:
+        - { name: daily, in: query, schema: { type: boolean }, description: 홈 5개 세트만 반환 }
+        - { name: q, in: query, schema: { type: string }, description: 검색 판정 질의어 }
+        - { name: category, in: query, schema: { $ref: '#/components/schemas/Category' } }
+        - name: sort
+          in: query
+          schema: { type: string, enum: [action, asked] }
+          description: 기본 action(지금 행동해야 하는 순) · asked=인기 질의 추천
+        - { name: cursor, in: query, schema: { type: string } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/TrendSummary' } }
+                  nextCursor: { type: [string, 'null'] }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /v1/trends/{id}:
+    get:
+      tags: [app-trends]
+      summary: 트렌드 상세 (뜻/유래/전파 경로/연령대/판정 근거)
+      parameters: [{ $ref: '#/components/parameters/TrendId' }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TrendDetail' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v1/trends/{id}/metrics:
+    get:
+      tags: [app-trends]
+      summary: 지표 시계열 (L2 등급 이상 열람)
+      parameters: [{ $ref: '#/components/parameters/TrendId' }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/MetricPoint' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /v1/trends/{id}/vote:
+    post:
+      tags: [app-trends]
+      summary: 이거 더 뜰까요 투표 (판정과 무관 · R1)
+      description: 투표는 유행 여부 판정에 절대 입력되지 않는다. 유저당 1표, 토글 가능.
+      parameters: [{ $ref: '#/components/parameters/TrendId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [willTrend]
+              properties: { willTrend: { type: boolean } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VoteResult' }
+
+  # ─────────────────────────────  앱 · 제보  ─────────────────────────────
+  /v1/submissions:
+    post:
+      tags: [app-submissions]
+      summary: 제보 등록 (제보권 차감 · 14일 뒤 자동 판정)
+      description: >
+        올리는 건 사람, 채점은 기계(01 §1). 중복이면 409로 동의 전환을 안내한다.
+        근거 URL 없으면 반려, 이해관계는 고지 체크 필수.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SubmissionCreate' }
+      responses:
+        '201':
+          description: 접수됨
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SubmissionMine' }
+        '409':
+          description: 중복 항목 — 제보권 미차감 동의로 전환 가능
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  trendItemId: { type: string, format: uuid }
+                  dupeRank: { type: integer, description: 클러스터 내 현재 제보 수 기준 순위 }
+                  message: { type: string }
+        '422':
+          description: 제보권 소진 또는 필드 누락
+          content: { application/json: { schema: { $ref: '#/components/schemas/Problem' } } }
+  /v1/submissions/me:
+    get:
+      tags: [app-submissions]
+      summary: 내 제보 목록 + 판정 상태
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/SubmissionMine' }
+  /v1/trends/{id}/endorse:
+    post:
+      tags: [app-submissions]
+      summary: 동의 (중복 제보를 endorsement로 전환)
+      description: 제보권 미소모. 적중 시 소액 가점, 실패 무감점. 유저 단위 dedup.
+      parameters: [{ $ref: '#/components/parameters/TrendId' }]
+      responses:
+        '201': { description: 동의 처리됨 }
+        '409': { description: 이미 동의/제보한 유저 }
+
+  # ─────────────────────────────  앱 · 나  ─────────────────────────────
+  /v1/me/grade:
+    get:
+      tags: [app-me]
+      summary: 등급 · AS · TI · 다음 승급 부족분 (산정 근거 동봉)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GradeStatus' }
+  /v1/me/ledger:
+    get:
+      tags: [app-me]
+      summary: 점수 원장 전건 열람 (append-only)
+      parameters: [{ name: cursor, in: query, schema: { type: string } }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/LedgerEntry' } }
+                  nextCursor: { type: [string, 'null'] }
+  /v1/me/preferences:
+    put:
+      tags: [app-me]
+      summary: 관심 분야 · 알림 시간 (온보딩/설정)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Preferences' }
+      responses:
+        '200':
+          description: OK
+          content: { application/json: { schema: { $ref: '#/components/schemas/Preferences' } } }
+  /v1/me/watch:
+    get:
+      tags: [app-me]
+      summary: 워치 목록
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/WatchItem' } }
+    post:
+      tags: [app-me]
+      summary: 워치 추가 (급상승 진입 시 즉시 알림)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [keyword]
+              properties: { keyword: { type: string } }
+      responses:
+        '201': { description: 추가됨 }
+  /v1/me/watch/{keyword}:
+    delete:
+      tags: [app-me]
+      summary: 워치 해제
+      parameters: [{ name: keyword, in: path, required: true, schema: { type: string } }]
+      responses:
+        '204': { description: 해제됨 }
+  /v1/appeals:
+    post:
+      tags: [app-me]
+      summary: 판정·제재 이의 제기
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AppealCreate' }
+      responses:
+        '201': { description: 접수됨 (처리기한 5영업일) }
+  /v1/leaderboard:
+    get:
+      tags: [app-me]
+      summary: 상위 10 (동의자 한정 노출)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/LeaderboardEntry' } }
+
+  # ─────────────────────────────  콘솔 · 큐  ─────────────────────────────
+  /admin/queues/summary:
+    get:
+      tags: [admin-queues]
+      summary: 오늘의 작업 (ADM-010) — 큐 카운트 · SLA 초과 · 시스템 알림
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/QueueSummary' }
+  /admin/merge-queue:
+    get:
+      tags: [admin-queues]
+      summary: 병합 검수 큐 (ADM-100) — 유사도 0.75~0.85 구간
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { name: sort, in: query, schema: { type: string, enum: [similarity, oldest] } }
+        - { name: category, in: query, schema: { $ref: '#/components/schemas/Category' } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/MergeCandidate' }
+  /admin/merge-queue/{id}/action:
+    post:
+      tags: [admin-queues]
+      summary: 병합 결정 (병합/분리/VOID/보류) — 권한 부족 시 403
+      description: order_rank 재부여는 확정 전 미리보기로 제공. VOID는 OPERATOR 이상.
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string }
+          description: 재시도 이중 실행 방지 멱등성 키(04 §5.4)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action: { type: string, enum: [MERGE, SPLIT, VOID, HOLD] }
+                targetClusterId: { type: [string, 'null'], format: uuid }
+                reason: { type: string, description: 감사 로그 기록. VOID는 필수 }
+      responses:
+        '200': { description: 처리됨 }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { description: 다른 검수자가 이미 처리함 — 낙관적 락 충돌(03 §6) }
+
+  # ─────────────────────────────  콘솔 · 트렌드/수집  ────────────────────
+  /admin/trends/{id}:
+    get:
+      tags: [admin-trends]
+      summary: 트렌드 항목 상세 (ADM-111) — 지표 시계열 · 예상 판정(잠정)
+      security: [{ cookieAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/TrendId' }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminTrendDetail' }
+  /admin/trends/{id}/exceptions:
+    post:
+      tags: [admin-trends]
+      summary: 판정 예외 처리 (ADM-200) — VOID / 유예 연장 / 재판정 요청만
+      description: >
+        HIT/MISS 직접 변경·T 수동입력·verdict 삭제는 제공하지 않는다(금지기능).
+        재판정은 새 verdict를 supersedes로 쌓고 차액을 ADJ 원장으로 반영.
+      security: [{ cookieAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/TrendId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type, reasonCode]
+              properties:
+                type: { type: string, enum: [VOID, EXTEND, REJUDGE] }
+                reasonCode: { type: string, description: VOID 사유 코드 필수 }
+                note: { type: string }
+      responses:
+        '200': { description: 처리됨 }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /admin/collectors:
+    get:
+      tags: [admin-trends]
+      summary: 지표 수집 모니터 (ADM-210) — 소스별 상태/성공률/한도
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/CollectorStatus' }
+  /admin/collectors/extend-affected:
+    post:
+      tags: [admin-trends]
+      summary: 수집 장애 영향 항목 일괄 유예 연장 (최대 +7일, 1회)
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200': { description: 연장됨 }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  # ─────────────────────────────  콘솔 · 유저/원장  ─────────────────────
+  /admin/users/{id}:
+    get:
+      tags: [admin-users]
+      summary: 유저 상세 / 원장 (ADM-311) — 개인정보 기본 마스킹
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: unmask, in: query, schema: { type: boolean }, description: true면 사유 헤더 필수 · 접속기록 남김 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminUserDetail' }
+  /admin/users/{id}/ledger-adjust:
+    post:
+      tags: [admin-users]
+      summary: 상쇄 원장(ADJ) 추가 — 기존 판정 불변, ADJ 행만 덧붙임
+      description: 사유 필수. 100점 초과는 2인 승인(approval 생성 후 pending).
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [delta, reason]
+              properties:
+                delta: { type: number }
+                reason: { type: string, minLength: 1 }
+      responses:
+        '201': { description: ADJ 기록됨 }
+        '202': { description: 100점 초과 — 2인 승인 대기 생성됨 }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  # ─────────────────────────────  콘솔 · 거버넌스  ─────────────────────
+  /admin/parameter-drafts:
+    get:
+      tags: [admin-governance]
+      summary: 파라미터 드래프트 목록 (ADM-600)
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/ParameterDraft' } }
+    post:
+      tags: [admin-governance]
+      summary: 드래프트 생성 (가중치 합계 1.0 아니면 저장 불가)
+      security: [{ cookieAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ParameterPayload' }
+      responses:
+        '201':
+          description: 생성됨
+          content: { application/json: { schema: { $ref: '#/components/schemas/ParameterDraft' } } }
+        '422': { description: 가중치 합계 ≠ 1.0 }
+  /admin/parameter-drafts/{id}/simulate:
+    post:
+      tags: [admin-governance]
+      summary: 시뮬레이션 (과거 180일 재판정) — 승인 요청 전 필수
+      description: 같은 ScoreEngine을 임의 ParameterSet으로 호출(04 §1). 결과 없으면 승인요청 불가.
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SimulationResult' }
+  /admin/parameter-drafts/{id}/request-approval:
+    post:
+      tags: [admin-governance]
+      summary: 적용 승인 요청 (시뮬 완료 시에만) — 기본 예약(비소급)
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [applyMode, applyAt]
+              properties:
+                applyMode: { type: string, enum: [SCHEDULED, RETROACTIVE] }
+                applyAt: { type: string, format: date-time }
+                rationale: { type: string, description: RETROACTIVE는 사유서 필수 }
+      responses:
+        '202': { description: 승인 대기 생성됨 (0/2) }
+        '409': { description: 시뮬레이션 미실행 }
+  /admin/approvals:
+    get:
+      tags: [admin-governance]
+      summary: 2인 승인 대기 목록
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/ApprovalRequest' } }
+  /admin/approvals/{id}/approve:
+    post:
+      tags: [admin-governance]
+      summary: 승인 (요청자·직전 승인자와 달라야 함)
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: 승인 반영 (2/2면 실행) }
+        '409': { description: 요청자 본인이거나 이미 승인함 }
+  /admin/audit-log:
+    get:
+      tags: [admin-governance]
+      summary: 감사 로그 (ADM-700) — 조회행위 포함 · append-only
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { name: actor, in: query, schema: { type: string } }
+        - { name: action, in: query, schema: { type: string } }
+        - { name: from, in: query, schema: { type: string, format: date-time } }
+        - { name: to, in: query, schema: { type: string, format: date-time } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/AuditEntry' }
+
+  # ══════════════ 확장 엔드포인트 (05-screen-endpoint-map §C) ══════════════
+  /v1/me/summary:
+    get:
+      tags: [app-me]
+      summary: 홈/제보/나 공용 요약 (스트릭·제보권·적중률·읽은 수)
+      responses:
+        '200':
+          description: OK
+          content: { application/json: { schema: { $ref: '#/components/schemas/MeSummary' } } }
+  /v1/me/reads:
+    post:
+      tags: [app-me]
+      summary: 읽음 표시 기록 (홈 완독 스트릭)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [trendId]
+              properties: { trendId: { type: string, format: uuid } }
+      responses:
+        '204': { description: 기록됨 }
+
+  /admin/trends:
+    get:
+      tags: [admin-trends]
+      summary: 트렌드 목록/필터 (ADM-110)
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { name: state, in: query, schema: { type: string, enum: [PENDING, JUDGING, RESOLVED, VOID, MERGED] } }
+        - { name: category, in: query, schema: { $ref: '#/components/schemas/Category' } }
+        - { name: cursor, in: query, schema: { type: string } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/AdminTrendListItem' } }
+                  nextCursor: { type: [string, 'null'] }
+  /admin/abuse-flags:
+    get:
+      tags: [admin-users]
+      summary: 어뷰징 플래그 큐 (ADM-300)
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/AbuseFlag' } }
+  /admin/abuse-flags/{id}/resolve:
+    post:
+      tags: [admin-users]
+      summary: 오탐 처리 / 경고 / 에스컬레이션 (플래그만, 제재 아님 · R4)
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [resolution, reason]
+              properties:
+                resolution: { type: string, enum: [DISMISS, WARN, ESCALATE] }
+                reason: { type: string, minLength: 1 }
+      responses:
+        '200': { description: 처리됨 }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /admin/sanctions:
+    get:
+      tags: [admin-users]
+      summary: 제재 목록 (ADM-320)
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/Sanction' } }
+    post:
+      tags: [admin-users]
+      summary: 제재 상신 (OPERATOR → ADMIN 2인 승인)
+      security: [{ cookieAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [targetUserId, type, reason]
+              properties:
+                targetUserId: { type: string, format: uuid }
+                type: { type: string, enum: [WARNING, GRADE_RESET, SUSPEND] }
+                reason: { type: string, minLength: 1 }
+      responses:
+        '202': { description: 상신됨 — 승인 대기 생성 }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /admin/users:
+    get:
+      tags: [admin-users]
+      summary: 유저 목록 (ADM-310)
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { name: grade, in: query, schema: { $ref: '#/components/schemas/Grade' } }
+        - { name: hasFlags, in: query, schema: { type: boolean } }
+        - { name: cursor, in: query, schema: { type: string } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/AdminUserSummary' } }
+                  nextCursor: { type: [string, 'null'] }
+  /admin/users/{id}/grade-adjust:
+    post:
+      tags: [admin-users]
+      summary: 등급 수동 조정 (ADMIN 2인 · 다음 재계산 시 원복 경고)
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [grade, reason]
+              properties:
+                grade: { $ref: '#/components/schemas/Grade' }
+                reason: { type: string, minLength: 1 }
+      responses:
+        '202': { description: 2인 승인 대기 생성됨 }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /admin/appeals:
+    get:
+      tags: [admin-queues]
+      summary: 이의 제기 큐 (ADM-400)
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/Appeal' } }
+  /admin/appeals/{id}/resolve:
+    post:
+      tags: [admin-queues]
+      summary: 이의 결정 (인용 시 ADJ 발생 · 근거수치 통보)
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision: { type: string, enum: [UPHELD, PARTIAL, REJECTED] }
+                note: { type: string }
+      responses:
+        '200': { description: 처리됨 }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /admin/reports:
+    get:
+      tags: [admin-queues]
+      summary: 신고 콘텐츠 큐 (ADM-410 · 신고자 비식별)
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/Report' } }
+  /admin/reports/{id}/decide:
+    post:
+      tags: [admin-queues]
+      summary: 신고 결정 (복원 / 영구비공개 / 수정후복원)
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision: { type: string, enum: [RESTORE, HIDE_PERMANENT, EDIT_RESTORE] }
+                note: { type: string }
+      responses:
+        '200': { description: 처리됨 }
+  /admin/seeding:
+    post:
+      tags: [admin-trends]
+      summary: 시딩 등록 (is_seed=true · 점수 원장 미반영 · ADM-500)
+      security: [{ cookieAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SubmissionCreate' }
+      responses:
+        '201': { description: 시딩 등록됨 }
+  /admin/seeding/stats:
+    get:
+      tags: [admin-trends]
+      summary: 시딩 비중 · 담당자별 적중률
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content: { application/json: { schema: { $ref: '#/components/schemas/SeedingStats' } } }
+  /admin/grade-policy:
+    get:
+      tags: [admin-governance]
+      summary: 등급 정책 조회 (ADM-610)
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content: { application/json: { schema: { $ref: '#/components/schemas/GradePolicy' } } }
+    post:
+      tags: [admin-governance]
+      summary: 등급 정책 드래프트 (적용은 2인 승인)
+      security: [{ cookieAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GradePolicy' }
+      responses:
+        '201': { description: 드래프트 생성됨 }
+  /admin/accounts:
+    get:
+      tags: [admin-governance]
+      summary: 관리자 계정 목록 (ADM-800)
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/AdminAccount' } }
+  /admin/accounts/{id}/role:
+    post:
+      tags: [admin-governance]
+      summary: 권한 부여/회수 (2인 승인)
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties: { role: { type: string, enum: [REVIEWER, OPERATOR, ADMIN, AUDITOR] } }
+      responses:
+        '202': { description: 2인 승인 대기 생성됨 }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: 앱 유저 JWT(액세스+리프레시 회전)
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: TRD_ADMIN_SESSION
+      description: 콘솔 세션(2FA · 30분 타임아웃). RBAC는 서버 권한 매트릭스로 강제(02 §1.1)
+
+  parameters:
+    TrendId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+
+  responses:
+    Unauthorized:
+      description: 인증 필요
+      content: { application/json: { schema: { $ref: '#/components/schemas/Problem' } } }
+    Forbidden:
+      description: 권한 부족 (RBAC / 등급)
+      content: { application/json: { schema: { $ref: '#/components/schemas/Problem' } } }
+    NotFound:
+      description: 없음
+      content: { application/json: { schema: { $ref: '#/components/schemas/Problem' } } }
+
+  schemas:
+    Problem:
+      description: RFC 9457 형식 오류 응답
+      type: object
+      properties:
+        type: { type: string }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+
+    Category:
+      type: string
+      enum: [MEME, PRODUCT, PERSON_CHANNEL, CHALLENGE, SLANG, ETC]
+    Stage:
+      description: 표시용 단계 (색은 여기에만 쓴다)
+      type: string
+      enum: [SEED, RISING, PEAK, FADING]
+    ReachLevel:
+      type: string
+      enum: [L1, L2, L3, L4]
+    Grade:
+      type: string
+      enum: [L0, L1, L2, L3, L4]
+
+    TrendSummary:
+      type: object
+      required: [id, word, meaning, stage]
+      properties:
+        id: { type: string, format: uuid }
+        word: { type: string, description: canonical_name }
+        meaning: { type: string }
+        stage: { $ref: '#/components/schemas/Stage' }
+        stageLabel: { type: string, example: 급상승 }
+        lifeText: { type: string, description: "숫자보다 문장", example: "3주쯤 남았어요" }
+        dText: { type: string, example: "D-38" }
+        pathText: { type: string, example: "디시 → X → 인스타" }
+        reachedCount: { type: integer }
+        ageShort: { type: string, example: "20대 52%" }
+
+    PropagationStep:
+      type: object
+      properties:
+        channel: { type: string, example: "디시·더쿠" }
+        date: { type: [string, 'null'] }
+        note: { type: string }
+        reached: { type: boolean }
+    AgeBand:
+      type: object
+      properties:
+        label: { type: string, example: "20대" }
+        pct: { type: integer }
+    TrendDetail:
+      allOf:
+        - $ref: '#/components/schemas/TrendSummary'
+        - type: object
+          properties:
+            verdict: { type: string, example: "지금이 적기예요" }
+            verdictWhy: { type: string }
+            reachLevel: { $ref: '#/components/schemas/ReachLevel' }
+            origin: { type: string }
+            example: { type: string }
+            ageSentence: { type: string }
+            ages: { type: array, items: { $ref: '#/components/schemas/AgeBand' } }
+            propagationPath: { type: array, items: { $ref: '#/components/schemas/PropagationStep' } }
+            voteCount: { type: string, example: "2,160명 참여 · 뜬다 85%" }
+            watched: { type: boolean }
+
+    MetricPoint:
+      type: object
+      properties:
+        source: { type: string, enum: [X, DCINSIDE, NAVER_DATALAB, INSTAGRAM, DERIVED] }
+        metric: { type: string }
+        value: { type: number }
+        capturedAt: { type: string, format: date-time }
+
+    VoteResult:
+      type: object
+      properties:
+        willTrend: { type: boolean }
+        voteCount: { type: string }
+
+    SubmissionCreate:
+      type: object
+      required: [name, category, platform, evidenceUrl, confidence, disclosure, oneLine]
+      properties:
+        name: { type: string }
+        category: { $ref: '#/components/schemas/Category' }
+        platform: { type: string, description: 최초 목격 플랫폼 (디시 갤러리명 등) }
+        evidenceUrl: { type: string, format: uri }
+        confidence: { type: integer, enum: [10, 30, 50] }
+        disclosure: { type: boolean, description: 이해관계 고지 (미고지 적발 시 제재 근거) }
+        oneLine: { type: string, maxLength: 200 }
+    SubmissionMine:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        word: { type: string }
+        status: { type: string, enum: [PENDING, HIT, MISS, VOID] }
+        reachLevel: { $ref: '#/components/schemas/ReachLevel' }
+        delta: { type: [number, 'null'] }
+        confidence: { type: integer }
+        orderRank: { type: [integer, 'null'], description: 판정 전에는 파생 잠정값 }
+        note: { type: string, description: 산정 근거 (예 "T=0.61 · 검색량 4.2배") }
+        judgeInDays: { type: [integer, 'null'], description: 판정까지 남은 일수 }
+        createdAt: { type: string, format: date-time }
+
+    GradeRequirement:
+      type: object
+      description: 승급은 AS와 TI를 모두(AND) 만족해야 함(R3)
+      properties:
+        label: { type: string, example: "신뢰도 지수 TI" }
+        current: { type: number }
+        required: { type: number }
+        met: { type: boolean }
+        basis: { type: string, description: 산정 근거 문자열, example: "TI 0.48 / 요구치 0.55 / 부족분 0.07" }
+    GradeStatus:
+      type: object
+      properties:
+        grade: { $ref: '#/components/schemas/Grade' }
+        gradeName: { type: string, example: 탐지자 }
+        trustIndex: { type: number }
+        activeScore: { type: number }
+        judgedCount: { type: integer }
+        nextGrade: { type: string }
+        requirements: { type: array, items: { $ref: '#/components/schemas/GradeRequirement' } }
+        note: { type: string }
+
+    LedgerEntry:
+      type: object
+      properties:
+        word: { type: string }
+        kind: { type: string, enum: [HIT, MISS, VOID, ADJ] }
+        delta: { type: number }
+        reason: { type: string }
+        createdAt: { type: string, format: date-time }
+
+    Preferences:
+      type: object
+      properties:
+        categories: { type: array, maxItems: 3, items: { $ref: '#/components/schemas/Category' } }
+        notifyHour: { type: integer, minimum: 0, maximum: 23, example: 8 }
+    WatchItem:
+      type: object
+      properties:
+        keyword: { type: string }
+        stage: { $ref: '#/components/schemas/Stage' }
+        note: { type: string }
+    AppealCreate:
+      type: object
+      required: [targetType, targetId]
+      properties:
+        targetType: { type: string, enum: [VERDICT, SANCTION, GRADE] }
+        targetId: { type: string, format: uuid }
+        reason: { type: string }
+    LeaderboardEntry:
+      type: object
+      properties:
+        handle: { type: string }
+        grade: { $ref: '#/components/schemas/Grade' }
+        trustIndex: { type: number }
+
+    # ── 콘솔 스키마 ──
+    QueueSummary:
+      type: object
+      properties:
+        slaBreaches: { type: integer }
+        queues:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string, example: ADM-100 }
+              name: { type: string }
+              count: { type: integer }
+              oldest: { type: string, example: "26h" }
+              slaExceeded: { type: boolean }
+        alerts:
+          type: array
+          items:
+            type: object
+            properties:
+              title: { type: string }
+              detail: { type: string }
+        seedRatio: { type: number, description: 시딩 비중 (Phase 2 전환 기준 70%) }
+    MergeCandidate:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        similarity: { type: number, example: 0.82 }
+        newName: { type: string }
+        oldName: { type: string }
+        oldClusterId: { type: string, format: uuid }
+        orderPreview: { type: array, items: { type: string }, description: 병합 시 선점 순위 미리보기 }
+        submitterGrade: { $ref: '#/components/schemas/Grade' }
+    AdminTrendDetail:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        state: { type: string, enum: [DRAFT, PENDING, JUDGING, RESOLVED, VOID, MERGED] }
+        dayOfWindow: { type: integer, example: 9 }
+        metrics: { type: array, items: { $ref: '#/components/schemas/MetricPoint' } }
+        provisionalT: { type: number, description: 잠정값. 확정 아님(D+14 재계산) }
+        provisionalVerdict: { type: string, example: "HIT / L3 (잠정)" }
+    CollectorStatus:
+      type: object
+      properties:
+        source: { type: string }
+        state: { type: string, enum: [OK, DELAYED, FAILED] }
+        lastCollectedAgo: { type: string }
+        successRate24h: { type: number }
+        quotaUsed: { type: number }
+    AdminUserDetail:
+      type: object
+      properties:
+        userId: { type: string, format: uuid }
+        grade: { $ref: '#/components/schemas/Grade' }
+        activeScore: { type: number }
+        trustIndex: { type: number }
+        judgedCount: { type: integer }
+        flags: { type: integer }
+        masked: { type: boolean }
+        ledger: { type: array, items: { $ref: '#/components/schemas/LedgerEntry' } }
+
+    ParameterPayload:
+      type: object
+      description: 가중치 합계는 1.0이어야 함
+      properties:
+        weights:
+          type: object
+          properties:
+            S1: { type: number }
+            S2: { type: number }
+            S3: { type: number }
+            S4: { type: number }
+            S5: { type: number }
+        hitThreshold: { type: number }
+        halflifeDays: { type: integer }
+    ParameterDraft:
+      allOf:
+        - $ref: '#/components/schemas/ParameterPayload'
+        - type: object
+          properties:
+            id: { type: string, format: uuid }
+            status: { type: string, enum: [DRAFT, REVIEW, APPROVED, APPLIED, ROLLED_BACK] }
+            author: { type: string }
+            hasSimulation: { type: boolean }
+    SimulationResult:
+      type: object
+      properties:
+        changed: { type: integer }
+        total: { type: integer }
+        rows:
+          type: array
+          items:
+            type: object
+            properties:
+              label: { type: string, example: "HIT → MISS" }
+              count: { type: integer }
+        affectedUsers: { type: integer }
+        avgDelta: { type: number }
+        demotions: { type: integer }
+        promotions: { type: integer }
+    ApprovalRequest:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        actionType: { type: string, enum: [SANCTION, GRADE_ADJUST, PARAM_APPLY, LEDGER_ADJ_OVER100] }
+        requestedBy: { type: string }
+        status: { type: string, enum: [PENDING, PARTIAL, APPROVED, REJECTED, EXECUTED] }
+        approvals: { type: integer, description: 현재 승인 수 (0~2) }
+    AuditEntry:
+      type: object
+      properties:
+        id: { type: integer }
+        actor: { type: string }
+        role: { type: string, enum: [REVIEWER, OPERATOR, ADMIN, AUDITOR] }
+        action: { type: string, example: PII_VIEW }
+        targetType: { type: string }
+        targetId: { type: [string, 'null'], format: uuid }
+        createdAt: { type: string, format: date-time }
+
+    # ── 확장 스키마 (05 §C) ──
+    MeSummary:
+      type: object
+      properties:
+        streakDays: { type: integer }
+        quotaUsed: { type: integer }
+        quotaMax: { type: integer }
+        voteHitRate: { type: number }
+        votesTotal: { type: integer }
+        votesCorrect: { type: integer }
+        totalRead: { type: integer }
+    AdminTrendListItem:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        state: { type: string, enum: [DRAFT, PENDING, JUDGING, RESOLVED, VOID, MERGED] }
+        category: { $ref: '#/components/schemas/Category' }
+        dayOfWindow: { type: integer }
+        provisionalT: { type: [number, 'null'] }
+    AbuseFlag:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        ruleCode: { type: string, example: R-005 }
+        severity: { type: string, enum: [LOW, MEDIUM, HIGH] }
+        status: { type: string, enum: [OPEN, DISMISSED, ESCALATED, ACTIONED] }
+        detail: { type: object, additionalProperties: true }
+        detectedAt: { type: string, format: date-time }
+    Sanction:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        targetUserId: { type: string, format: uuid }
+        type: { type: string }
+        reason: { type: string }
+        status: { type: string, enum: [REQUESTED, APPROVED, EXECUTED, REJECTED] }
+        createdAt: { type: string, format: date-time }
+    AdminUserSummary:
+      type: object
+      properties:
+        userId: { type: string, format: uuid }
+        grade: { $ref: '#/components/schemas/Grade' }
+        trustIndex: { type: number }
+        activeScore: { type: number }
+        flags: { type: integer }
+    Appeal:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        targetType: { type: string, enum: [VERDICT, SANCTION, GRADE] }
+        targetId: { type: string, format: uuid }
+        status: { type: string, enum: [RECEIVED, ASSIGNED, REVIEWING, RESOLVED] }
+        decision: { type: [string, 'null'] }
+        createdAt: { type: string, format: date-time }
+    Report:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        targetType: { type: string }
+        targetId: { type: string, format: uuid }
+        status: { type: string }
+        createdAt: { type: string, format: date-time }
+    SeedingStats:
+      type: object
+      properties:
+        seedRatio: { type: number }
+        byOperator:
+          type: array
+          items:
+            type: object
+            properties:
+              operator: { type: string }
+              hitRate: { type: number }
+              count: { type: integer }
+    GradePolicy:
+      type: object
+      properties:
+        grades:
+          type: array
+          items:
+            type: object
+            properties:
+              grade: { $ref: '#/components/schemas/Grade' }
+              minJudged: { type: integer }
+              minTrustIndex: { type: number }
+              minActiveScore: { type: number }
+              weeklyQuota: { type: integer }
+        l4Ratio: { type: number }
+    AdminAccount:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        loginId: { type: string }
+        displayName: { type: string }
+        role: { type: string, enum: [REVIEWER, OPERATOR, ADMIN, AUDITOR] }
+        twofaEnabled: { type: boolean }
+        lastLoginAt: { type: [string, 'null'], format: date-time }

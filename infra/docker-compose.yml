@@ -1,0 +1,32 @@
+# 로컬 개발 스택. Redis는 Phase 2에 추가(04 §2.5) — 지금은 Postgres+pgvector만.
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: trd
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: pw
+    ports:
+      - "5432:5432"
+    volumes:
+      - trd-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d trd"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # 백엔드는 최초 1회 `gradle wrapper` 후 `./gradlew :app:bootRun` 으로 기동하거나
+  # 아래 서비스를 활성화해 컨테이너로 실행. Flyway가 기동 시 V1~V9를 적용한다.
+  # backend:
+  #   build: ../backend
+  #   depends_on:
+  #     db: { condition: service_healthy }
+  #   environment:
+  #     DB_URL: jdbc:postgresql://db:5432/trd
+  #     DB_USER: postgres
+  #     DB_PASSWORD: pw
+  #   ports: ["8080:8080"]
+
+volumes:
+  trd-db:

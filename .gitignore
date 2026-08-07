@@ -1,0 +1,25 @@
+# ── Java / Gradle ──
+backend/.gradle/
+backend/**/build/
+!backend/**/src/**/build/
+.gradle/
+*.class
+
+# ── Node / Expo / Vite ──
+node_modules/
+app/.expo/
+app/dist/
+admin/dist/
+*.tsbuildinfo
+
+# ── 환경/시크릿 ──
+.env
+.env.*
+!.env.example
+
+# ── IDE / OS ──
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
