@@ -7,8 +7,16 @@
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
-    "ios": { "supportsTablet": false },
-    "android": { "package": "kr.trendstage.app" },
-    "plugins": ["expo-font", "expo-notifications"]
+    "ios": {
+      "supportsTablet": false
+    },
+    "android": {
+      "package": "kr.trendstage.app"
+    },
+    "plugins": [
+      "expo-font",
+      "expo-notifications",
+      "expo-asset"
+    ]
   }
 }

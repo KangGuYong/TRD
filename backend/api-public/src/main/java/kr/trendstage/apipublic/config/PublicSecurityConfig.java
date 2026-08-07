@@ -28,6 +28,6 @@ public class PublicSecurityConfig {
                 .anyRequest().authenticated()
             );
         // TODO(O6 인증 확정): .oauth2ResourceServer(o -> o.jwt(...))
-        return http;
+        return http.build();
     }
 }

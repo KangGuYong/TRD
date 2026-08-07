@@ -1,0 +1,50 @@
+/**
+ * 경량 타입드 API 클라이언트. openapi.yaml 계약을 따른다.
+ * 베이스 URL은 EXPO_PUBLIC_API_URL로 주입(안드로이드 에뮬레이터는 10.0.2.2).
+ * 인증(JWT)은 O6 확정 후 tokenProvider로 헤더 주입.
+ */
+const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:8080";
+
+let tokenProvider: () => string | null = () => null;
+export function setTokenProvider(fn: () => string | null) {
+  tokenProvider = fn;
+}
+
+export class ApiError extends Error {
+  constructor(public status: number, message: string) {
+    super(message);
+  }
+}
+
+async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const token = tokenProvider();
+  const res = await fetch(`${BASE_URL}${path}`, {
+    method,
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  if (!res.ok) {
+    let detail = res.statusText;
+    try {
+      const p = await res.json();
+      detail = p.detail ?? p.message ?? detail;
+    } catch {
+      /* non-json error */
+    }
+    throw new ApiError(res.status, detail);
+  }
+  if (res.status === 204) return undefined as T;
+  return (await res.json()) as T;
+}
+
+export const api = {
+  get: <T>(path: string) => request<T>("GET", path),
+  post: <T>(path: string, body?: unknown) => request<T>("POST", path, body),
+  put: <T>(path: string, body?: unknown) => request<T>("PUT", path, body),
+  del: <T>(path: string) => request<T>("DELETE", path),
+};
+
+export { BASE_URL };
