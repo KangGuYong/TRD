@@ -2,7 +2,7 @@ spring:
   application:
     name: trend-radar
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/trd}
+    url: ${DB_URL:jdbc:postgresql://localhost:5433/trd}   # 5433 = infra/docker-compose 매핑(로컬 PG 충돌 회피)
     username: ${DB_USER:postgres}
     password: ${DB_PASSWORD:pw}
   jpa:

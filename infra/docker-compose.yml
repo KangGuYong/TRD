@@ -1,13 +1,14 @@
-# 로컬 개발 스택. Redis는 Phase 2에 추가(04 §2.5) — 지금은 Postgres+pgvector만.
 services:
   db:
     image: pgvector/pgvector:pg16
+    container_name: trd-db
     environment:
       POSTGRES_DB: trd
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: pw
     ports:
-      - "5432:5432"
+      # 호스트 5433 → 컨테이너 5432. (로컬 설치 PostgreSQL이 5432를 점유하는 충돌 회피)
+      - "5433:5432"
     volumes:
       - trd-db:/var/lib/postgresql/data
     healthcheck:
@@ -16,7 +17,11 @@ services:
       timeout: 3s
       retries: 20
 
-  # 백엔드는 최초 1회 `gradle wrapper` 후 `./gradlew :app:bootRun` 으로 기동하거나
+volumes:
+  trd-db:
+
+
+ # 백엔드는 최초 1회 `gradle wrapper` 후 `./gradlew :app:bootRun` 으로 기동하거나
   # 아래 서비스를 활성화해 컨테이너로 실행. Flyway가 기동 시 V1~V9를 적용한다.
   # backend:
   #   build: ../backend
@@ -27,6 +32,3 @@ services:
   #     DB_USER: postgres
   #     DB_PASSWORD: pw
   #   ports: ["8080:8080"]
-
-volumes:
-  trd-db:

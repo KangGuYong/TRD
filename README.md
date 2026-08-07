@@ -28,8 +28,9 @@ trend-radar/
 | JDK            | 17+           | 백엔드 (Gradle 설치 불필요 — 래퍼 포함) |
 | Node.js        | 20+ / npm 10+ | 앱·콘솔                                 |
 
-> DB 접속 기본값: `jdbc:postgresql://localhost:5432/trd`, user `postgres`, pw `pw`
+> DB 접속 기본값: `jdbc:postgresql://localhost:5433/trd`, user `postgres`, pw `pw`
 > (환경변수 `DB_URL`/`DB_USER`/`DB_PASSWORD`로 재정의).
+> 컨테이너는 호스트 **5433** 포트를 쓴다 — 로컬에 설치된 PostgreSQL(5432)과 충돌을 피하기 위함.
 
 ## 최초 실행
 
@@ -40,7 +41,13 @@ cd infra
 docker compose up -d db
 ```
 
-`pgvector/pgvector:pg16` 컨테이너가 5432 포트로 뜬다. 스키마는 백엔드 기동 시 Flyway가 자동 적용한다.
+`pgvector/pgvector:pg16` 컨테이너가 호스트 **5433** 포트로 뜬다. 스키마는 백엔드 기동 시 Flyway가 자동 적용한다.
+
+> **접속 오류(password authentication failed) 대처**
+> - 로컬에 PostgreSQL이 설치돼 5432를 쓰고 있으면 컨테이너 대신 그쪽에 붙어 실패한다 → 본 프로젝트는 컨테이너를 5433으로 분리해 회피.
+> - 볼륨(`trd-db`)이 예전에 다른 비밀번호로 초기화됐다면 env 변경이 반영되지 않는다. 비번만 맞추려면:
+>   `docker exec trd-db psql -U postgres -c "ALTER USER postgres WITH PASSWORD 'pw';"`
+>   (완전 초기화는 `docker compose down -v` 후 다시 `up` — 데이터 삭제됨, 스키마는 Flyway가 재적용).
 
 ### 2) 백엔드 (앱·콘솔 API + 배치)
 
