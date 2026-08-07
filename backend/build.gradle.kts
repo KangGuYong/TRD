@@ -21,6 +21,8 @@ subprojects {
     tasks.withType<JavaCompile>().configureEach {
         // 소스는 UTF-8. (Windows 기본 코드페이지로 읽으면 한글 주석이 깨진다)
         options.encoding = "UTF-8"
+        // 파라미터 이름 보존 — @RequestParam/@PathVariable 이름 추론에 필요(Spring Boot 관례).
+        options.compilerArgs.add("-parameters")
     }
     tasks.withType<Test>().configureEach { useJUnitPlatform() }
 }

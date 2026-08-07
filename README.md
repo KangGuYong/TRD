@@ -9,7 +9,7 @@
 trend-radar/
 ├─ backend/     Java 17 · Spring Boot 3.3 (Gradle 멀티모듈, 모듈러 모놀리스)
 │   ├─ domain-core/   점수·판정·등급 순수 엔진 (골든 테스트)
-│   ├─ persistence/   JPA + Flyway 마이그레이션 V1~V10
+│   ├─ persistence/   JPA + Flyway 마이그레이션 V1~V11
 │   ├─ scheduler/     verdict_runner · grade_recalc 배치
 │   ├─ api-public/    앱 API /v1 · api-admin/ 콘솔 API /admin
 │   ├─ audit/ collectors/ app/(부트스트랩)
@@ -56,7 +56,7 @@ Gradle 래퍼가 포함돼 있어 별도 설치가 필요 없다(최초 실행 �
 ```bash
 cd backend
 ./gradlew :domain-core:test            # 점수·판정·등급 골든 테스트   (Windows: .\gradlew.bat)
-./gradlew :app:bootRun                 # Flyway가 V1~V10 적용 후 :8080 기동
+./gradlew :app:bootRun                 # Flyway가 V1~V11 적용 후 :8080 기동
 ```
 
 - 기동되면 `GET http://localhost:8080/v1/trends?daily=true` 로 확인.
@@ -95,7 +95,7 @@ npm run gen:api        # openapi.yaml → src/api/schema.ts
 | 영역                                  | 상태                                                                  |
 | ------------------------------------- | --------------------------------------------------------------------- |
 | 백엔드 전체 빌드                      | ✅`./gradlew` 전 모듈 컴파일 + 테스트 성공                          |
-| DB 스키마 V1~V10                      | ✅ pgvector 컨테이너 검증 (append-only 트리거·2인승인 CHECK 등 실증) |
+| DB 스키마 V1~V11                      | ✅ pgvector 컨테이너 검증 (append-only 트리거·2인승인 CHECK 등 실증) |
 | 도메인 엔진(점수·판정·등급·정규화) | ✅ 골든 테스트 통과 (순수 함수, 시뮬레이션 재사용)                    |
 | persistence 엔티티·리포지토리        | ✅ 컴파일 (append-only @Immutable, order_rank 뷰)                     |
 | 배치 verdict_runner · grade_recalc   | ✅ 컴파일 (멱등·order_rank 동결·시딩 제외)                          |

@@ -22,7 +22,7 @@ public class TrendController {
 
     /** 홈 "오늘의 5개" / 목록. daily=true면 5개로 끝(더 보기 없음). */
     @GetMapping
-    public TrendListResponse list(@RequestParam(defaultValue = "false") boolean daily) {
+    public TrendListResponse list(@RequestParam(name = "daily", defaultValue = "false") boolean daily) {
         return new TrendListResponse(service.home(daily), null);
     }
 }
