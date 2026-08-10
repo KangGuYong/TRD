@@ -44,6 +44,7 @@ docker compose up -d db
 `pgvector/pgvector:pg16` 컨테이너가 호스트 **5433** 포트로 뜬다. 스키마는 백엔드 기동 시 Flyway가 자동 적용한다.
 
 > **접속 오류(password authentication failed) 대처**
+>
 > - 로컬에 PostgreSQL이 설치돼 5432를 쓰고 있으면 컨테이너 대신 그쪽에 붙어 실패한다 → 본 프로젝트는 컨테이너를 5433으로 분리해 회피.
 > - 볼륨(`trd-db`)이 예전에 다른 비밀번호로 초기화됐다면 env 변경이 반영되지 않는다. 비번만 맞추려면:
 >   `docker exec trd-db psql -U postgres -c "ALTER USER postgres WITH PASSWORD 'pw';"`
@@ -103,7 +104,8 @@ npm run gen:api        # openapi.yaml → src/api/schema.ts
 | OpenAPI 3.1 계약 (앱7·콘솔15 화면)   | ✅ validator 통과                                                     |
 | 앱 7화면 + API 연결                   | ✅ tsc 통과 · Metro 번들 성공                                        |
 | 그 외`/v1`·`/admin` 엔드포인트   | 🔶 계약만(백엔드 구현 예정) — 05 §C                                 |
-| 콘솔 화면                             | 🔶 셸만                                                               |
+| 콘솔 P0 화면 (010·100·600·311·700)   | ✅ tsc·vite 빌드 + 브라우저 렌더 (dev 픽스처, /admin 연동 대기)       |
+| 그 외 콘솔 화면                       | 🔶 사이드바 스텁                                                      |
 
 ## 설계 문서
 
