@@ -3,6 +3,9 @@ import {
   getAuth,
   onIdTokenChanged,
   signInWithCredential,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
   signOut as fbSignOut,
   GoogleAuthProvider,
   type User,
@@ -14,6 +17,9 @@ type AuthState = {
   user: User | null;
   initializing: boolean;
   signInWithGoogle: () => Promise<void>;
+  signInWithEmail: (email: string, password: string) => Promise<void>;
+  signUpWithEmail: (email: string, password: string) => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
   signOut: () => Promise<void>;
 };
 
@@ -50,6 +56,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { data } = await GoogleSignin.signIn();
         if (!data?.idToken) throw new Error("구글 로그인이 취소되었습니다");
         await signInWithCredential(getAuth(), GoogleAuthProvider.credential(data.idToken));
+      },
+      signInWithEmail: async (email, password) => {
+        await signInWithEmailAndPassword(getAuth(), email.trim(), password);
+      },
+      signUpWithEmail: async (email, password) => {
+        await createUserWithEmailAndPassword(getAuth(), email.trim(), password);
+      },
+      resetPassword: async (email) => {
+        await sendPasswordResetEmail(getAuth(), email.trim());
       },
       signOut: async () => {
         await GoogleSignin.signOut();
