@@ -1,0 +1,12 @@
+{
+  "auth": {
+    "authorizedDomains": ["localhost"],
+    "providers": {
+      "emailPassword": true,
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "Trend Radar",
+        "supportEmail": "kgy00100431@gmail.com"
+      }
+    }
+  }
+}

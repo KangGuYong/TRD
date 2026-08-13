@@ -2,7 +2,7 @@ spring:
   application:
     name: trend-radar
   datasource:
-    url: ${DB_URL:jdbc:postgresql://192.168.0:5433/trd}   # 5433 = infra/docker-compose 매핑(로컬 PG 충돌 회피)
+    url: ${DB_URL:jdbc:postgresql://192.168.0.56:5433/trd}   # 5433 = infra/docker-compose 매핑(로컬 PG 충돌 회피)
     username: ${DB_USER:postgres}
     password: ${DB_PASSWORD:pw}
   jpa:
@@ -22,6 +22,9 @@ spring:
 # 시간은 UTC 저장, 표시만 KST (04 §8)
 server:
   port: ${PORT:8080}
+  servlet:
+    session:
+      timeout: 30m   # 관리자 콘솔 세션 타임아웃(ADM-800). /v1/**는 STATELESS라 세션을 안 써서 영향 없음.
 
 management:
   endpoints:

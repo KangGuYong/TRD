@@ -2,14 +2,19 @@ import React, { createContext, useContext, useMemo, useState } from "react";
 import type { Role } from "../theme";
 
 /** RBAC 데모용 역할 전환(관리자 콘솔.dc.html). 실제 권한은 서버가 강제 — 여기선 UX 게이트. */
-const RoleContext = createContext<{ role: Role; setRole: (r: Role) => void }>({
+const RoleContext = createContext<{ role: Role; setRole: (r: Role) => void; locked: boolean }>({
   role: "OPERATOR",
   setRole: () => {},
+  locked: false,
 });
 
-export function RoleProvider({ children }: { children: React.ReactNode }) {
-  const [role, setRole] = useState<Role>("OPERATOR");
-  const value = useMemo(() => ({ role, setRole }), [role]);
+export function RoleProvider({ children, initialRole = "OPERATOR", locked = false }: {
+  children: React.ReactNode; initialRole?: Role; locked?: boolean;
+}) {
+  const [role, setRoleState] = useState<Role>(initialRole);
+  // locked(실제 로그인 모드)에서는 서버가 준 역할이 유일한 진실 — 클라이언트가 임의로 바꾸지 못한다.
+  const setRole = locked ? () => {} : setRoleState;
+  const value = useMemo(() => ({ role, setRole, locked }), [role, locked]);
   return <RoleContext.Provider value={value}>{children}</RoleContext.Provider>;
 }
 export const useRole = () => useContext(RoleContext);

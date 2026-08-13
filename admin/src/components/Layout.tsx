@@ -1,6 +1,7 @@
 import React from "react";
 import { C, ROLE_LABEL, type Role } from "../theme";
 import { useRole } from "../state/role";
+import { useAuth } from "../state/auth";
 
 export type ScreenId = "ADM-010" | "ADM-100" | "ADM-600" | "ADM-311" | "ADM-700" | "stub";
 
@@ -33,7 +34,9 @@ const ROLES: Role[] = ["REVIEWER", "OPERATOR", "ADMIN", "AUDITOR"];
 export function Layout({ screen, setScreen, title, children }: {
   screen: ScreenId; setScreen: (s: ScreenId) => void; title: string; children: React.ReactNode;
 }) {
-  const { role, setRole } = useRole();
+  const { role, setRole, locked } = useRole();
+  const { state: authState, logout } = useAuth();
+  const principal = authState.status === "authenticated" ? authState.principal : null;
   return (
     <div style={{ display: "flex", height: "100vh", fontFamily: "Pretendard, system-ui, sans-serif", color: C.ink }}>
       {/* 사이드바 */}
@@ -64,17 +67,29 @@ export function Layout({ screen, setScreen, title, children }: {
             </div>
           ))}
         </div>
-        {/* 역할 전환 */}
-        <div style={{ padding: "14px 16px 18px", borderTop: "1px solid rgba(255,255,255,0.09)" }}>
-          <div style={{ font: "600 9.5px Pretendard", letterSpacing: ".11em", color: "rgba(255,255,255,0.32)", marginBottom: 9 }}>역할 전환 (권한 데모)</div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
-            {ROLES.map((r) => (
-              <button key={r} onClick={() => setRole(r)}
-                style={{ padding: "7px 4px", borderRadius: 6, border: "none", cursor: "pointer", font: "600 9.5px ui-monospace, monospace", background: role === r ? "#fff" : "rgba(255,255,255,0.1)", color: role === r ? C.ink : "rgba(255,255,255,0.6)" }}>{r}</button>
-            ))}
+        {/* 역할 전환 — fixture 데모 모드에서만. 실제 로그인 시에는 서버가 준 역할이 유일한 진실. */}
+        {!locked && (
+          <div style={{ padding: "14px 16px 18px", borderTop: "1px solid rgba(255,255,255,0.09)" }}>
+            <div style={{ font: "600 9.5px Pretendard", letterSpacing: ".11em", color: "rgba(255,255,255,0.32)", marginBottom: 9 }}>역할 전환 (권한 데모)</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
+              {ROLES.map((r) => (
+                <button key={r} onClick={() => setRole(r)}
+                  style={{ padding: "7px 4px", borderRadius: 6, border: "none", cursor: "pointer", font: "600 9.5px ui-monospace, monospace", background: role === r ? "#fff" : "rgba(255,255,255,0.1)", color: role === r ? C.ink : "rgba(255,255,255,0.6)" }}>{r}</button>
+              ))}
+            </div>
+            <div style={{ font: "500 11px Pretendard", color: "rgba(255,255,255,0.5)", marginTop: 10 }}>{ROLE_LABEL[role]}로 보는 중</div>
           </div>
-          <div style={{ font: "500 11px Pretendard", color: "rgba(255,255,255,0.5)", marginTop: 10 }}>{ROLE_LABEL[role]}로 보는 중</div>
-        </div>
+        )}
+        {locked && principal && (
+          <div style={{ padding: "14px 16px 18px", borderTop: "1px solid rgba(255,255,255,0.09)" }}>
+            <div style={{ font: "600 12.5px Pretendard", color: "#fff" }}>{principal.displayName}</div>
+            <div style={{ font: "500 10.5px ui-monospace, monospace", color: "rgba(255,255,255,0.4)", marginTop: 3 }}>{ROLE_LABEL[principal.role]} · {principal.loginId}</div>
+            <button onClick={() => logout()}
+              style={{ marginTop: 10, width: "100%", padding: "8px 4px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.16)", cursor: "pointer", font: "600 11px Pretendard", background: "transparent", color: "rgba(255,255,255,0.75)" }}>
+              로그아웃
+            </button>
+          </div>
+        )}
       </aside>
 
       {/* 본문 */}
