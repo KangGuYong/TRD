@@ -28,4 +28,7 @@ public interface SubmissionRepository extends JpaRepository<Submission, UUID> {
 
     /** 등급 재계산용 HIT/MISS 카운트(전체). 180일 창은 서비스 계층에서 필터. */
     long countByUserIdAndResult(UUID userId, SubmissionResult result);
+
+    /** 409 응답의 dupeRank(클러스터 내 현재 제보 수) 계산용. */
+    long countByTrendItemIdAndResultNot(UUID trendItemId, SubmissionResult excluded);
 }

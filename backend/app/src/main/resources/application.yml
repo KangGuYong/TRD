@@ -11,7 +11,13 @@ spring:
     open-in-view: false
   flyway:
     enabled: true
-    locations: classpath:db/migration   # persistence 모듈의 V1~V11
+    locations: classpath:db/migration   # persistence 모듈의 V1~V13
+
+# Firebase 서비스 계정 키 JSON 경로. 미설정 시 앱은 정상 기동하되 인증이 필요한 /v1 요청은 401.
+# 환경변수 FIREBASE_CREDENTIALS_PATH로만 주입한다 — 여기 기본값을 두면 안 됨(FirebaseConfig의
+# @ConditionalOnProperty가 "설정 안 됨"으로 인식하지 못해 빈 파일 경로로 초기화를 시도하게 된다).
+# firebase:
+#   credentials-path: ${FIREBASE_CREDENTIALS_PATH}
 
 # 시간은 UTC 저장, 표시만 KST (04 §8)
 server:

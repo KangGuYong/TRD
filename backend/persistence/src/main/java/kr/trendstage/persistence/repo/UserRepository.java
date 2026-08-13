@@ -8,4 +8,5 @@ import java.util.UUID;
 
 public interface UserRepository extends JpaRepository<UserAccount, UUID> {
     Optional<UserAccount> findByHandle(String handle);
+    Optional<UserAccount> findByFirebaseUid(String firebaseUid);
 }

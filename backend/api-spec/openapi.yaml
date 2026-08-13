@@ -24,7 +24,7 @@ tags:
   - name: admin-queues
     description: 콘솔 · 큐(병합/어뷰징/이의/신고)
   - name: admin-trends
-    description: 콘솔 · 트렌드/판정/수집 모니터
+    description: 콘솔 · 트렌드/판정 관리
   - name: admin-users
     description: 콘솔 · 유저 원장/제재
   - name: admin-governance
@@ -40,6 +40,7 @@ paths:
       tags: [app-trends]
       summary: 트렌드 목록 (홈 "오늘의 5개" / 검색)
       description: 정렬은 인기순이 아니라 "지금 행동해야 하는 순"이 기본(앱 설계 원칙 05).
+      security: []
       parameters:
         - { name: daily, in: query, schema: { type: boolean }, description: 홈 5개 세트만 반환 }
         - { name: q, in: query, schema: { type: string }, description: 검색 판정 질의어 }
@@ -64,6 +65,7 @@ paths:
     get:
       tags: [app-trends]
       summary: 트렌드 상세 (뜻/유래/전파 경로/연령대/판정 근거)
+      security: []
       parameters: [{ $ref: '#/components/parameters/TrendId' }]
       responses:
         '200':

@@ -19,6 +19,10 @@ public class UserAccount {
     @Column(nullable = false, unique = true, length = 40)
     private String handle;
 
+    /** Firebase Authentication UID. 구글은 Firebase가 직접 발급, 카카오는 Custom Token 경로로 부여(추후). */
+    @Column(name = "firebase_uid", unique = true, length = 128)
+    private String firebaseUid;
+
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.NAMED_ENUM)          // PG 네이티브 enum 매핑
     @Column(nullable = false)
@@ -37,8 +41,14 @@ public class UserAccount {
 
     public UserAccount(String handle) { this.handle = handle; }
 
+    public UserAccount(String handle, String firebaseUid) {
+        this.handle = handle;
+        this.firebaseUid = firebaseUid;
+    }
+
     public UUID getId() { return id; }
     public String getHandle() { return handle; }
+    public String getFirebaseUid() { return firebaseUid; }
     public UserStatus getStatus() { return status; }
     public Instant getJoinedAt() { return joinedAt; }
     public Instant getVerifiedAt() { return verifiedAt; }
