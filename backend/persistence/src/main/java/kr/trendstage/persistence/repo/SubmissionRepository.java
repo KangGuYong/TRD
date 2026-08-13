@@ -3,6 +3,8 @@ package kr.trendstage.persistence.repo;
 import kr.trendstage.persistence.entity.Submission;
 import kr.trendstage.persistence.type.SubmissionResult;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
@@ -11,6 +13,10 @@ import java.util.UUID;
 public interface SubmissionRepository extends JpaRepository<Submission, UUID> {
 
     List<Submission> findByTrendItemIdAndResultNot(UUID trendItemId, SubmissionResult excluded);
+
+    /** 서로 다른 최초 목격 플랫폼(제보 자체가 근거, 외부 지표 아님). 홈 카드 경로 표시용. */
+    @Query("select distinct s.sourcePlatform from Submission s where s.trendItemId = :id and s.result <> kr.trendstage.persistence.type.SubmissionResult.VOID")
+    List<String> findDistinctPlatforms(@Param("id") UUID trendItemId);
 
     List<Submission> findByUserIdOrderByCreatedAtDesc(UUID userId);
 

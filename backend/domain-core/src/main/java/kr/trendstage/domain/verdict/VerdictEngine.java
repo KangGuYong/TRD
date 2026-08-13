@@ -3,30 +3,34 @@ package kr.trendstage.domain.verdict;
 import kr.trendstage.domain.params.ParameterSet;
 
 /**
- * 종합 점수 T와 판정 결과를 산출하는 순수 함수. 01 §4.2, §4.3.
+ * 종합 점수 T와 판정 결과를 산출하는 순수 함수.
  *
  * <pre>
- *   T = 0.25·s1 + 0.20·s2 + 0.25·s3 + 0.15·s4 + 0.15·s5   (가중치는 주입)
- *   T < 0.20            → MISS
- *   0.20 ≤ T < 0.35     → HIT L1 (m 0.2)
- *   0.35 ≤ T < 0.55     → HIT L2 (m 0.5)
- *   0.55 ≤ T < 0.75     → HIT L3 (m 1.0)
- *   T ≥ 0.75            → HIT L4 (m 1.5)
+ *   r = distinctSubmitters / submitterTarget   (서로 다른 제보자 유입 — 증가분 성격, R5)
+ *   T = clip(r, 0, 1)
+ *   T < hitThreshold      → MISS
+ *   hitThreshold ≤ T < bandL2  → HIT L1
+ *   bandL2 ≤ T < bandL3        → HIT L2
+ *   bandL3 ≤ T < bandL4        → HIT L3
+ *   T ≥ bandL4                 → HIT L4
  * </pre>
  *
- * S5(파생 생성) 게이트: s5 == 0 이면 reach 를 L2 이상으로 올리지 않는다(L1로 캡). 01 §4.2.
- * VOID(지표 결측·기준선 초과·규정위반)는 이 엔진 밖에서 판단한다.
+ * submitterTarget은 근거 없는 초기 추정치다. Phase 0 백테스트로 보정한다(O1).
+ * 이전에는 외부 지표(X/네이버/인스타/디시) 가중합이었으나, 제보 기반 운영으로 전환하며
+ * 후속 제보자 수만을 판정 근거로 쓴다(CLAUDE.md R1 개정 — 유저 투표가 아니라 관측 가능한
+ * 제보 시계열이므로 R1의 "운영자가 임의로 못 바꾼다"는 정신은 그대로 유지).
+ * VOID(규정 위반·중복 제보)는 이 엔진 밖에서 판단한다.
  */
 public final class VerdictEngine {
     private VerdictEngine() {}
 
-    public static double computeT(SignalScores s, ParameterSet p) {
-        double[] w = p.weights;
-        return w[0]*s.s1() + w[1]*s.s2() + w[2]*s.s3() + w[3]*s.s4() + w[4]*s.s5();
+    public static double computeT(SubmissionSignal sig, ParameterSet p) {
+        double r = sig.distinctSubmitters() / (double) Math.max(p.submitterTarget, 1);
+        return Math.max(0.0, Math.min(1.0, r));
     }
 
-    public static VerdictOutcome evaluate(SignalScores s, ParameterSet p) {
-        double t = computeT(s, p);
+    public static VerdictOutcome evaluate(SubmissionSignal sig, ParameterSet p) {
+        double t = computeT(sig, p);
         if (t < p.hitThreshold) return new VerdictOutcome(VerdictResult.MISS, null, t);
 
         ReachLevel reach;
@@ -35,10 +39,6 @@ public final class VerdictEngine {
         else if (t < p.bandL4) reach = ReachLevel.L3;
         else reach = ReachLevel.L4;
 
-        // S5 게이트: 파생 생성이 전무하면 대중 확산으로 인정하지 않는다.
-        if (s.s5() == 0.0 && reach.ordinal() > ReachLevel.L1.ordinal()) {
-            reach = ReachLevel.L1;
-        }
         return new VerdictOutcome(VerdictResult.HIT, reach, t);
     }
 }

@@ -15,7 +15,6 @@ const NAV: { group: string; items: { id: ScreenId | "stub"; label: string; code:
   { group: "트렌드", items: [
     { id: "stub", label: "항목 목록", code: "ADM-110" },
     { id: "stub", label: "판정 관리", code: "ADM-200" },
-    { id: "stub", label: "수집 모니터", code: "ADM-210" },
   ]},
   { group: "유저", items: [
     { id: "stub", label: "유저 목록", code: "ADM-310" },

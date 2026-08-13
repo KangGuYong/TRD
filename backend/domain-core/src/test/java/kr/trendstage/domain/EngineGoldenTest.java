@@ -44,13 +44,15 @@ class EngineGoldenTest {
         assertEquals(0.4, TrustIndex.compute(0, 0, p), 1e-9);
     }
 
-    @Test void verdict_밴드와_S5게이트() {
-        VerdictOutcome o = VerdictEngine.evaluate(new SignalScores(0.88, 0.36, 0.71, 0.50, 0.62), p);
+    @Test void verdict_밴드는_distinctSubmitters_비율로_정해진다() {
+        // submitterTarget=20(기본). distinctSubmitters=12 → T=0.6 → HIT L3
+        VerdictOutcome o = VerdictEngine.evaluate(new SubmissionSignal(12, 3), p);
         assertEquals(VerdictResult.HIT, o.result());
         assertEquals(ReachLevel.L3, o.reach());
-        // S5(파생 생성)가 0이면 reach를 L1로 캡
-        assertEquals(ReachLevel.L1, VerdictEngine.evaluate(new SignalScores(0.9, 0, 0.9, 0, 0), p).reach());
-        assertEquals(VerdictResult.MISS, VerdictEngine.evaluate(new SignalScores(0.1, 0, 0.1, 0, 0.1), p).result());
+        // distinctSubmitters=20 → T=1.0 → HIT L4
+        assertEquals(ReachLevel.L4, VerdictEngine.evaluate(new SubmissionSignal(20, 1), p).reach());
+        // distinctSubmitters=2 → T=0.1 < hitThreshold → MISS
+        assertEquals(VerdictResult.MISS, VerdictEngine.evaluate(new SubmissionSignal(2, 1), p).result());
     }
 
     @Test void grade_는_AS와_TI를_모두_요구() {

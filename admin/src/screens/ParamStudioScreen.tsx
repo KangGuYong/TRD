@@ -1,25 +1,17 @@
-import React, { useMemo, useState } from "react";
+import React, { useState } from "react";
 import { fxParams, fxSimulation } from "../fixtures";
 import { Card, Btn } from "../components/ui";
 import { C } from "../theme";
 import { useRole, CAN } from "../state/role";
 
-const WK: (keyof typeof fxParams.weights)[] = ["S1", "S2", "S3", "S4", "S5"];
-const WNAME: Record<string, string> = { S1: "X 고참여", S2: "디시 언급", S3: "검색량", S4: "인스타", S5: "파생 생성" };
-
 /** ADM-600. 드래프트 → 시뮬 → 2인 승인 → 예약. 시뮬 없이는 승인요청 불가(안전장치). */
 export default function ParamStudioScreen() {
   const { role } = useRole();
-  const base = fxParams.weights;
-  const [w, setW] = useState({ ...base });
+  const [target, setTarget] = useState(fxParams.submitterTarget);
   const [hit, setHit] = useState(fxParams.hitThreshold);
   const [simDone, setSimDone] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
-  const sum = useMemo(() => WK.reduce((a, k) => a + w[k], 0), [w]);
-  const sumOk = Math.abs(sum - 1) < 1e-9;
-
-  const bump = (k: keyof typeof base, d: number) => { setW((p) => ({ ...p, [k]: Math.round((p[k] + d) * 100) / 100 })); setSimDone(false); };
   const flash = (m: string) => { setToast(m); setTimeout(() => setToast(null), 2600); };
 
   return (
@@ -31,35 +23,19 @@ export default function ParamStudioScreen() {
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <Card>
-          <b style={{ fontSize: 13 }}>지표 가중치</b>
-          <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 16 }}>
-            {WK.map((k) => {
-              const changed = w[k] !== base[k];
-              return (
-                <div key={k} style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <span style={{ width: 96, flex: "none" }}>
-                    <span style={{ display: "block", font: "600 12.5px Pretendard" }}>{WNAME[k]}</span>
-                    <span style={{ display: "block", font: "500 10px ui-monospace, monospace", color: C.faint, marginTop: 4 }}>{k}</span>
-                  </span>
-                  <span style={{ flex: 1, height: 5, borderRadius: 9, background: "rgba(20,19,15,0.08)", overflow: "hidden" }}>
-                    <span style={{ display: "block", height: "100%", borderRadius: 9, width: `${w[k] * 100 * 2}%`, background: changed ? C.peak : C.ink }} />
-                  </span>
-                  <span style={{ font: "500 11.5px ui-monospace, monospace", color: C.faint, width: 32, textAlign: "right" }}>{base[k].toFixed(2)}</span>
-                  <span style={{ font: "600 10px Pretendard", color: C.faint }}>→</span>
-                  <span style={{ font: "700 13px ui-monospace, monospace", width: 40, textAlign: "right", color: changed ? C.peak : C.ink }}>{w[k].toFixed(2)}</span>
-                  <span style={{ display: "flex", gap: 3, flex: "none" }}>
-                    <MiniBtn disabled={!CAN.paramDraft(role)} onClick={() => bump(k, -0.05)}>−</MiniBtn>
-                    <MiniBtn disabled={!CAN.paramDraft(role)} onClick={() => bump(k, 0.05)}>+</MiniBtn>
-                  </span>
-                </div>
-              );
-            })}
+          <b style={{ fontSize: 13 }}>판정 파라미터</b>
+          <div style={{ font: "500 11.5px Pretendard", color: C.faint, marginTop: 6, lineHeight: 1.6 }}>
+            외부 지표 없이 제보 자체가 판정 근거입니다 — 서로 다른 후속 제보자 수만 씁니다(R1).
           </div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 18, paddingTop: 14, borderTop: `1px solid ${C.line}` }}>
-            <b style={{ fontSize: 12.5 }}>합계</b>
-            <b style={{ font: "700 15px ui-monospace, monospace", color: sumOk ? C.rising : C.fading }}>{sum.toFixed(2)}</b>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 18, paddingTop: 14, borderTop: `1px solid ${C.line}` }}>
+            <span style={{ font: "600 12.5px Pretendard" }}>목표 제보자 수 (T=1.0 기준)</span>
+            <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ font: "500 11.5px ui-monospace, monospace", color: C.faint }}>{fxParams.submitterTarget} →</span>
+              <span style={{ font: "700 13px ui-monospace, monospace", color: target !== fxParams.submitterTarget ? C.peak : C.ink }}>{target}</span>
+              <MiniBtn disabled={!CAN.paramDraft(role)} onClick={() => { setTarget((v) => Math.max(1, v - 1)); setSimDone(false); }}>−</MiniBtn>
+              <MiniBtn disabled={!CAN.paramDraft(role)} onClick={() => { setTarget((v) => v + 1); setSimDone(false); }}>+</MiniBtn>
+            </span>
           </div>
-          {!sumOk && <div style={{ font: "500 11.5px Pretendard", marginTop: 8, color: C.fading }}>합계가 1.00이어야 저장할 수 있습니다.</div>}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 14 }}>
             <span style={{ font: "600 12.5px Pretendard" }}>판정 임계값 (HIT)</span>
             <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -106,7 +82,7 @@ export default function ParamStudioScreen() {
       </div>
 
       <div style={{ display: "flex", gap: 8, marginTop: 12, alignItems: "center" }}>
-        <Btn disabled={!CAN.paramDraft(role) || !sumOk} onClick={() => { setSimDone(true); flash("시뮬레이션 완료 (과거 180일 재판정)"); }}>시뮬레이션 실행</Btn>
+        <Btn disabled={!CAN.paramDraft(role)} onClick={() => { setSimDone(true); flash("시뮬레이션 완료 (과거 180일 재판정)"); }}>시뮬레이션 실행</Btn>
         <Btn tone="primary" disabled={!simDone || !CAN.paramDraft(role)} title={!simDone ? "시뮬레이션 먼저" : undefined} onClick={() => flash("승인 요청 생성됨 (0/2) · 기본 예약 적용")}>승인 요청 (예약·비소급)</Btn>
         <span style={{ marginLeft: "auto", font: "500 11.5px Pretendard", color: C.faint }}>
           적용 승인은 {CAN.paramApply(role) ? "가능(ADMIN 2인)" : "ADMIN 2인 필요"}

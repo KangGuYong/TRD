@@ -72,20 +72,6 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/TrendDetail' }
         '404': { $ref: '#/components/responses/NotFound' }
-  /v1/trends/{id}/metrics:
-    get:
-      tags: [app-trends]
-      summary: 지표 시계열 (L2 등급 이상 열람)
-      parameters: [{ $ref: '#/components/parameters/TrendId' }]
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: array
-                items: { $ref: '#/components/schemas/MetricPoint' }
-        '403': { $ref: '#/components/responses/Forbidden' }
   /v1/trends/{id}/vote:
     post:
       tags: [app-trends]
@@ -345,28 +331,6 @@ paths:
       responses:
         '200': { description: 처리됨 }
         '403': { $ref: '#/components/responses/Forbidden' }
-  /admin/collectors:
-    get:
-      tags: [admin-trends]
-      summary: 지표 수집 모니터 (ADM-210) — 소스별 상태/성공률/한도
-      security: [{ cookieAuth: [] }]
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: array
-                items: { $ref: '#/components/schemas/CollectorStatus' }
-  /admin/collectors/extend-affected:
-    post:
-      tags: [admin-trends]
-      summary: 수집 장애 영향 항목 일괄 유예 연장 (최대 +7일, 1회)
-      security: [{ cookieAuth: [] }]
-      responses:
-        '200': { description: 연장됨 }
-        '403': { $ref: '#/components/responses/Forbidden' }
-
   # ─────────────────────────────  콘솔 · 유저/원장  ─────────────────────
   /admin/users/{id}:
     get:
@@ -868,14 +832,6 @@ components:
             voteCount: { type: string, example: "2,160명 참여 · 뜬다 85%" }
             watched: { type: boolean }
 
-    MetricPoint:
-      type: object
-      properties:
-        source: { type: string, enum: [X, DCINSIDE, NAVER_DATALAB, INSTAGRAM, DERIVED] }
-        metric: { type: string }
-        value: { type: number }
-        capturedAt: { type: string, format: date-time }
-
     VoteResult:
       type: object
       properties:
@@ -903,7 +859,7 @@ components:
         delta: { type: [number, 'null'] }
         confidence: { type: integer }
         orderRank: { type: [integer, 'null'], description: 판정 전에는 파생 잠정값 }
-        note: { type: string, description: 산정 근거 (예 "T=0.61 · 검색량 4.2배") }
+        note: { type: string, description: 산정 근거 (예 "T=0.61 · 후속 제보자 12명") }
         judgeInDays: { type: [integer, 'null'], description: 판정까지 남은 일수 }
         createdAt: { type: string, format: date-time }
 
@@ -1001,17 +957,10 @@ components:
         id: { type: string, format: uuid }
         state: { type: string, enum: [DRAFT, PENDING, JUDGING, RESOLVED, VOID, MERGED] }
         dayOfWindow: { type: integer, example: 9 }
-        metrics: { type: array, items: { $ref: '#/components/schemas/MetricPoint' } }
+        distinctSubmitters: { type: integer, description: 서로 다른 제보자 수 (판정 입력) }
+        distinctPlatforms: { type: integer, description: 서로 다른 최초 목격 플랫폼 수 }
         provisionalT: { type: number, description: 잠정값. 확정 아님(D+14 재계산) }
         provisionalVerdict: { type: string, example: "HIT / L3 (잠정)" }
-    CollectorStatus:
-      type: object
-      properties:
-        source: { type: string }
-        state: { type: string, enum: [OK, DELAYED, FAILED] }
-        lastCollectedAgo: { type: string }
-        successRate24h: { type: number }
-        quotaUsed: { type: number }
     AdminUserDetail:
       type: object
       properties:
@@ -1026,16 +975,9 @@ components:
 
     ParameterPayload:
       type: object
-      description: 가중치 합계는 1.0이어야 함
+      description: submitterTarget = T가 1.0에 도달하는 목표 서로 다른 제보자 수 (근거 없는 초기 추정치, O1)
       properties:
-        weights:
-          type: object
-          properties:
-            S1: { type: number }
-            S2: { type: number }
-            S3: { type: number }
-            S4: { type: number }
-            S5: { type: number }
+        submitterTarget: { type: integer }
         hitThreshold: { type: number }
         halflifeDays: { type: integer }
     ParameterDraft:

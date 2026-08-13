@@ -5,6 +5,7 @@ import kr.trendstage.domain.score.LedgerLine;
 import kr.trendstage.domain.score.SubmissionRef;
 import kr.trendstage.domain.score.VerdictComputation;
 import kr.trendstage.domain.score.VerdictPlan;
+import kr.trendstage.domain.verdict.SubmissionSignal;
 import kr.trendstage.domain.verdict.VerdictResult;
 import kr.trendstage.persistence.entity.*;
 import kr.trendstage.persistence.repo.*;
@@ -43,16 +44,15 @@ public class VerdictRunner {
     private final SubmissionOrderRankRepository orderRanks;
     private final VerdictRepository verdicts;
     private final ScoreLedgerRepository ledger;
-    private final MetricAggregator aggregator;
     private final ParameterSetProvider params;
     private final Clock clock;
 
     public VerdictRunner(TrendItemRepository trendItems, SubmissionRepository submissions,
                          SubmissionOrderRankRepository orderRanks, VerdictRepository verdicts,
-                         ScoreLedgerRepository ledger, MetricAggregator aggregator,
+                         ScoreLedgerRepository ledger,
                          ParameterSetProvider params, Clock clock) {
         this.trendItems = trendItems; this.submissions = submissions; this.orderRanks = orderRanks;
-        this.verdicts = verdicts; this.ledger = ledger; this.aggregator = aggregator;
+        this.verdicts = verdicts; this.ledger = ledger;
         this.params = params; this.clock = clock;
     }
 
@@ -84,10 +84,7 @@ public class VerdictRunner {
     protected void judgeOne(TrendItem item, Instant judgedAt) {
         ParameterSet p = params.current();
 
-        // 1) 지표 정규화
-        MetricAggregator.Result agg = aggregator.aggregate(item);
-
-        // 2) 선점 순위 동결 + 제보 스냅샷
+        // 1) 선점 순위 동결 + 제보 스냅샷
         Map<UUID, Integer> rankById = new HashMap<>();
         for (SubmissionOrderRank r : orderRanks.findByTrendItemId(item.getId())) {
             rankById.put(r.getSubmissionId(), r.getOrderRank());
@@ -103,12 +100,18 @@ public class VerdictRunner {
                     Duration.between(s.getCreatedAt(), judgedAt).toDays()));
         }
 
-        // 3) 순수 판정 계산
-        VerdictPlan plan = VerdictComputation.run(agg.signals(), agg.missingCount(), false, refs, p);
+        // 2) 제보 신호 집계 — 외부 지표 없이 제보 자체가 판정 근거(R1 개정)
+        long distinctSubmitters = subEntities.stream().map(Submission::getUserId).distinct().count();
+        long distinctPlatforms = subEntities.stream().map(Submission::getSourcePlatform)
+                .filter(Objects::nonNull).distinct().count();
+        SubmissionSignal signal = new SubmissionSignal((int) distinctSubmitters, (int) distinctPlatforms);
 
-        // 4) verdicts 기록 (evidence_json에 순위·신호·결측 동결)
+        // 3) 순수 판정 계산
+        VerdictPlan plan = VerdictComputation.run(signal, false, refs, p);
+
+        // 4) verdicts 기록 (evidence_json에 순위·신호 동결)
         BigDecimal t = BigDecimal.valueOf(plan.t()).setScale(4, RoundingMode.HALF_UP);
-        String evidence = buildEvidence(plan, rankById, agg, t);
+        String evidence = buildEvidence(plan, rankById, signal, t);
         Verdict verdict = verdicts.save(new Verdict(
                 item.getId(), plan.result(), plan.reach(),
                 plan.result() == VerdictResult.VOID ? null : t,
@@ -132,15 +135,13 @@ public class VerdictRunner {
     }
 
     private String buildEvidence(VerdictPlan plan, Map<UUID, Integer> ranks,
-                                 MetricAggregator.Result agg, BigDecimal t) {
+                                 SubmissionSignal signal, BigDecimal t) {
         StringBuilder sb = new StringBuilder("{");
         sb.append("\"result\":\"").append(plan.result()).append("\",");
         sb.append("\"reach\":").append(plan.reach() == null ? "null" : "\"" + plan.reach() + "\"").append(",");
         sb.append("\"t\":").append(t).append(",");
-        sb.append("\"missingSources\":").append(agg.missingCount()).append(",");
-        var s = agg.signals();
-        sb.append("\"signals\":[").append(s.s1()).append(",").append(s.s2()).append(",")
-          .append(s.s3()).append(",").append(s.s4()).append(",").append(s.s5()).append("],");
+        sb.append("\"distinctSubmitters\":").append(signal.distinctSubmitters()).append(",");
+        sb.append("\"distinctPlatforms\":").append(signal.distinctPlatforms()).append(",");
         sb.append("\"orderRanks\":{");
         boolean first = true;
         for (var e : ranks.entrySet()) {

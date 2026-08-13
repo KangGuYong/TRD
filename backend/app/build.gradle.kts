@@ -7,7 +7,6 @@ dependencies {
     implementation(project(":api-public"))
     implementation(project(":api-admin"))
     implementation(project(":scheduler"))
-    implementation(project(":collectors"))
     implementation(project(":audit"))
     implementation(project(":persistence"))
     implementation(project(":domain-core"))

@@ -10,8 +10,7 @@ export const fxQueueSummary: QueueSummary = {
     { id: "ADM-410", name: "신고", count: 2, oldest: "3h", slaExceeded: false },
   ],
   alerts: [
-    { title: "X API 수집 실패 (2h 연속)", detail: "판정 4건 VOID 위험" },
-    { title: "인스타 Graph API 일일 한도 82% 소진", detail: "보조 지표 결손 주의" },
+    { title: "이의 제기 큐 SLA 초과 3건", detail: "5영업일 기준 초과, 상위 역할 확인 필요" },
   ],
   seedRatio: 0.41,
   judgedToday: 17,
@@ -42,7 +41,7 @@ export const fxMergeQueue: MergeCandidate[] = [
 ];
 
 export const fxParams: ParameterPayload = {
-  weights: { S1: 0.25, S2: 0.2, S3: 0.25, S4: 0.15, S5: 0.15 },
+  submitterTarget: 20,
   hitThreshold: 0.2,
   halflifeDays: 90,
 };
@@ -74,7 +73,7 @@ export const fxUser: AdminUserDetail = {
   ledger: [
     { date: "08-05", kind: "HIT", delta: "+75.0", reason: "#1204 order1 c50 m1.0" },
     { date: "08-01", kind: "MISS", delta: "−15.0", reason: "#1188 c30" },
-    { date: "07-28", kind: "ADJ", delta: "+12.0", reason: "수집장애 보정 (승인:박관리)" },
+    { date: "07-28", kind: "ADJ", delta: "+12.0", reason: "판정 재계산 보정 (승인:박관리)" },
     { date: "07-21", kind: "HIT", delta: "+60.0", reason: "#1150 order1 c30 m2.0" },
   ],
 };

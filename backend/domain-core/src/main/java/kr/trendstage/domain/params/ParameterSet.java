@@ -13,8 +13,8 @@ import kr.trendstage.domain.verdict.ReachLevel;
  */
 public final class ParameterSet {
 
-    // 지표 가중치 S1..S5 (합계 1.0) — 01 §4.2
-    public final double[] weights;
+    // T=1.0에 도달하는 목표 서로 다른 제보자 수 — 01 §4.2(개정)
+    public final int submitterTarget;
     // HIT 컷 및 reach 밴드 상한 — 01 §4.3
     public final double hitThreshold;   // < 이 값이면 MISS
     public final double bandL2;         // [.., bandL2) = L1
@@ -29,14 +29,12 @@ public final class ParameterSet {
     // TI 베이지안 평활 — 01 §5.2
     public final double tiAlpha, tiBeta;
 
-    public ParameterSet(double[] weights, double hitThreshold, double bandL2, double bandL3, double bandL4,
+    public ParameterSet(int submitterTarget, double hitThreshold, double bandL2, double bandL3, double bandL4,
                         double mL1, double mL2, double mL3, double mL4,
                         double wRank1, double wRank2, double wRank3, double wRankRest,
                         int halflifeDays, double tiAlpha, double tiBeta) {
-        if (weights.length != 5) throw new IllegalArgumentException("weights must be S1..S5");
-        double sum = 0; for (double w : weights) sum += w;
-        if (Math.abs(sum - 1.0) > 1e-9) throw new IllegalArgumentException("weights sum must be 1.0, got " + sum);
-        this.weights = weights.clone();
+        if (submitterTarget < 1) throw new IllegalArgumentException("submitterTarget must be >= 1");
+        this.submitterTarget = submitterTarget;
         this.hitThreshold = hitThreshold; this.bandL2 = bandL2; this.bandL3 = bandL3; this.bandL4 = bandL4;
         this.mL1 = mL1; this.mL2 = mL2; this.mL3 = mL3; this.mL4 = mL4;
         this.wRank1 = wRank1; this.wRank2 = wRank2; this.wRank3 = wRank3; this.wRankRest = wRankRest;
@@ -46,7 +44,7 @@ public final class ParameterSet {
     /** 설계서 초기 추정치. */
     public static ParameterSet defaults() {
         return new ParameterSet(
-                new double[]{0.25, 0.20, 0.25, 0.15, 0.15},
+                20,
                 0.20, 0.35, 0.55, 0.75,
                 0.2, 0.5, 1.0, 1.5,
                 1.0, 0.6, 0.4, 0.2,

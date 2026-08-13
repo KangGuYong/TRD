@@ -22,7 +22,8 @@ export interface MergeCandidate {
 }
 
 export interface ParameterPayload {
-  weights: { S1: number; S2: number; S3: number; S4: number; S5: number };
+  /** T가 1.0에 도달하는 목표 서로 다른 제보자 수. 근거 없는 초기 추정치(O1). */
+  submitterTarget: number;
   hitThreshold: number;
   halflifeDays: number;
 }

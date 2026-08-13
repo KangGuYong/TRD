@@ -78,6 +78,7 @@ public class Submission {
     public UUID getUserId() { return userId; }
     public UUID getTrendItemId() { return trendItemId; }
     public short getConfidence() { return confidence; }
+    public String getSourcePlatform() { return sourcePlatform; }
     public String getOneLine() { return oneLine; }
     public SubmissionResult getResult() { return result; }
     public boolean isSeed() { return seed; }

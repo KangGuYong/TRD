@@ -25,7 +25,6 @@
 | 상호작용 | API | 상태 | 권한 |
 |---|---|:--:|---|
 | 상세 로드 (판정·전파경로·연령대·뜻/유래/예문) | `GET /v1/trends/{id}` | ✅ | 전체 |
-| 지표 시계열(원시 그래프) | `GET /v1/trends/{id}/metrics` | ✅ | **L2 이상**(403 처리) |
 | 전파경로 3뷰 토글(지도/타임라인/볼륨) | (클라, `propagationPath` 재사용) | — | |
 | "뜬다 / 안 뜬다" 투표 | `POST /v1/trends/{id}/vote` | ✅ | 판정과 무관(R1) |
 | 워치 추가/해제 | `POST /v1/me/watch` · `DELETE /v1/me/watch/{keyword}` | ✅ | |
@@ -84,19 +83,13 @@
 | 상호작용 | API | 상태 | 권한 |
 |---|---|:--:|---|
 | 항목 목록·필터 | `GET /admin/trends` | 🔶 | R/O/A/Au |
-| 항목 상세(지표·예상판정 잠정) | `GET /admin/trends/{id}` | ✅ | R/O/A/Au |
+| 항목 상세(제보 시계열·예상판정 잠정) | `GET /admin/trends/{id}` | ✅ | R/O/A/Au |
 
 ### ADM-200 · 판정 관리 (예외 전용)
 | 상호작용 | API | 상태 | 권한 |
 |---|---|:--:|---|
 | VOID / 유예연장 / 재판정 | `POST /admin/trends/{id}/exceptions` | ✅ | **O/A** · 사유코드 필수 |
 | ~~HIT/MISS 변경·T 수동입력·verdict 삭제~~ | **엔드포인트 없음** | — | 금지기능(R1) |
-
-### ADM-210 · 지표 수집 모니터
-| 상호작용 | API | 상태 | 권한 |
-|---|---|:--:|---|
-| 소스별 상태·성공률·한도 | `GET /admin/collectors` | ✅ | R/O/A/Au |
-| 영향 항목 일괄 유예 연장 | `POST /admin/collectors/extend-affected` | ✅ | **O/A** |
 
 ### ADM-300 · 어뷰징 플래그 큐
 | 상호작용 | API | 상태 | 권한 |

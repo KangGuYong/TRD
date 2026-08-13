@@ -5,10 +5,8 @@ import kr.trendstage.domain.trend.DisplayStage;
 import kr.trendstage.domain.trend.StageEvaluator;
 import kr.trendstage.persistence.entity.Submission;
 import kr.trendstage.persistence.entity.TrendItem;
-import kr.trendstage.persistence.repo.MetricSnapshotRepository;
 import kr.trendstage.persistence.repo.SubmissionRepository;
 import kr.trendstage.persistence.repo.TrendItemRepository;
-import kr.trendstage.persistence.type.MetricSource;
 import kr.trendstage.persistence.type.TrendState;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,18 +24,11 @@ public class TrendQueryService {
 
     private static final int DAILY_LIMIT = 5;
 
-    /** 채널 표시명(경로 텍스트용). */
-    private static final java.util.Map<MetricSource, String> CH = java.util.Map.of(
-            MetricSource.DCINSIDE, "디시", MetricSource.X, "X", MetricSource.NAVER_DATALAB, "네이버",
-            MetricSource.INSTAGRAM, "인스타", MetricSource.DERIVED, "파생");
-
     private final TrendItemRepository trends;
     private final SubmissionRepository submissions;
-    private final MetricSnapshotRepository metrics;
 
-    public TrendQueryService(TrendItemRepository trends, SubmissionRepository submissions,
-                             MetricSnapshotRepository metrics) {
-        this.trends = trends; this.submissions = submissions; this.metrics = metrics;
+    public TrendQueryService(TrendItemRepository trends, SubmissionRepository submissions) {
+        this.trends = trends; this.submissions = submissions;
     }
 
     @Transactional(readOnly = true)
@@ -51,15 +42,15 @@ public class TrendQueryService {
     }
 
     private TrendSummaryResponse toSummary(TrendItem item) {
-        List<MetricSource> reached = metrics.findDistinctSources(item.getId());
-        int reachedCount = reached.size();
+        List<String> platforms = submissions.findDistinctPlatforms(item.getId());
+        int reachedCount = platforms.size();
         boolean resolvedFading = item.getState() == TrendState.RESOLVED;   // 잠정 근사
         DisplayStage stage = StageEvaluator.fromReach(reachedCount, resolvedFading);
 
         String meaning = submissions.findFirstByTrendItemIdOrderByCreatedAtAsc(item.getId())
                 .map(Submission::getOneLine).orElse("");
 
-        String pathText = reached.stream().map(s -> CH.getOrDefault(s, s.name())).collect(Collectors.joining(" → "));
+        String pathText = String.join(" → ", platforms);
 
         return new TrendSummaryResponse(
                 item.getId(),
