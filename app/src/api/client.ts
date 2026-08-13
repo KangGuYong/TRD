@@ -1,7 +1,7 @@
 /**
  * 경량 타입드 API 클라이언트. openapi.yaml 계약을 따른다.
  * 베이스 URL은 EXPO_PUBLIC_API_URL로 주입(안드로이드 에뮬레이터는 10.0.2.2).
- * 인증(JWT)은 O6 확정 후 tokenProvider로 헤더 주입.
+ * Authorization 헤더에는 Firebase ID 토큰이 실린다 — AuthProvider가 setTokenProvider로 공급.
  */
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:8080";
 

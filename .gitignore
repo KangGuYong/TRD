@@ -17,6 +17,11 @@ admin/dist/
 .env.*
 !.env.example
 
+# Firebase — 앱 설정 파일과 백엔드 서비스 계정 키(절대 커밋 금지)
+app/google-services.json
+app/GoogleService-Info.plist
+**/firebase-service-account*.json
+
 # ── IDE / OS ──
 .idea/
 .vscode/

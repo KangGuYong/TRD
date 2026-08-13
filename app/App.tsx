@@ -6,7 +6,7 @@ import { NavigationContainer } from "@react-navigation/native";
 import RootNavigator from "./src/navigation/RootNavigator";
 import OnboardingScreen from "./src/screens/OnboardingScreen";
 import { ReadsProvider } from "./src/state/reads";
-import { C } from "./src/theme";
+import { AuthProvider } from "./src/state/auth";
 
 const qc = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
@@ -19,16 +19,18 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <QueryClientProvider client={qc}>
-        <ReadsProvider>
-          <StatusBar style="dark" />
-          {onboarded ? (
-            <NavigationContainer>
-              <RootNavigator />
-            </NavigationContainer>
-          ) : (
-            <OnboardingScreen onDone={() => setOnboarded(true)} />
-          )}
-        </ReadsProvider>
+        <AuthProvider>
+          <ReadsProvider>
+            <StatusBar style="dark" />
+            {onboarded ? (
+              <NavigationContainer>
+                <RootNavigator />
+              </NavigationContainer>
+            ) : (
+              <OnboardingScreen onDone={() => setOnboarded(true)} />
+            )}
+          </ReadsProvider>
+        </AuthProvider>
       </QueryClientProvider>
     </SafeAreaProvider>
   );

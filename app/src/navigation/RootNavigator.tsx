@@ -10,6 +10,10 @@ import SearchScreen from "../screens/SearchScreen";
 import SubmitScreen from "../screens/SubmitScreen";
 import WatchScreen from "../screens/WatchScreen";
 import MeScreen from "../screens/MeScreen";
+import { AuthGate } from "../components/AuthGate";
+
+const GatedSubmit = () => <AuthGate><SubmitScreen /></AuthGate>;
+const GatedMe = () => <AuthGate><MeScreen /></AuthGate>;
 
 const Stack = createNativeStackNavigator<HomeStackParamList>();
 const Tab = createBottomTabNavigator();
@@ -37,9 +41,9 @@ export default function RootNavigator() {
     >
       <Tab.Screen name="홈" component={HomeStack} options={{ tabBarIcon: icon("⌂") }} />
       <Tab.Screen name="검색" component={SearchScreen} options={{ tabBarIcon: icon("⌕") }} />
-      <Tab.Screen name="제보" component={SubmitScreen} options={{ tabBarIcon: icon("＋") }} />
+      <Tab.Screen name="제보" component={GatedSubmit} options={{ tabBarIcon: icon("＋") }} />
       <Tab.Screen name="워치" component={WatchScreen} options={{ tabBarIcon: icon("◉") }} />
-      <Tab.Screen name="나" component={MeScreen} options={{ tabBarIcon: icon("☺") }} />
+      <Tab.Screen name="나" component={GatedMe} options={{ tabBarIcon: icon("☺") }} />
     </Tab.Navigator>
   );
 }
