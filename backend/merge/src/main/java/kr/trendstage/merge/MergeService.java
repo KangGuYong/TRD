@@ -95,6 +95,49 @@ public class MergeService {
         ));
     }
 
+    /**
+     * ADM-100 병합 후 미리보기(dry-run). DB에 아무것도 쓰지 않는다 — merge()와 같은 순수 함수를
+     * 재사용하므로 실제 병합 결과와 어긋날 수 없다(readOnly 트랜잭션으로 실수 저장도 방지).
+     */
+    @Transactional(readOnly = true)
+    public PreviewResult preview(UUID survivorId, UUID loserId) {
+        TrendItem survivor = trendItems.findById(survivorId)
+                .orElseThrow(() -> new IllegalStateException("승자 항목이 없습니다: " + survivorId));
+        TrendItem loser = trendItems.findById(loserId)
+                .orElseThrow(() -> new IllegalStateException("패자 항목이 없습니다: " + loserId));
+
+        List<Submission> survivorSubs = submissions.findByTrendItemIdAndResultNot(survivorId, SubmissionResult.VOID);
+        List<Submission> loserSubs = submissions.findByTrendItemIdAndResultNot(loserId, SubmissionResult.VOID);
+
+        List<MergeComputation.SubmissionInput> a = toInputs(survivorSubs);
+        List<MergeComputation.SubmissionInput> b = toInputs(loserSubs);
+
+        Set<UUID> voided = MergeComputation.computeDedup(a, b);
+        List<MergeComputation.SubmissionInput> activeAfterDedup = new ArrayList<>();
+        for (var s : a) if (!voided.contains(s.submissionId())) activeAfterDedup.add(s);
+        for (var s : b) if (!voided.contains(s.submissionId())) activeAfterDedup.add(s);
+
+        String newCanonicalName = MergeComputation.computeCanonicalName(activeAfterDedup)
+                .orElse(survivor.getCanonicalName());
+        List<MergeComputation.OrderComputed> orderAfter = MergeComputation.computeCombinedOrder(activeAfterDedup);
+
+        Instant firstSeenAtBefore = survivor.getFirstSeenAt();
+        Instant firstSeenAtAfter = loser.getFirstSeenAt().isBefore(firstSeenAtBefore)
+                ? loser.getFirstSeenAt() : firstSeenAtBefore;
+        boolean baselineShifted = loser.getFirstSeenAt().isBefore(firstSeenAtBefore);
+
+        return new PreviewResult(newCanonicalName, orderAfter, voided, firstSeenAtBefore, firstSeenAtAfter, baselineShifted);
+    }
+
+    public record PreviewResult(
+            String newCanonicalName,
+            List<MergeComputation.OrderComputed> orderAfter,
+            Set<UUID> dedupVoidedSubmissionIds,
+            Instant firstSeenAtBefore,
+            Instant firstSeenAtAfter,
+            boolean baselineShifted
+    ) {}
+
     /** 같은 유저가 두 클러스터 모두에 유효 제보를 낸 경우, 늦은 쪽을 VOID(03 §4.4) — 헤지 방지. */
     private void dedupSameUserSubmissions(UUID trendItemA, UUID trendItemB) {
         List<Submission> a = submissions.findByTrendItemIdAndResultNot(trendItemA, SubmissionResult.VOID);
