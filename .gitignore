@@ -28,3 +28,4 @@ app/GoogleService-Info.plist
 *.iml
 .DS_Store
 Thumbs.db
+.superpowers/
