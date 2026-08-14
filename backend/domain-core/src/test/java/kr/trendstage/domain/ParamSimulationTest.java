@@ -58,4 +58,13 @@ class ParamSimulationTest {
         assertEquals(0, r.missToHit());
         assertEquals(0, r.hitToMiss());
     }
+
+    @Test void 빈_목록이면_전부_0() {
+        SimulationSummary r = ParamSimulation.run(List.of(), defaults);
+        assertEquals(0, r.changed());
+        assertEquals(0, r.total());
+        assertEquals(0, r.missToHit());
+        assertEquals(0, r.hitToMiss());
+        assertEquals(0, r.reachChanged());
+    }
 }
