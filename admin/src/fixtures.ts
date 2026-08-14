@@ -1,5 +1,5 @@
 /** dev 시연용 데이터. 관리자 콘솔.dc.html 예시를 반영. 실 API로 대체됨. */
-import type { AdminAccountSummary, AdminUserDetail, AuditEntry, ImminentItem, JudgedItem, MergeCandidate, ParameterPayload, QueueSummary, SimulationResult, VerdictListResponse } from "./api/types";
+import type { AdminAccountSummary, AdminUserDetail, AuditEntry, ImminentItem, JudgedItem, MergeCandidate, MergePreview, ParameterPayload, QueueSummary, SimulationResult, VerdictListResponse } from "./api/types";
 
 export const fxQueueSummary: QueueSummary = {
   slaBreaches: 3,
@@ -37,8 +37,30 @@ export const fxMergeQueue: MergeCandidate[] = [
       { k: "상태", v: "PENDING · 현재 T 추정 0.31" },
     ],
     orderPreview: ["order1 user_4410", "order2 user_8821", "order3 user_0092", "order4 신규", "order5 신규"],
+    newSubmissions: [
+      { handle: "user_8821", rawInput: "새싹챌린지", oneLine: "요즘 카페에서 새싹 올린 음료 챌린지 유행 중", evidenceUrl: "https://instagram.com/p/example1", createdAt: "2h 전" },
+      { handle: "user_0092", rawInput: "새싹 올리기 챌린지", oneLine: "인스타에서 새싹 사진 릴레이", evidenceUrl: "https://instagram.com/p/example2", createdAt: "1h 전" },
+    ],
+    oldSubmissions: [
+      { handle: "user_4410", rawInput: "새싹 챌린지", oneLine: "새싹 인테리어 유행", evidenceUrl: "https://instagram.com/p/example3", createdAt: "3일 전" },
+      { handle: "user_1122", rawInput: "새싹 챌린지", oneLine: "새싹 키우기 챌린지 확산 중", evidenceUrl: "", createdAt: "2일 전" },
+    ],
   },
 ];
+
+export const fxMergePreview: MergePreview = {
+  newCanonicalName: "새싹챌린지",
+  orderRank: [
+    { handle: "user_4410", rankBefore: 1, rankAfter: 1 },
+    { handle: "user_1122", rankBefore: 2, rankAfter: 2 },
+    { handle: "user_8821", rankBefore: 1, rankAfter: 3 },
+    { handle: "user_0092", rankBefore: 2, rankAfter: 4 },
+  ],
+  firstSeenAtBefore: "2026-08-11 09:00",
+  firstSeenAtAfter: "2026-08-11 09:00",
+  baselineShifted: false,
+  dedupVoidedHandles: [],
+};
 
 export const fxParams: ParameterPayload = {
   submitterTarget: 20,
