@@ -15,6 +15,8 @@ import org.springframework.web.bind.annotation.*;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 /**
@@ -33,6 +35,9 @@ public class MergeQueueController {
     private final UserGradeRepository userGrades;
     private final MergeService mergeService;
     private final Clock clock;
+
+    private static final DateTimeFormatter DISPLAY_FORMAT =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.of("Asia/Seoul"));
 
     public MergeQueueController(MergeQueueRepository mergeQueue, TrendItemRepository trendItems,
                                  SubmissionRepository submissions, SubmissionOrderRankRepository orderRanks,
@@ -105,7 +110,7 @@ public class MergeQueueController {
 
         return new MergePreviewResponse(
                 result.newCanonicalName(), orderRank,
-                result.firstSeenAtBefore().toString(), result.firstSeenAtAfter().toString(),
+                DISPLAY_FORMAT.format(result.firstSeenAtBefore()), DISPLAY_FORMAT.format(result.firstSeenAtAfter()),
                 result.baselineShifted(), dedupVoidedHandles);
     }
 
