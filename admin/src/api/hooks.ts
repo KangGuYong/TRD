@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { api, USE_FIXTURES } from "./client";
 import * as fx from "../fixtures";
-import type { AdminAccountSummary, AdminUserDetail, AuditEntry, MergeCandidate, QueueSummary, VerdictListResponse } from "./types";
+import type { AdminAccountSummary, AdminUserDetail, AuditEntry, MergeCandidate, MergePreview, QueueSummary, VerdictListResponse } from "./types";
 
 /** 픽스처 on이면 즉시 픽스처, off면 실 API. 동일 훅으로 백엔드 전환. */
 function useData<T>(key: unknown[], path: string, fixture: T) {
@@ -35,6 +35,9 @@ export const setAdminAccountDisabled = (id: string, disabled: boolean) =>
 
 export const decideMergeCandidate = (id: string, action: "merge" | "separate" | "void", reason: string) =>
   api.post<void>(`/admin/merge-queue/${id}/${action}`, { reason });
+
+export const fetchMergePreview = (id: string) =>
+  api.get<MergePreview>(`/admin/merge-queue/${id}/preview`);
 
 export const useVerdicts = () =>
   useData<VerdictListResponse>(["admin", "verdicts"], "/admin/verdicts", fx.fxVerdicts);
