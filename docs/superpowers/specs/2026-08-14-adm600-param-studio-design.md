@@ -17,7 +17,7 @@ CLAUDE.md의 열린 결정사항 O1(submitterTarget·판정 임계값)·O4(확�
 - 편집 가능 파라미터: `submitterTarget`(목표 제보자 수), `hitThreshold`(판정 임계값) 2개만. `ParameterSet`의 나머지 14개 필드(band, 확산배수, 선점가중, 반감기, TI α/β)는 `defaults()` 고정값 유지.
 - 시뮬레이션 범위: 판정(HIT/MISS/reach) 변동만. 등급(TI/AS/강등·승급) 계산은 제외.
 - 승인·적용 워크플로: 드래프트 생성 → 시뮬레이션 → 2인 승인 **요청 생성**까지. 실제 승인 클릭(`approver_1`/`approver_2` 채우기), `APPROVED`→`APPLIED` 전이, `ParameterSetProvider`가 `APPLIED` 값을 읽어 운영에 반영하는 배선은 범위 밖.
-- 신규 DB 마이그레이션 불필요 — `parameter_drafts`/`approval_requests`는 V6에 이미 존재하고 append-only 트리거(V7) 대상이 아니라 UPDATE 가능.
+- `parameter_drafts`/`approval_requests`는 V6에 이미 존재하고 append-only 트리거(V7) 대상이 아니라 UPDATE 가능. (구현 중 발견: `@Version` 낙관적 락을 위한 `version` 컬럼은 V6에 없어 V17 마이그레이션으로 추가함 — 애초 "신규 마이그레이션 불필요" 가정은 낙관적 락 요구사항을 반영하지 못했던 설계 당시의 누락이었다.)
 
 ## 아키텍처
 
