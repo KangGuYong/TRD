@@ -1,5 +1,6 @@
 package kr.trendstage.persistence.repo;
 
+import kr.trendstage.domain.verdict.VerdictResult;
 import kr.trendstage.persistence.entity.Verdict;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -32,7 +33,11 @@ public interface VerdictRepository extends JpaRepository<Verdict, UUID> {
      * ADM-600 시뮬레이션용: 최근 N일 내 판정된 "현재" 판정(다른 행에 superseded 안 됨) 중 VOID 제외.
      * VOID는 파라미터(threshold/target)와 무관한 별도 사유(어뷰징·중복)라 재평가 대상이 아니다.
      */
-    @Query("SELECT v FROM Verdict v WHERE v.judgedAt >= :since AND v.result <> kr.trendstage.domain.verdict.VerdictResult.VOID " +
+    default List<Verdict> findCurrentNonVoidSince(Instant since) {
+        return findCurrentExcludingResultSince(since, VerdictResult.VOID);
+    }
+
+    @Query("SELECT v FROM Verdict v WHERE v.judgedAt >= :since AND v.result <> :excluded " +
            "AND NOT EXISTS (SELECT 1 FROM Verdict v2 WHERE v2.supersedes = v.id)")
-    List<Verdict> findCurrentNonVoidSince(@Param("since") Instant since);
+    List<Verdict> findCurrentExcludingResultSince(@Param("since") Instant since, @Param("excluded") VerdictResult excluded);
 }
