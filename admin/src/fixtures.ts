@@ -1,5 +1,5 @@
 /** dev 시연용 데이터. 관리자 콘솔.dc.html 예시를 반영. 실 API로 대체됨. */
-import type { AdminUserDetail, AuditEntry, MergeCandidate, ParameterPayload, QueueSummary, SimulationResult } from "./api/types";
+import type { AdminAccountSummary, AdminUserDetail, AuditEntry, MergeCandidate, ParameterPayload, QueueSummary, SimulationResult } from "./api/types";
 
 export const fxQueueSummary: QueueSummary = {
   slaBreaches: 3,
@@ -77,6 +77,13 @@ export const fxUser: AdminUserDetail = {
     { date: "07-21", kind: "HIT", delta: "+60.0", reason: "#1150 order1 c30 m2.0" },
   ],
 };
+
+export const fxAdminAccounts: AdminAccountSummary[] = [
+  { id: "a1", loginId: "admin", displayName: "박관리", role: "ADMIN", lastLoginAt: "2026-08-07 09:12", disabledAt: null, createdAt: "2026-07-01 10:00" },
+  { id: "a2", loginId: "op_kim", displayName: "김운영", role: "OPERATOR", lastLoginAt: "2026-08-07 16:41", disabledAt: null, createdAt: "2026-07-05 11:30" },
+  { id: "a3", loginId: "auditor_lee", displayName: "이감사", role: "AUDITOR", lastLoginAt: "2026-08-06 14:03", disabledAt: null, createdAt: "2026-07-10 09:00" },
+  { id: "a4", loginId: "reviewer_old", displayName: "퇴사자", role: "REVIEWER", lastLoginAt: "2026-06-01 09:00", disabledAt: "2026-06-15 00:00", createdAt: "2026-05-01 09:00" },
+];
 
 export const fxAudit: AuditEntry[] = [
   { id: 5012, actor: "김운영", role: "OPERATOR", action: "MERGE", targetType: "TREND", targetId: "#1204", createdAt: "2026-08-07 16:41" },

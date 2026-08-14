@@ -27,4 +27,6 @@ export const CAN = {
   paramApply: (r: Role) => r === "ADMIN",
   ledgerAdj: (r: Role) => r === "ADMIN",
   sanctionRequest: (r: Role) => r === "OPERATOR" || r === "ADMIN",
+  accountView: (r: Role) => r === "ADMIN" || r === "AUDITOR",
+  accountManage: (r: Role) => r === "ADMIN",
 };

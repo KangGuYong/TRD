@@ -65,3 +65,13 @@ export interface AuditEntry {
   targetId: string | null;
   createdAt: string;
 }
+
+export interface AdminAccountSummary {
+  id: string;
+  loginId: string;
+  displayName: string;
+  role: string;
+  lastLoginAt: string | null;
+  disabledAt: string | null;
+  createdAt: string;
+}

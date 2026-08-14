@@ -1,7 +1,10 @@
 package kr.trendstage.apiadmin.web;
 
 import kr.trendstage.apiadmin.auth.AccountDisabledException;
+import kr.trendstage.apiadmin.auth.AdminValidationException;
+import kr.trendstage.apiadmin.auth.DuplicateLoginIdException;
 import kr.trendstage.apiadmin.auth.InvalidCredentialsException;
+import kr.trendstage.apiadmin.auth.SelfModificationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -27,6 +30,21 @@ public class AdminApiExceptionHandler {
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<Map<String, Object>> handle(AccessDeniedException e) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(problem(403, "권한이 없습니다"));
+    }
+
+    @ExceptionHandler(DuplicateLoginIdException.class)
+    public ResponseEntity<Map<String, Object>> handle(DuplicateLoginIdException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(problem(409, e.getMessage()));
+    }
+
+    @ExceptionHandler(SelfModificationException.class)
+    public ResponseEntity<Map<String, Object>> handle(SelfModificationException e) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(problem(403, e.getMessage()));
+    }
+
+    @ExceptionHandler(AdminValidationException.class)
+    public ResponseEntity<Map<String, Object>> handle(AdminValidationException e) {
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(problem(422, e.getMessage()));
     }
 
     private Map<String, Object> problem(int status, String detail) {

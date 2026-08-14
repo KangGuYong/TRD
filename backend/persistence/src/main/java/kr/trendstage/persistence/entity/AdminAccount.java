@@ -53,6 +53,7 @@ public class AdminAccount {
 
     public void recordLogin(Instant at) { this.lastLoginAt = at; }
     public void disable(Instant at) { this.disabledAt = at; }
+    public void enable() { this.disabledAt = null; }
 
     public UUID getId() { return id; }
     public String getLoginId() { return loginId; }
