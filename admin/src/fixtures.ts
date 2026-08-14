@@ -49,7 +49,7 @@ export const fxMergeQueue: MergeCandidate[] = [
 ];
 
 export const fxMergePreview: MergePreview = {
-  newCanonicalName: "새싹챌린지",
+  newCanonicalName: "새싹 챌린지",
   orderRank: [
     { handle: "user_4410", rankBefore: 1, rankAfter: 1 },
     { handle: "user_1122", rankBefore: 2, rankAfter: 2 },
