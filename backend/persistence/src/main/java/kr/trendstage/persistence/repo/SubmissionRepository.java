@@ -14,6 +14,9 @@ public interface SubmissionRepository extends JpaRepository<Submission, UUID> {
 
     List<Submission> findByTrendItemIdAndResultNot(UUID trendItemId, SubmissionResult excluded);
 
+    /** 병합 시 VOID 포함 전량 재배정용(감사 추적 연속성, 03 §3). */
+    List<Submission> findByTrendItemId(UUID trendItemId);
+
     /** 서로 다른 최초 목격 플랫폼(제보 자체가 근거, 외부 지표 아님). 홈 카드 경로 표시용. */
     @Query("select distinct s.sourcePlatform from Submission s where s.trendItemId = :id and s.result <> kr.trendstage.persistence.type.SubmissionResult.VOID")
     List<String> findDistinctPlatforms(@Param("id") UUID trendItemId);

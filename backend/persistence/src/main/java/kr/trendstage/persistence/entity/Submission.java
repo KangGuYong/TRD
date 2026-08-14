@@ -77,6 +77,7 @@ public class Submission {
     public UUID getId() { return id; }
     public UUID getUserId() { return userId; }
     public UUID getTrendItemId() { return trendItemId; }
+    public String getRawInput() { return rawInput; }
     public short getConfidence() { return confidence; }
     public String getSourcePlatform() { return sourcePlatform; }
     public String getOneLine() { return oneLine; }
@@ -88,4 +89,7 @@ public class Submission {
 
     /** 같은 유저 중복 병합 시 늦은 쪽 VOID + 제보권 반환(03 §4.4). */
     public void voidOut() { this.result = SubmissionResult.VOID; }
+
+    /** 병합 시 패자 클러스터의 제보를 승자로 재배정(03 §3). VOID된 제보도 감사 추적 연속성을 위해 함께 옮긴다. */
+    public void reassignTrendItem(UUID survivorTrendItemId) { this.trendItemId = survivorTrendItemId; }
 }

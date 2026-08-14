@@ -1,5 +1,7 @@
 import React, { useState } from "react";
-import { useMergeQueue } from "../api/hooks";
+import { useQueryClient } from "@tanstack/react-query";
+import { useMergeQueue, decideMergeCandidate } from "../api/hooks";
+import { ApiError, USE_FIXTURES } from "../api/client";
 import { Card, StateView, Btn } from "../components/ui";
 import { C } from "../theme";
 import { useRole, CAN } from "../state/role";
@@ -7,13 +9,30 @@ import { useRole, CAN } from "../state/role";
 export default function MergeQueueScreen() {
   const q = useMergeQueue();
   const { role } = useRole();
+  const qc = useQueryClient();
   const [reason, setReason] = useState("");
   const [toast, setToast] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
-  const act = (label: string) => {
-    setToast(`${label} 처리됨 (감사 로그 기록). 근거: ${reason || "—"}`);
-    setReason("");
-    setTimeout(() => setToast(null), 2600);
+  const flash = (m: string) => { setToast(m); setTimeout(() => setToast(null), 2600); };
+
+  const act = async (id: string, label: string, action: "merge" | "separate" | "void") => {
+    if (USE_FIXTURES) {
+      flash(`(데모) ${label} 처리됨. 근거: ${reason || "—"}`);
+      setReason("");
+      return;
+    }
+    setBusyId(id);
+    try {
+      await decideMergeCandidate(id, action, reason);
+      await qc.invalidateQueries({ queryKey: ["admin", "merge-queue"] });
+      flash(`${label} 처리됨 (감사 로그 기록)`);
+      setReason("");
+    } catch (e) {
+      flash(e instanceof ApiError ? e.message : `${label} 처리에 실패했습니다`);
+    } finally {
+      setBusyId(null);
+    }
   };
 
   return (
@@ -79,10 +98,10 @@ export default function MergeQueueScreen() {
                   <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="판단 근거 (선택 · 감사 로그에 기록됩니다)"
                     style={{ width: "100%", boxSizing: "border-box", padding: "12px 14px", borderRadius: 10, border: "1px solid rgba(20,19,15,0.1)", background: "#FBFAF7", outline: "none", font: "500 12.5px Pretendard" }} />
                   <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-                    <Btn tone="primary" disabled={!CAN.merge(role)} onClick={() => act("병합")}>병합 (order 5 부여)</Btn>
-                    <Btn disabled={!CAN.merge(role)} onClick={() => act("분리")}>별도 항목으로 분리</Btn>
-                    <Btn tone="danger" disabled={!CAN.void(role)} onClick={() => act("VOID")} title={!CAN.void(role) ? "OPERATOR 이상 필요" : undefined}>VOID (허위/규정위반)</Btn>
-                    <Btn onClick={() => act("보류")}>보류 → 다음</Btn>
+                    <Btn tone="primary" disabled={!CAN.merge(role) || busyId === mi.id} onClick={() => act(mi.id, "병합", "merge")}>병합</Btn>
+                    <Btn disabled={!CAN.merge(role) || busyId === mi.id} onClick={() => act(mi.id, "분리", "separate")}>별도 항목으로 분리</Btn>
+                    <Btn tone="danger" disabled={!CAN.void(role) || busyId === mi.id} onClick={() => act(mi.id, "VOID", "void")} title={!CAN.void(role) ? "OPERATOR 이상 필요" : undefined}>VOID (허위/규정위반)</Btn>
+                    <Btn onClick={() => flash("다음 항목으로 보류")}>보류 → 다음</Btn>
                   </div>
                   {!CAN.void(role) && <div style={{ marginTop: 11, font: "500 11.5px Pretendard", color: C.fading }}>현재 역할({role})에는 VOID 권한이 없습니다. OPERATOR 이상 필요.</div>}
                 </div>

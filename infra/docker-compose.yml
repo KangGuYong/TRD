@@ -17,8 +17,25 @@ services:
       timeout: 3s
       retries: 20
 
+  embeddings:
+    # 한국어 특화 임베딩(KURE-v1, 1024-dim — trend_items.embedding vector(1024)과 일치). 온프레미스, 외부 전송 없음(M2).
+    image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.6
+    container_name: trd-embeddings
+    command: ["--model-id", "nlpai-lab/KURE-v1"]
+    ports:
+      - "6000:80"
+    volumes:
+      - trd-embeddings-cache:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:80/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 120s   # 최초 기동 시 모델 다운로드(수 GB) 시간 확보
+
 volumes:
   trd-db:
+  trd-embeddings-cache:
 
 
  # 백엔드는 최초 1회 `gradle wrapper` 후 `./gradlew :app:bootRun` 으로 기동하거나

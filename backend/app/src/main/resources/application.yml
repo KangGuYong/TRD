@@ -19,6 +19,11 @@ spring:
 # firebase:
 #   credentials-path: ${FIREBASE_CREDENTIALS_PATH}
 
+# 온프레미스 한국어 임베딩(KURE-v1, TEI). infra/docker-compose의 embeddings 서비스(M2).
+embedding:
+  service:
+    url: ${EMBEDDING_SERVICE_URL:http://localhost:6000}
+
 # 시간은 UTC 저장, 표시만 KST (04 §8)
 server:
   port: ${PORT:8080}

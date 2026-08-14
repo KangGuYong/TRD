@@ -4,8 +4,9 @@ dependencies {
     implementation(project(":domain-core"))
     implementation(project(":persistence"))
     implementation(project(":audit"))
-    implementation(project(":merge"))
-    implementation("org.springframework.boot:spring-boot-starter-web")
-    implementation("org.springframework.boot:spring-boot-starter-security")     // 세션 + RBAC + 2FA
-    implementation("org.springframework.boot:spring-boot-starter-validation")
+    implementation("org.springframework.boot:spring-boot-starter")
+    implementation("com.fasterxml.jackson.core:jackson-databind")   // TEI /embed 응답 파싱용
+
+    testImplementation(platform("org.junit:junit-bom:5.10.3"))
+    testImplementation("org.junit.jupiter:junit-jupiter")
 }

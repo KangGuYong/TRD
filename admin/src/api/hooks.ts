@@ -32,3 +32,6 @@ export const createAdminAccount = (req: { loginId: string; displayName: string; 
 
 export const setAdminAccountDisabled = (id: string, disabled: boolean) =>
   api.post<AdminAccountSummary>(`/admin/accounts/${id}/${disabled ? "disable" : "enable"}`);
+
+export const decideMergeCandidate = (id: string, action: "merge" | "separate" | "void", reason: string) =>
+  api.post<void>(`/admin/merge-queue/${id}/${action}`, { reason });

@@ -57,6 +57,10 @@ public class TrendItem {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt = Instant.now();
 
+    /** cluster_merge 배치가 임베딩 유사도 비교를 마친 시점. NULL이면 아직 미검토(03 §2③). */
+    @Column(name = "merge_checked_at")
+    private Instant mergeCheckedAt;
+
     protected TrendItem() {}
 
     public TrendItem(String canonicalName, String normalizedKey, TrendCategory category, Instant firstSeenAt) {
@@ -75,6 +79,8 @@ public class TrendItem {
     public Instant getFirstSeenAt() { return firstSeenAt; }
     public UUID getMergedInto() { return mergedInto; }
     public int getVersion() { return version; }
+    public Instant getMergeCheckedAt() { return mergeCheckedAt; }
+    public void markMergeChecked(Instant at) { this.mergeCheckedAt = at; }
 
     public void transitionTo(TrendState next) { this.state = next; }
 

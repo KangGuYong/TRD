@@ -22,8 +22,9 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     }
     throw new ApiError(res.status, detail);
   }
-  if (res.status === 204) return undefined as T;
-  return (await res.json()) as T;
+  // void 컨트롤러 메서드는 200 + 빈 본문을 준다(204가 아님) — 상태코드로만 판단하면 JSON.parse가 깨진다.
+  const text = await res.text();
+  return (text ? JSON.parse(text) : undefined) as T;
 }
 
 export const api = {
