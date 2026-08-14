@@ -119,12 +119,12 @@ public final class ParamSimulation {
 
 ### 엔드포인트 (`ParamStudioController`, `@PreAuthorize("hasAnyRole('OPERATOR','ADMIN')")`)
 
-| Method | Path | 동작 |
-|---|---|---|
-| GET | `/admin/params/draft` | 활성 드래프트 + 현재 운영값(`ParameterSetProvider.current()`) 비교 반환 |
-| PUT | `/admin/params/draft` | `{submitterTarget, hitThreshold}` → 드래프트 값 갱신 |
-| POST | `/admin/params/draft/simulate` | 시뮬레이션 실행, 결과 반환 |
-| POST | `/admin/params/draft/request-approval` | `{reason}` → 승인 요청 생성 |
+| Method | Path                                     | 동작                                                                      |
+| ------ | ---------------------------------------- | ------------------------------------------------------------------------- |
+| GET    | `/admin/params/draft`                  | 활성 드래프트 + 현재 운영값(`ParameterSetProvider.current()`) 비교 반환 |
+| PUT    | `/admin/params/draft`                  | `{submitterTarget, hitThreshold}` → 드래프트 값 갱신                   |
+| POST   | `/admin/params/draft/simulate`         | 시뮬레이션 실행, 결과 반환                                                |
+| POST   | `/admin/params/draft/request-approval` | `{reason}` → 승인 요청 생성                                            |
 
 응답은 CLAUDE.md 관례("산정 근거 함께 반환")에 따라 필드별 diff를 포함한다:
 
