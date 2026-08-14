@@ -1,6 +1,7 @@
 package kr.trendstage.apiadmin.params;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.persistence.EntityManager;
 import kr.trendstage.apiadmin.auth.AdminValidationException;
 import kr.trendstage.apiadmin.auth.DraftLockedException;
 import kr.trendstage.audit.AuditLogService;
@@ -37,6 +38,8 @@ public class ParamStudioService {
 
     private static final int SIM_WINDOW_DAYS = 180;
     private static final List<ParamStatus> ACTIVE_STATUSES = List.of(ParamStatus.DRAFT, ParamStatus.REVIEW);
+    /** parameter_draft 동시 쓰기 직렬화용 고정 advisory lock 키. 임의의 상수. */
+    private static final long PARAM_DRAFT_LOCK_KEY = 457_829_316L;
 
     private final ParameterDraftRepository drafts;
     private final ApprovalRequestRepository approvals;
@@ -44,20 +47,27 @@ public class ParamStudioService {
     private final AuditLogService auditLogService;
     private final ObjectMapper objectMapper;
     private final Clock clock;
+    private final EntityManager entityManager;
 
     public ParamStudioService(ParameterDraftRepository drafts, ApprovalRequestRepository approvals,
                                VerdictRepository verdicts, AuditLogService auditLogService,
-                               ObjectMapper objectMapper, Clock clock) {
+                               ObjectMapper objectMapper, Clock clock, EntityManager entityManager) {
         this.drafts = drafts;
         this.approvals = approvals;
         this.verdicts = verdicts;
         this.auditLogService = auditLogService;
         this.objectMapper = objectMapper;
         this.clock = clock;
+        this.entityManager = entityManager;
     }
 
     @Transactional
     public ParameterDraft getOrCreateActiveDraft(UUID actorId) {
+        // pg_advisory_xact_lock으로 check-then-create 연산을 직렬화: 두 관리자가 동시에 active draft 생성하는 경합 방지
+        entityManager.createNativeQuery("SELECT pg_advisory_xact_lock(:key)")
+                .setParameter("key", PARAM_DRAFT_LOCK_KEY)
+                .getSingleResult();
+
         return drafts.findFirstByStatusInOrderByCreatedAtDesc(ACTIVE_STATUSES)
                 .orElseGet(() -> drafts.save(new ParameterDraft(actorId, defaultPayloadJson())));
     }
@@ -97,6 +107,7 @@ public class ParamStudioService {
 
     @Transactional
     public ParameterDraft requestApproval(UUID actorId, AdminRole actorRole, String reason) {
+        requireReason(reason);
         ParameterDraft draft = getOrCreateActiveDraft(actorId);
         if (draft.getSimResult() == null) {
             throw new AdminValidationException("시뮬레이션을 먼저 실행해야 승인 요청을 보낼 수 있습니다");
@@ -159,5 +170,11 @@ public class ParamStudioService {
     private String simResultJson(SimulationSummary s) {
         return "{\"changed\":%d,\"total\":%d,\"missToHit\":%d,\"hitToMiss\":%d,\"reachChanged\":%d}"
                 .formatted(s.changed(), s.total(), s.missToHit(), s.hitToMiss(), s.reachChanged());
+    }
+
+    private static void requireReason(String reason) {
+        if (reason == null || reason.isBlank()) {
+            throw new AdminValidationException("사유는 필수입니다");
+        }
     }
 }

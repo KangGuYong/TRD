@@ -8,6 +8,7 @@ import kr.trendstage.apiadmin.auth.InvalidCredentialsException;
 import kr.trendstage.apiadmin.auth.SelfModificationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -51,6 +52,11 @@ public class AdminApiExceptionHandler {
     @ExceptionHandler(AdminValidationException.class)
     public ResponseEntity<Map<String, Object>> handle(AdminValidationException e) {
         return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(problem(422, e.getMessage()));
+    }
+
+    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+    public ResponseEntity<Map<String, Object>> handle(ObjectOptimisticLockingFailureException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(problem(409, "다른 관리자가 먼저 수정했습니다 — 새로고침 후 다시 시도하세요"));
     }
 
     private Map<String, Object> problem(int status, String detail) {
