@@ -2,6 +2,7 @@ package kr.trendstage.apiadmin.web;
 
 import kr.trendstage.apiadmin.auth.AccountDisabledException;
 import kr.trendstage.apiadmin.auth.AdminValidationException;
+import kr.trendstage.apiadmin.auth.DraftLockedException;
 import kr.trendstage.apiadmin.auth.DuplicateLoginIdException;
 import kr.trendstage.apiadmin.auth.InvalidCredentialsException;
 import kr.trendstage.apiadmin.auth.SelfModificationException;
@@ -34,6 +35,11 @@ public class AdminApiExceptionHandler {
 
     @ExceptionHandler(DuplicateLoginIdException.class)
     public ResponseEntity<Map<String, Object>> handle(DuplicateLoginIdException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(problem(409, e.getMessage()));
+    }
+
+    @ExceptionHandler(DraftLockedException.class)
+    public ResponseEntity<Map<String, Object>> handle(DraftLockedException e) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(problem(409, e.getMessage()));
     }
 
