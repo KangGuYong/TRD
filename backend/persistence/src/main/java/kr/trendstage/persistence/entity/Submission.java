@@ -81,6 +81,7 @@ public class Submission {
     public short getConfidence() { return confidence; }
     public String getSourcePlatform() { return sourcePlatform; }
     public String getOneLine() { return oneLine; }
+    public String getEvidenceUrl() { return evidenceUrl; }
     public SubmissionResult getResult() { return result; }
     public boolean isSeed() { return seed; }
     public Instant getCreatedAt() { return createdAt; }
