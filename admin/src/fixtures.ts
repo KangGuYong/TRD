@@ -1,5 +1,5 @@
 /** dev 시연용 데이터. 관리자 콘솔.dc.html 예시를 반영. 실 API로 대체됨. */
-import type { AdminAccountSummary, AdminUserDetail, AuditEntry, ImminentItem, JudgedItem, MergeCandidate, MergePreview, ParameterPayload, QueueSummary, SimulationResult, VerdictListResponse } from "./api/types";
+import type { AdminAccountSummary, AdminUserDetail, AuditEntry, ImminentItem, JudgedItem, MergeCandidate, MergePreview, ParameterDraftView, QueueSummary, SimulationSummary, VerdictListResponse } from "./api/types";
 
 export const fxQueueSummary: QueueSummary = {
   slaBreaches: 3,
@@ -62,24 +62,14 @@ export const fxMergePreview: MergePreview = {
   dedupVoidedHandles: [],
 };
 
-export const fxParams: ParameterPayload = {
+export const fxParamDraft: ParameterDraftView = {
+  draftId: "pd-17",
+  status: "DRAFT",
   submitterTarget: 20,
+  currentSubmitterTarget: 20,
   hitThreshold: 0.2,
-  halflifeDays: 90,
-};
-
-export const fxSimulation: SimulationResult = {
-  changed: 28,
-  total: 342,
-  rows: [
-    { label: "MISS → HIT", count: 11, tone: "up" },
-    { label: "HIT → MISS", count: 17, tone: "down" },
-    { label: "등급 강등 / 승급", count: 0, tone: "neutral" },
-  ],
-  affectedUsers: 14,
-  avgDelta: -23,
-  demotions: 3,
-  promotions: 1,
+  currentHitThreshold: 0.2,
+  simResult: null,
 };
 
 export const fxUser: AdminUserDetail = {
