@@ -30,6 +30,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 export const api = {
   get: <T>(p: string) => request<T>("GET", p),
   post: <T>(p: string, b?: unknown) => request<T>("POST", p, b),
+  put: <T>(p: string, b?: unknown) => request<T>("PUT", p, b),
 };
 
 /** dev 시연용 픽스처 사용 여부. 백엔드 /admin 미구현 동안 기본 on. VITE_USE_FIXTURES=false 로 실 API 전환. */

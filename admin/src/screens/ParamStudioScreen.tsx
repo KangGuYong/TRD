@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { ApiError } from "../api/client";
 import { requestParamApproval, simulateParamDraft, updateParamDraft, useParamDraft } from "../api/hooks";
 import { Card, Btn } from "../components/ui";
 import { C } from "../theme";
@@ -26,13 +27,15 @@ export default function ParamStudioScreen() {
   const dirty = draft != null && (target !== draft.submitterTarget || hit !== draft.hitThreshold);
   const locked = draft?.status === "REVIEW";
 
+  const onError = (e: unknown) => flash(e instanceof ApiError ? e.message : "처리에 실패했습니다");
+
   const apply = async () => {
     setBusy(true);
     try {
       const next = await updateParamDraft({ submitterTarget: target, hitThreshold: hit });
       queryClient.setQueryData(["admin", "param-draft"], next);
       flash("드래프트에 적용됨 — 시뮬레이션이 필요합니다");
-    } finally { setBusy(false); }
+    } catch (e) { onError(e); } finally { setBusy(false); }
   };
 
   const runSimulation = async () => {
@@ -41,7 +44,7 @@ export default function ParamStudioScreen() {
       const next = await simulateParamDraft();
       queryClient.setQueryData(["admin", "param-draft"], next);
       flash("시뮬레이션 완료 (과거 180일 재판정)");
-    } finally { setBusy(false); }
+    } catch (e) { onError(e); } finally { setBusy(false); }
   };
 
   const requestApproval = async () => {
@@ -50,7 +53,7 @@ export default function ParamStudioScreen() {
       const next = await requestParamApproval(reason);
       queryClient.setQueryData(["admin", "param-draft"], next);
       flash("승인 요청 생성됨 (0/2) · 기본 예약 적용");
-    } finally { setBusy(false); }
+    } catch (e) { onError(e); } finally { setBusy(false); }
   };
 
   if (isLoading || !draft) return <div style={{ padding: 24, font: "500 13px Pretendard", color: C.faint }}>불러오는 중...</div>;
