@@ -9,6 +9,13 @@ export interface QueueSummary {
   imminent24h: number;
 }
 
+export interface SubmissionDetail {
+  handle: string;
+  rawInput: string;
+  oneLine: string;
+  evidenceUrl: string;
+  createdAt: string;
+}
 export interface MergeCandidate {
   id: string;
   similarity: number;
@@ -19,6 +26,22 @@ export interface MergeCandidate {
   newRows: { k: string; v: string }[];
   oldRows: { k: string; v: string }[];
   orderPreview: string[];
+  newSubmissions: SubmissionDetail[];
+  oldSubmissions: SubmissionDetail[];
+}
+
+export interface OrderEntry {
+  handle: string;
+  rankBefore: number | null;
+  rankAfter: number;
+}
+export interface MergePreview {
+  newCanonicalName: string;
+  orderRank: OrderEntry[];
+  firstSeenAtBefore: string;
+  firstSeenAtAfter: string;
+  baselineShifted: boolean;
+  dedupVoidedHandles: string[];
 }
 
 export interface ParameterPayload {
