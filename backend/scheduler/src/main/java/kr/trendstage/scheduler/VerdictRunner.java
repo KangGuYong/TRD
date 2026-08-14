@@ -77,7 +77,11 @@ public class VerdictRunner {
     }
 
     private boolean isDue(TrendItem item, Instant now) {
-        return !now.isBefore(item.getFirstSeenAt().plus(Duration.ofDays(JUDGE_WINDOW_DAYS)));
+        // ADM-200 유예 연장(judgment_deadline_override)이 있으면 그걸 우선한다 — 없으면 기본 D+14.
+        Instant deadline = item.getJudgmentDeadlineOverride() != null
+                ? item.getJudgmentDeadlineOverride()
+                : item.getFirstSeenAt().plus(Duration.ofDays(JUDGE_WINDOW_DAYS));
+        return !now.isBefore(deadline);
     }
 
     @Transactional

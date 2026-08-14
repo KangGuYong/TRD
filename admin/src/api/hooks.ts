@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { api, USE_FIXTURES } from "./client";
 import * as fx from "../fixtures";
-import type { AdminAccountSummary, AdminUserDetail, AuditEntry, MergeCandidate, QueueSummary } from "./types";
+import type { AdminAccountSummary, AdminUserDetail, AuditEntry, MergeCandidate, QueueSummary, VerdictListResponse } from "./types";
 
 /** 픽스처 on이면 즉시 픽스처, off면 실 API. 동일 훅으로 백엔드 전환. */
 function useData<T>(key: unknown[], path: string, fixture: T) {
@@ -35,3 +35,15 @@ export const setAdminAccountDisabled = (id: string, disabled: boolean) =>
 
 export const decideMergeCandidate = (id: string, action: "merge" | "separate" | "void", reason: string) =>
   api.post<void>(`/admin/merge-queue/${id}/${action}`, { reason });
+
+export const useVerdicts = () =>
+  useData<VerdictListResponse>(["admin", "verdicts"], "/admin/verdicts", fx.fxVerdicts);
+
+export const voidVerdict = (trendItemId: string, reason: string) =>
+  api.post<void>(`/admin/verdicts/${trendItemId}/void`, { reason });
+
+export const rejudgeVerdict = (trendItemId: string, reason: string) =>
+  api.post<void>(`/admin/verdicts/${trendItemId}/rejudge`, { reason });
+
+export const extendVerdictGrace = (trendItemId: string, days: number, reason: string) =>
+  api.post<void>(`/admin/verdicts/${trendItemId}/extend-grace`, { days, reason });

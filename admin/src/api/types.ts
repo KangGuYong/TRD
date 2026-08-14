@@ -75,3 +75,25 @@ export interface AdminAccountSummary {
   disabledAt: string | null;
   createdAt: string;
 }
+
+export interface JudgedItem {
+  trendItemId: string;
+  canonicalName: string;
+  result: string;
+  reachLevel: string | null;
+  scoreT: string | null;
+  judgedAt: string | null;
+  superseded: boolean;
+}
+export interface ImminentItem {
+  trendItemId: string;
+  canonicalName: string;
+  firstSeenAt: string;
+  deadline: string;
+  daysLeft: number;
+  graceExtended: boolean;
+}
+export interface VerdictListResponse {
+  judged: JudgedItem[];
+  imminent: ImminentItem[];
+}

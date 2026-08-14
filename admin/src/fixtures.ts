@@ -1,5 +1,5 @@
 /** dev 시연용 데이터. 관리자 콘솔.dc.html 예시를 반영. 실 API로 대체됨. */
-import type { AdminAccountSummary, AdminUserDetail, AuditEntry, MergeCandidate, ParameterPayload, QueueSummary, SimulationResult } from "./api/types";
+import type { AdminAccountSummary, AdminUserDetail, AuditEntry, ImminentItem, JudgedItem, MergeCandidate, ParameterPayload, QueueSummary, SimulationResult, VerdictListResponse } from "./api/types";
 
 export const fxQueueSummary: QueueSummary = {
   slaBreaches: 3,
@@ -84,6 +84,18 @@ export const fxAdminAccounts: AdminAccountSummary[] = [
   { id: "a3", loginId: "auditor_lee", displayName: "이감사", role: "AUDITOR", lastLoginAt: "2026-08-06 14:03", disabledAt: null, createdAt: "2026-07-10 09:00" },
   { id: "a4", loginId: "reviewer_old", displayName: "퇴사자", role: "REVIEWER", lastLoginAt: "2026-06-01 09:00", disabledAt: "2026-06-15 00:00", createdAt: "2026-05-01 09:00" },
 ];
+
+const fxJudged: JudgedItem[] = [
+  { trendItemId: "t1", canonicalName: "탕후루 챌린지", result: "HIT", reachLevel: "L2", scoreT: "0.5500", judgedAt: "2026-08-07 03:00", superseded: false },
+  { trendItemId: "t2", canonicalName: "도파민 디톡스", result: "MISS", reachLevel: null, scoreT: "0.1200", judgedAt: "2026-08-06 03:00", superseded: false },
+  { trendItemId: "t3", canonicalName: "제로슈거 밀키트", result: "VOID", reachLevel: null, scoreT: null, judgedAt: "2026-08-05 03:00", superseded: true },
+];
+const fxImminent: ImminentItem[] = [
+  { trendItemId: "t4", canonicalName: "가을 캠퍼스룩", firstSeenAt: "2026-07-31 09:00", deadline: "2026-08-14 09:00", daysLeft: 0, graceExtended: false },
+  { trendItemId: "t5", canonicalName: "저속노화 식단", firstSeenAt: "2026-08-01 12:00", deadline: "2026-08-15 12:00", daysLeft: 1, graceExtended: false },
+  { trendItemId: "t6", canonicalName: "역주행 챌린지", firstSeenAt: "2026-07-28 08:00", deadline: "2026-08-18 08:00", daysLeft: 4, graceExtended: true },
+];
+export const fxVerdicts: VerdictListResponse = { judged: fxJudged, imminent: fxImminent };
 
 export const fxAudit: AuditEntry[] = [
   { id: 5012, actor: "김운영", role: "OPERATOR", action: "MERGE", targetType: "TREND", targetId: "#1204", createdAt: "2026-08-07 16:41" },

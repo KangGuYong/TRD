@@ -61,6 +61,10 @@ public class TrendItem {
     @Column(name = "merge_checked_at")
     private Instant mergeCheckedAt;
 
+    /** ADM-200 판정 유예 연장. NULL이면 기본 D+14. 최대 D+21(firstSeenAt+21일)까지만 허용(서비스 계층 검증). */
+    @Column(name = "judgment_deadline_override")
+    private Instant judgmentDeadlineOverride;
+
     protected TrendItem() {}
 
     public TrendItem(String canonicalName, String normalizedKey, TrendCategory category, Instant firstSeenAt) {
@@ -81,6 +85,8 @@ public class TrendItem {
     public int getVersion() { return version; }
     public Instant getMergeCheckedAt() { return mergeCheckedAt; }
     public void markMergeChecked(Instant at) { this.mergeCheckedAt = at; }
+    public Instant getJudgmentDeadlineOverride() { return judgmentDeadlineOverride; }
+    public void extendJudgmentDeadline(Instant newDeadline) { this.judgmentDeadlineOverride = newDeadline; }
 
     public void transitionTo(TrendState next) { this.state = next; }
 
