@@ -44,20 +44,21 @@ export interface MergePreview {
   dedupVoidedHandles: string[];
 }
 
-export interface ParameterPayload {
-  /** T가 1.0에 도달하는 목표 서로 다른 제보자 수. 근거 없는 초기 추정치(O1). */
-  submitterTarget: number;
-  hitThreshold: number;
-  halflifeDays: number;
-}
-export interface SimulationResult {
+export interface SimulationSummary {
   changed: number;
   total: number;
-  rows: { label: string; count: number; tone: "up" | "down" | "neutral" }[];
-  affectedUsers: number;
-  avgDelta: number;
-  demotions: number;
-  promotions: number;
+  missToHit: number;
+  hitToMiss: number;
+  reachChanged: number;
+}
+export interface ParameterDraftView {
+  draftId: string;
+  status: "DRAFT" | "REVIEW";
+  submitterTarget: number;
+  currentSubmitterTarget: number;
+  hitThreshold: number;
+  currentHitThreshold: number;
+  simResult: SimulationSummary | null;
 }
 
 export interface LedgerEntry {
