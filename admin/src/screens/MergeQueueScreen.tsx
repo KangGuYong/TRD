@@ -50,6 +50,7 @@ export default function MergeQueueScreen() {
     setPreviewLabel(label);
     setPreviewData(null);
     setPreviewError(null);
+    setReason("");
     setPreviewLoading(true);
     try {
       const data = USE_FIXTURES ? fx.fxMergePreview : await fetchMergePreview(id);
