@@ -13,7 +13,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * 병합 실행(03 §3·§4). 배치(cluster_merge, 0.85↑ 자동)와 ADM-100 관리자 확정이 공유한다.
@@ -100,16 +99,12 @@ public class MergeService {
     private void dedupSameUserSubmissions(UUID trendItemA, UUID trendItemB) {
         List<Submission> a = submissions.findByTrendItemIdAndResultNot(trendItemA, SubmissionResult.VOID);
         List<Submission> b = submissions.findByTrendItemIdAndResultNot(trendItemB, SubmissionResult.VOID);
-        Map<UUID, List<Submission>> byUser = new HashMap<>();
-        for (Submission s : a) byUser.computeIfAbsent(s.getUserId(), k -> new ArrayList<>()).add(s);
-        for (Submission s : b) byUser.computeIfAbsent(s.getUserId(), k -> new ArrayList<>()).add(s);
+        Map<UUID, Submission> byId = new HashMap<>();
+        for (Submission s : a) byId.put(s.getId(), s);
+        for (Submission s : b) byId.put(s.getId(), s);
 
-        for (List<Submission> group : byUser.values()) {
-            if (group.size() < 2) continue;
-            group.sort(Comparator.comparing(Submission::getCreatedAt));
-            // 가장 이른 것만 유효로 남기고 나머지(같은 유저의 늦은 중복)는 VOID.
-            for (int i = 1; i < group.size(); i++) group.get(i).voidOut();
-        }
+        Set<UUID> voided = MergeComputation.computeDedup(toInputs(a), toInputs(b));
+        for (UUID id : voided) byId.get(id).voidOut();
     }
 
     private void mergeAliases(TrendItem survivor, TrendItem loser) {
@@ -121,21 +116,12 @@ public class MergeService {
 
     private void recomputeCanonicalName(TrendItem survivor) {
         List<Submission> active = submissions.findByTrendItemIdAndResultNot(survivor.getId(), SubmissionResult.VOID);
-        if (active.isEmpty()) return;
-        Map<String, List<Submission>> byRawInput = active.stream()
-                .collect(Collectors.groupingBy(Submission::getRawInput));
-        String best = null;
-        int bestCount = -1;
-        Instant bestEarliest = null;
-        for (var e : byRawInput.entrySet()) {
-            int count = e.getValue().size();
-            Instant earliest = e.getValue().stream().map(Submission::getCreatedAt).min(Instant::compareTo).orElseThrow();
-            if (count > bestCount || (count == bestCount && earliest.isBefore(bestEarliest))) {
-                best = e.getKey();
-                bestCount = count;
-                bestEarliest = earliest;
-            }
-        }
-        survivor.setCanonicalName(best);
+        MergeComputation.computeCanonicalName(toInputs(active)).ifPresent(survivor::setCanonicalName);
+    }
+
+    private static List<MergeComputation.SubmissionInput> toInputs(List<Submission> subs) {
+        return subs.stream()
+                .map(s -> new MergeComputation.SubmissionInput(s.getId(), s.getUserId(), s.getRawInput(), s.getCreatedAt()))
+                .toList();
     }
 }
