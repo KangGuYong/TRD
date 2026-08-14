@@ -28,17 +28,20 @@ public class MergeQueueController {
     private final MergeQueueRepository mergeQueue;
     private final TrendItemRepository trendItems;
     private final SubmissionRepository submissions;
+    private final SubmissionOrderRankRepository orderRanks;
     private final UserRepository users;
     private final UserGradeRepository userGrades;
     private final MergeService mergeService;
     private final Clock clock;
 
     public MergeQueueController(MergeQueueRepository mergeQueue, TrendItemRepository trendItems,
-                                 SubmissionRepository submissions, UserRepository users,
-                                 UserGradeRepository userGrades, MergeService mergeService, Clock clock) {
+                                 SubmissionRepository submissions, SubmissionOrderRankRepository orderRanks,
+                                 UserRepository users, UserGradeRepository userGrades,
+                                 MergeService mergeService, Clock clock) {
         this.mergeQueue = mergeQueue;
         this.trendItems = trendItems;
         this.submissions = submissions;
+        this.orderRanks = orderRanks;
         this.users = users;
         this.userGrades = userGrades;
         this.mergeService = mergeService;
@@ -46,10 +49,18 @@ public class MergeQueueController {
     }
 
     public record KV(String k, String v) {}
+    public record SubmissionDetail(String handle, String rawInput, String oneLine,
+                                    String evidenceUrl, String createdAt) {}
     public record MergeCandidateResponse(String id, double similarity, String newName, String oldName,
                                           String oldClusterId, String ago, List<KV> newRows, List<KV> oldRows,
-                                          List<String> orderPreview) {}
+                                          List<String> orderPreview, List<SubmissionDetail> newSubmissions,
+                                          List<SubmissionDetail> oldSubmissions) {}
     public record DecisionRequest(String reason) {}
+
+    public record OrderEntry(String handle, Integer rankBefore, int rankAfter) {}
+    public record MergePreviewResponse(String newCanonicalName, List<OrderEntry> orderRank,
+                                        String firstSeenAtBefore, String firstSeenAtAfter,
+                                        boolean baselineShifted, List<String> dedupVoidedHandles) {}
 
     @GetMapping
     @PreAuthorize("hasAnyRole('REVIEWER', 'OPERATOR', 'ADMIN', 'AUDITOR')")
@@ -57,6 +68,45 @@ public class MergeQueueController {
         return mergeQueue.findByStatusOrderByCreatedAtAsc(MergeQueueStatus.PENDING).stream()
                 .map(this::toResponse)
                 .toList();
+    }
+
+    /** 온디맨드 dry-run — 병합 실행과 같은 계산(MergeComputation)을 공유하므로 실제 결과와 일치한다. */
+    @GetMapping("/{id}/preview")
+    @PreAuthorize("hasAnyRole('REVIEWER', 'OPERATOR', 'ADMIN', 'AUDITOR')")
+    public MergePreviewResponse preview(@PathVariable UUID id) {
+        MergeQueueEntry entry = requirePending(id);
+        TrendItem newItem = trendItems.findById(entry.getNewTrendItemId()).orElseThrow();
+        TrendItem oldItem = trendItems.findById(entry.getOldTrendItemId()).orElseThrow();
+
+        TrendItem survivor = newItem.getFirstSeenAt().isBefore(oldItem.getFirstSeenAt()) ? newItem : oldItem;
+        TrendItem loser = survivor == newItem ? oldItem : newItem;
+
+        MergeService.PreviewResult result = mergeService.preview(survivor.getId(), loser.getId());
+
+        Map<UUID, Integer> beforeRank = new HashMap<>();
+        for (SubmissionOrderRank r : orderRanks.findByTrendItemId(survivor.getId())) beforeRank.put(r.getSubmissionId(), r.getOrderRank());
+        for (SubmissionOrderRank r : orderRanks.findByTrendItemId(loser.getId())) beforeRank.put(r.getSubmissionId(), r.getOrderRank());
+
+        List<OrderEntry> orderRank = result.orderAfter().stream()
+                .map(o -> new OrderEntry(handleOf(o.userId()), beforeRank.get(o.submissionId()), o.rank()))
+                .toList();
+
+        List<String> dedupVoidedHandles = new ArrayList<>();
+        if (!result.dedupVoidedSubmissionIds().isEmpty()) {
+            List<Submission> combined = new ArrayList<>();
+            combined.addAll(submissions.findByTrendItemIdAndResultNot(survivor.getId(), SubmissionResult.VOID));
+            combined.addAll(submissions.findByTrendItemIdAndResultNot(loser.getId(), SubmissionResult.VOID));
+            for (Submission s : combined) {
+                if (result.dedupVoidedSubmissionIds().contains(s.getId())) {
+                    dedupVoidedHandles.add(handleOf(s.getUserId()));
+                }
+            }
+        }
+
+        return new MergePreviewResponse(
+                result.newCanonicalName(), orderRank,
+                result.firstSeenAtBefore().toString(), result.firstSeenAtAfter().toString(),
+                result.baselineShifted(), dedupVoidedHandles);
     }
 
     @PostMapping("/{id}/merge")
@@ -115,7 +165,7 @@ public class MergeQueueController {
         newRows.add(new KV("카테고리", newItem.getCategory().name()));
         submissions.findFirstByTrendItemIdOrderByCreatedAtAsc(newItem.getId()).ifPresent(founding -> {
             newRows.add(new KV("플랫폼", founding.getSourcePlatform()));
-            String submitter = users.findById(founding.getUserId()).map(UserAccount::getHandle).orElse("(탈퇴)");
+            String submitter = handleOf(founding.getUserId());
             String gradeInfo = userGrades.findTopByUserIdOrderByComputedAtDesc(founding.getUserId())
                     .map(g -> "TI %.2f / %s".formatted(g.getTrustIndex().doubleValue(), g.getGrade()))
                     .orElse("미평가");
@@ -132,13 +182,28 @@ public class MergeQueueController {
         );
 
         List<String> orderPreview = buildOrderPreview(newItem.getId(), oldItem.getId());
+        List<SubmissionDetail> newSubmissions = submissionDetails(newItem.getId());
+        List<SubmissionDetail> oldSubmissions = submissionDetails(oldItem.getId());
 
         return new MergeCandidateResponse(
                 entry.getId().toString(), entry.getSimilarity().doubleValue(),
                 newItem.getCanonicalName(), oldItem.getCanonicalName(),
                 "#" + oldItem.getId().toString().substring(0, 8),
                 formatAgo(entry.getCreatedAt()),
-                newRows, oldRows, orderPreview);
+                newRows, oldRows, orderPreview, newSubmissions, oldSubmissions);
+    }
+
+    /** 검수자가 원문을 직접 읽고 판단할 수 있도록 — evidence_url/one_line/raw_input은 요약 필드로 대체 불가(03 §2④). */
+    private List<SubmissionDetail> submissionDetails(UUID trendItemId) {
+        return submissions.findByTrendItemIdAndResultNot(trendItemId, SubmissionResult.VOID).stream()
+                .sorted(Comparator.comparing(Submission::getCreatedAt))
+                .map(s -> new SubmissionDetail(handleOf(s.getUserId()), s.getRawInput(), s.getOneLine(),
+                        s.getEvidenceUrl(), formatAgo(s.getCreatedAt())))
+                .toList();
+    }
+
+    private String handleOf(UUID userId) {
+        return users.findById(userId).map(UserAccount::getHandle).orElse("(탈퇴)");
     }
 
     private List<String> buildOrderPreview(UUID newTrendItemId, UUID oldTrendItemId) {
@@ -150,8 +215,7 @@ public class MergeQueueController {
         List<String> preview = new ArrayList<>();
         int rank = 1;
         for (Submission s : combined) {
-            String handle = users.findById(s.getUserId()).map(UserAccount::getHandle).orElse("탈퇴유저");
-            preview.add("order%d %s".formatted(rank++, handle));
+            preview.add("order%d %s".formatted(rank++, handleOf(s.getUserId())));
         }
         return preview;
     }
