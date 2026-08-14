@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { api, USE_FIXTURES } from "./client";
 import * as fx from "../fixtures";
-import type { AdminAccountSummary, AdminUserDetail, AuditEntry, MergeCandidate, MergePreview, QueueSummary, VerdictListResponse } from "./types";
+import type { AdminAccountSummary, AdminUserDetail, AuditEntry, MergeCandidate, MergePreview, ParameterDraftView, QueueSummary, VerdictListResponse } from "./types";
 
 /** 픽스처 on이면 즉시 픽스처, off면 실 API. 동일 훅으로 백엔드 전환. */
 function useData<T>(key: unknown[], path: string, fixture: T) {
@@ -38,6 +38,18 @@ export const decideMergeCandidate = (id: string, action: "merge" | "separate" | 
 
 export const fetchMergePreview = (id: string) =>
   api.get<MergePreview>(`/admin/merge-queue/${id}/preview`);
+
+export const useParamDraft = () =>
+  useData<ParameterDraftView>(["admin", "param-draft"], "/admin/params/draft", fx.fxParamDraft);
+
+export const updateParamDraft = (body: { submitterTarget: number; hitThreshold: number }) =>
+  api.put<ParameterDraftView>("/admin/params/draft", body);
+
+export const simulateParamDraft = () =>
+  api.post<ParameterDraftView>("/admin/params/draft/simulate");
+
+export const requestParamApproval = (reason: string) =>
+  api.post<ParameterDraftView>("/admin/params/draft/request-approval", { reason });
 
 export const useVerdicts = () =>
   useData<VerdictListResponse>(["admin", "verdicts"], "/admin/verdicts", fx.fxVerdicts);
