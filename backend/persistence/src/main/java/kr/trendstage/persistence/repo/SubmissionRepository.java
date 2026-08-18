@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -34,4 +35,8 @@ public interface SubmissionRepository extends JpaRepository<Submission, UUID> {
 
     /** 409 응답의 dupeRank(클러스터 내 현재 제보 수) 계산용. */
     long countByTrendItemIdAndResultNot(UUID trendItemId, SubmissionResult excluded);
+
+    long countByCreatedAtAfter(Instant since);
+
+    long countByCreatedAtAfterAndSeedTrue(Instant since);
 }
