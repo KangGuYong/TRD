@@ -11,11 +11,15 @@ import UserLedgerScreen from "./screens/UserLedgerScreen";
 import AuditLogScreen from "./screens/AuditLogScreen";
 import AdminAccountsScreen from "./screens/AdminAccountsScreen";
 import LoginScreen from "./screens/LoginScreen";
+import TrendListScreen from "./screens/TrendListScreen";
+import TrendDetailScreen from "./screens/TrendDetailScreen";
 import { C } from "./theme";
 
 const TITLE: Record<ScreenId, string> = {
   "ADM-010": "오늘의 작업",
   "ADM-100": "병합 검수",
+  "ADM-110": "트렌드 항목 목록",
+  "ADM-111": "트렌드 항목 상세",
   "ADM-200": "판정 관리",
   "ADM-500": "시딩 관리",
   "ADM-600": "파라미터 스튜디오",
@@ -50,11 +54,14 @@ function AuthGate() {
 
 function Console() {
   const [screen, setScreen] = useState<ScreenId>("ADM-010");
+  const [selectedTrendItemId, setSelectedTrendItemId] = useState<string | null>(null);
 
   return (
     <Layout screen={screen} setScreen={setScreen} title={TITLE[screen]}>
       {screen === "ADM-010" && <TodayScreen goMerge={() => setScreen("ADM-100")} />}
       {screen === "ADM-100" && <MergeQueueScreen />}
+      {screen === "ADM-110" && <TrendListScreen onSelect={(id) => { setSelectedTrendItemId(id); setScreen("ADM-111"); }} />}
+      {screen === "ADM-111" && <TrendDetailScreen trendItemId={selectedTrendItemId} onBack={() => setScreen("ADM-110")} />}
       {screen === "ADM-200" && <VerdictScreen />}
       {screen === "ADM-500" && <SeedScreen />}
       {screen === "ADM-600" && <ParamStudioScreen />}
