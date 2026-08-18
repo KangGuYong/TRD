@@ -142,3 +142,20 @@ export interface SeedAccuracyRow {
   judged: number;
   trustIndex: number;
 }
+
+export interface TrendItemSummary {
+  id: string; canonicalName: string; category: string; state: string;
+  firstSeenAt: string; submitterCount: number; currentResult: string | null;
+}
+export interface SubmissionRow {
+  submissionId: string; userHandle: string; orderRank: number;
+  confidence: number; submitterTi: number | null; createdAt: string;
+}
+export interface TrendItemDetail {
+  id: string; canonicalName: string; category: string; state: string;
+  firstSeenAt: string; deadline: string; daysLeft: number; graceExtended: boolean;
+  distinctSubmitters: number; distinctPlatforms: number; endorseCount: number;
+  currentResult: string | null; currentReachLevel: string | null; currentScoreT: string | null; currentJudgedAt: string | null;
+  previewResult: string | null; previewReachLevel: string | null; previewScoreT: string | null;
+  submissions: SubmissionRow[];
+}
