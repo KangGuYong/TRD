@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ApiError } from "../api/client";
+import { ApiError, USE_FIXTURES } from "../api/client";
 import { registerSeed, useSeedAccuracy } from "../api/hooks";
 import type { SeedSubmissionRequest } from "../api/types";
 import { Card, Btn, StateView } from "../components/ui";
@@ -29,6 +29,11 @@ export default function SeedScreen() {
     && form.evidenceUrl.trim() !== "" && form.oneLine.trim() !== "" && !busy;
 
   const submit = async () => {
+    if (USE_FIXTURES) {
+      flash(`(데모) 시딩 등록 완료: ${form.name}`);
+      setForm(EMPTY);
+      return;
+    }
     setBusy(true);
     try {
       const result = await registerSeed(form);
