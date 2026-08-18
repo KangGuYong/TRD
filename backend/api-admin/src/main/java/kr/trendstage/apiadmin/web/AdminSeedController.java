@@ -1,5 +1,6 @@
 package kr.trendstage.apiadmin.web;
 
+import jakarta.validation.Valid;
 import kr.trendstage.apiadmin.auth.AdminPrincipal;
 import kr.trendstage.apiadmin.seed.AdminSeedService;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -21,9 +22,9 @@ public class AdminSeedController {
 
     @PostMapping("/submissions")
     @PreAuthorize("hasAnyRole('OPERATOR', 'ADMIN')")
-    public AdminSeedService.SeedSubmissionResult register(@RequestBody AdminSeedService.SeedSubmissionRequest req,
+    public AdminSeedService.SeedSubmissionResult register(@RequestBody @Valid AdminSeedService.SeedSubmissionRequest req,
                                                             @AuthenticationPrincipal AdminPrincipal actor) {
-        return service.registerSeed(actor.id(), req);
+        return service.registerSeed(actor.id(), actor.role(), req);
     }
 
     @GetMapping("/accuracy")

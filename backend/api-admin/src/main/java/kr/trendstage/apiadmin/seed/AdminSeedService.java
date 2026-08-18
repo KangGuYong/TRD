@@ -1,6 +1,10 @@
 package kr.trendstage.apiadmin.seed;
 
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import kr.trendstage.apiadmin.auth.AdminValidationException;
+import kr.trendstage.audit.AuditLogService;
 import kr.trendstage.domain.params.ParameterSet;
 import kr.trendstage.domain.score.TrustIndex;
 import kr.trendstage.domain.trend.NameNormalizer;
@@ -12,6 +16,7 @@ import kr.trendstage.persistence.repo.AdminAccountRepository;
 import kr.trendstage.persistence.repo.SubmissionRepository;
 import kr.trendstage.persistence.repo.TrendItemRepository;
 import kr.trendstage.persistence.repo.UserRepository;
+import kr.trendstage.persistence.type.AdminRole;
 import kr.trendstage.persistence.type.SubmissionResult;
 import kr.trendstage.persistence.type.TrendCategory;
 import kr.trendstage.persistence.type.TrendState;
@@ -20,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -37,24 +43,39 @@ public class AdminSeedService {
     private final UserRepository users;
     private final TrendItemRepository trendItems;
     private final SubmissionRepository submissions;
+    private final AuditLogService auditLogService;
 
     public AdminSeedService(AdminAccountRepository adminAccounts, UserRepository users,
-                            TrendItemRepository trendItems, SubmissionRepository submissions) {
+                            TrendItemRepository trendItems, SubmissionRepository submissions,
+                            AuditLogService auditLogService) {
         this.adminAccounts = adminAccounts;
         this.users = users;
         this.trendItems = trendItems;
         this.submissions = submissions;
+        this.auditLogService = auditLogService;
     }
 
-    public record SeedSubmissionRequest(String name, String category, String platform,
-                                         String evidenceUrl, Integer confidence, String oneLine) {}
+    public record SeedSubmissionRequest(
+            @NotBlank @Size(max = 120) String name,
+            @NotBlank String category,
+            @NotBlank @Size(max = 60) String platform,
+            @NotBlank String evidenceUrl,
+            @NotNull Integer confidence,
+            @NotBlank @Size(max = 200) String oneLine) {}
     public record SeedSubmissionResult(String submissionId, String canonicalName, String trendItemId) {}
     public record SeedAccuracyRow(String operatorName, int hit, int miss, int judged, double trustIndex) {}
 
     @Transactional
-    public SeedSubmissionResult registerSeed(UUID actorId, SeedSubmissionRequest req) {
+    public SeedSubmissionResult registerSeed(UUID actorId, AdminRole actorRole, SeedSubmissionRequest req) {
         if (!VALID_CONFIDENCE.contains(req.confidence())) {
             throw new AdminValidationException("confidence는 10/30/50 중 하나여야 합니다");
+        }
+
+        TrendCategory category;
+        try {
+            category = TrendCategory.valueOf(req.category());
+        } catch (IllegalArgumentException e) {
+            throw new AdminValidationException("유효하지 않은 카테고리입니다");
         }
 
         AdminAccount actor = adminAccounts.findById(actorId).orElseThrow();
@@ -74,8 +95,7 @@ public class AdminSeedService {
                     item.getId(), seedUserId, SubmissionResult.VOID);
             if (dup) throw new AdminValidationException("이미 이 계정으로 시딩한 항목입니다");
         } else {
-            item = trendItems.save(new TrendItem(req.name(), normalized,
-                    TrendCategory.valueOf(req.category()), now));
+            item = trendItems.save(new TrendItem(req.name(), normalized, category, now));
             item.transitionTo(TrendState.PENDING);
         }
 
@@ -83,6 +103,9 @@ public class AdminSeedService {
                 seedUserId, item.getId(), req.name(), normalized,
                 req.confidence().shortValue(), req.platform(), req.evidenceUrl(), req.oneLine(),
                 false, true));
+
+        auditLogService.record(actorId, actorRole, "SEED_SUBMISSION_CREATE", "TREND_ITEM", item.getId(),
+                Map.of("name", req.name(), "confidence", req.confidence()));
 
         return new SeedSubmissionResult(sub.getId().toString(), item.getCanonicalName(), item.getId().toString());
     }
