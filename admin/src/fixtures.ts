@@ -1,5 +1,5 @@
 /** dev 시연용 데이터. 관리자 콘솔.dc.html 예시를 반영. 실 API로 대체됨. */
-import type { AdminAccountSummary, AdminUserDetail, AuditEntry, ImminentItem, JudgedItem, MergeCandidate, MergePreview, ParameterDraftView, QueueSummary, SimulationSummary, VerdictListResponse } from "./api/types";
+import type { AdminAccountSummary, AdminUserDetail, AuditEntry, ImminentItem, JudgedItem, MergeCandidate, MergePreview, ParameterDraftView, QueueSummary, SeedAccuracyRow, SimulationSummary, VerdictListResponse } from "./api/types";
 
 export const fxQueueSummary: QueueSummary = {
   slaBreaches: 3,
@@ -115,4 +115,10 @@ export const fxAudit: AuditEntry[] = [
   { id: 5010, actor: "이감사", role: "AUDITOR", action: "PII_VIEW", targetType: "USER", targetId: "user_7731", createdAt: "2026-08-07 14:03" },
   { id: 5009, actor: "김운영", role: "OPERATOR", action: "VOID", targetType: "TREND", targetId: "#1188", createdAt: "2026-08-07 11:47" },
   { id: 5008, actor: "박관리", role: "ADMIN", action: "PARAM_APPLY", targetType: "DRAFT", targetId: "#16", createdAt: "2026-08-06 09:00" },
+];
+
+export const fxSeedAccuracy: SeedAccuracyRow[] = [
+  { operatorName: "김운영", hit: 14, miss: 3, judged: 17, trustIndex: 0.7273 },
+  { operatorName: "이시딩", hit: 6, miss: 6, judged: 12, trustIndex: 0.4444 },
+  { operatorName: "박담당", hit: 1, miss: 4, judged: 5, trustIndex: 0.3 },
 ];
