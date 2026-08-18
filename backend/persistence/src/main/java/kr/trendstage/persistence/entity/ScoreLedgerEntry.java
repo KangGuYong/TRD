@@ -72,6 +72,7 @@ public class ScoreLedgerEntry {
 
     public UUID getId() { return id; }
     public UUID getUserId() { return userId; }
+    public UUID getSubmissionId() { return submissionId; }
     public LedgerKind getKind() { return kind; }
     public BigDecimal getDelta() { return delta; }
     public String getReason() { return reason; }
