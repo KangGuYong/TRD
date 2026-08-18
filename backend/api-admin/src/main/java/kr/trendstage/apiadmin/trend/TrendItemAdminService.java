@@ -130,7 +130,7 @@ public class TrendItemAdminService {
                 .map(s -> new SubmissionRow(
                         s.getId().toString(),
                         users.findById(s.getUserId()).map(UserAccount::getHandle).orElse("-"),
-                        rankById.getOrDefault(s.getId(), -1), s.getConfidence(),
+                        rankById.getOrDefault(s.getId(), Integer.MAX_VALUE), s.getConfidence(),
                         userGrades.findTopByUserIdOrderByComputedAtDesc(s.getUserId())
                                 .map(g -> g.getTrustIndex().doubleValue()).orElse(null),
                         DISPLAY_FORMAT.format(s.getCreatedAt())))
