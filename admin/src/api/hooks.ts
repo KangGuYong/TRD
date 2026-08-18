@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, USE_FIXTURES } from "./client";
 import * as fx from "../fixtures";
-import type { AdminAccountSummary, AdminUserDetail, AuditEntry, MergeCandidate, MergePreview, ParameterDraftView, QueueSummary, SeedAccuracyRow, SeedSubmissionRequest, SeedSubmissionResult, VerdictListResponse } from "./types";
+import type { AdminAccountSummary, AdminUserDetail, AuditEntry, MergeCandidate, MergePreview, ParameterDraftView, QueueSummary, SeedAccuracyRow, SeedSubmissionRequest, SeedSubmissionResult, TrendItemSummary, TrendItemDetail, VerdictListResponse } from "./types";
 
 /** 픽스처 on이면 즉시 픽스처, off면 실 API. 동일 훅으로 백엔드 전환. */
 function useData<T>(key: unknown[], path: string, fixture: T) {
@@ -68,3 +68,9 @@ export const useSeedAccuracy = () =>
 
 export const registerSeed = (req: SeedSubmissionRequest) =>
   api.post<SeedSubmissionResult>("/admin/seed/submissions", req);
+
+export const useTrendItems = () =>
+  useData<TrendItemSummary[]>(["admin", "trend-items"], "/admin/trend-items", fx.fxTrendItems);
+
+export const fetchTrendItemDetail = (id: string) =>
+  api.get<TrendItemDetail>(`/admin/trend-items/${id}`);
