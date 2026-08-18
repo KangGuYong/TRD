@@ -1,5 +1,5 @@
 /** dev 시연용 데이터. 관리자 콘솔.dc.html 예시를 반영. 실 API로 대체됨. */
-import type { AdminAccountSummary, AdminUserDetail, AuditEntry, ImminentItem, JudgedItem, MergeCandidate, MergePreview, ParameterDraftView, QueueSummary, SeedAccuracyRow, SimulationSummary, VerdictListResponse } from "./api/types";
+import type { AdminAccountSummary, AdminUserDetail, AuditEntry, ImminentItem, JudgedItem, MergeCandidate, MergePreview, ParameterDraftView, QueueSummary, SeedAccuracyRow, SimulationSummary, TrendItemDetail, TrendItemSummary, VerdictListResponse } from "./api/types";
 
 export const fxQueueSummary: QueueSummary = {
   slaBreaches: 3,
@@ -122,3 +122,24 @@ export const fxSeedAccuracy: SeedAccuracyRow[] = [
   { operatorName: "이시딩", hit: 6, miss: 6, judged: 12, trustIndex: 0.4444 },
   { operatorName: "박담당", hit: 1, miss: 4, judged: 5, trustIndex: 0.3 },
 ];
+
+export const fxTrendItems: TrendItemSummary[] = [
+  { id: "ti-1", canonicalName: "○○ 챌린지", category: "CHALLENGE", state: "PENDING", firstSeenAt: "2026-08-15 09:12", submitterCount: 12, currentResult: null },
+  { id: "ti-2", canonicalName: "△△ 밈", category: "MEME", state: "JUDGING", firstSeenAt: "2026-08-10 14:30", submitterCount: 20, currentResult: null },
+  { id: "ti-3", canonicalName: "□□ 신제품", category: "PRODUCT", state: "RESOLVED", firstSeenAt: "2026-07-28 11:00", submitterCount: 25, currentResult: "HIT" },
+  { id: "ti-4", canonicalName: "◇◇ 밈", category: "MEME", state: "VOID", firstSeenAt: "2026-07-20 08:45", submitterCount: 3, currentResult: "VOID" },
+  { id: "ti-5", canonicalName: "☆☆ 챌린지", category: "CHALLENGE", state: "RESOLVED", firstSeenAt: "2026-07-15 16:20", submitterCount: 8, currentResult: "MISS" },
+];
+
+export const fxTrendItemDetail: TrendItemDetail = {
+  id: "ti-1", canonicalName: "○○ 챌린지", category: "CHALLENGE", state: "PENDING",
+  firstSeenAt: "2026-08-15 09:12", deadline: "2026-08-29 09:12", daysLeft: 9, graceExtended: false,
+  distinctSubmitters: 12, distinctPlatforms: 3, endorseCount: 6,
+  currentResult: null, currentReachLevel: null, currentScoreT: null, currentJudgedAt: null,
+  previewResult: "HIT", previewReachLevel: "L3", previewScoreT: "0.6000",
+  submissions: [
+    { submissionId: "sub-1", userHandle: "user_4410", orderRank: 1, confidence: 50, submitterTi: 0.63, createdAt: "2026-08-15 09:12" },
+    { submissionId: "sub-2", userHandle: "user_8821", orderRank: 2, confidence: 30, submitterTi: 0.51, createdAt: "2026-08-16 10:05" },
+    { submissionId: "sub-3", userHandle: "user_0092", orderRank: 3, confidence: 10, submitterTi: 0.38, createdAt: "2026-08-17 18:40" },
+  ],
+};
