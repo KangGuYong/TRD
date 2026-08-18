@@ -121,3 +121,24 @@ export interface VerdictListResponse {
   judged: JudgedItem[];
   imminent: ImminentItem[];
 }
+
+export interface SeedSubmissionRequest {
+  name: string;
+  category: "MEME" | "PRODUCT" | "PERSON_CHANNEL" | "CHALLENGE" | "SLANG" | "ETC";
+  platform: string;
+  evidenceUrl: string;
+  confidence: 10 | 30 | 50;
+  oneLine: string;
+}
+export interface SeedSubmissionResult {
+  submissionId: string;
+  canonicalName: string;
+  trendItemId: string;
+}
+export interface SeedAccuracyRow {
+  operatorName: string;
+  hit: number;
+  miss: number;
+  judged: number;
+  trustIndex: number;
+}
