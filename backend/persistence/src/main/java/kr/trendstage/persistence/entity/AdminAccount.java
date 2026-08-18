@@ -39,6 +39,9 @@ public class AdminAccount {
     @Column(name = "disabled_at")
     private Instant disabledAt;
 
+    @Column(name = "seed_user_id")
+    private UUID seedUserId;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt = Instant.now();
 
@@ -55,6 +58,9 @@ public class AdminAccount {
     public void disable(Instant at) { this.disabledAt = at; }
     public void enable() { this.disabledAt = null; }
 
+    /** ADM-500: 최초 시딩 등록 시 자동 생성된 합성 유저 계정과 연결. */
+    public void linkSeedUser(UUID seedUserId) { this.seedUserId = seedUserId; }
+
     public UUID getId() { return id; }
     public String getLoginId() { return loginId; }
     public String getDisplayName() { return displayName; }
@@ -63,5 +69,6 @@ public class AdminAccount {
     public String getPasswordHash() { return passwordHash; }
     public Instant getLastLoginAt() { return lastLoginAt; }
     public Instant getDisabledAt() { return disabledAt; }
+    public UUID getSeedUserId() { return seedUserId; }
     public Instant getCreatedAt() { return createdAt; }
 }
