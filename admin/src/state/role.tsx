@@ -24,6 +24,7 @@ export const CAN = {
   void: (r: Role) => r === "OPERATOR" || r === "ADMIN",
   merge: (r: Role) => r === "REVIEWER" || r === "OPERATOR" || r === "ADMIN",
   paramDraft: (r: Role) => r === "OPERATOR" || r === "ADMIN",
+  seedRegister: (r: Role) => r === "OPERATOR" || r === "ADMIN",
   paramApply: (r: Role) => r === "ADMIN",
   ledgerAdj: (r: Role) => r === "ADMIN",
   sanctionRequest: (r: Role) => r === "OPERATOR" || r === "ADMIN",

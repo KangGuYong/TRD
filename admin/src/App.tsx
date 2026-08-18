@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from "./state/auth";
 import TodayScreen from "./screens/TodayScreen";
 import MergeQueueScreen from "./screens/MergeQueueScreen";
 import VerdictScreen from "./screens/VerdictScreen";
+import SeedScreen from "./screens/SeedScreen";
 import ParamStudioScreen from "./screens/ParamStudioScreen";
 import UserLedgerScreen from "./screens/UserLedgerScreen";
 import AuditLogScreen from "./screens/AuditLogScreen";
@@ -16,6 +17,7 @@ const TITLE: Record<ScreenId, string> = {
   "ADM-010": "오늘의 작업",
   "ADM-100": "병합 검수",
   "ADM-200": "판정 관리",
+  "ADM-500": "시딩 관리",
   "ADM-600": "파라미터 스튜디오",
   "ADM-311": "유저 상세 · 원장",
   "ADM-700": "감사 로그",
@@ -54,6 +56,7 @@ function Console() {
       {screen === "ADM-010" && <TodayScreen goMerge={() => setScreen("ADM-100")} />}
       {screen === "ADM-100" && <MergeQueueScreen />}
       {screen === "ADM-200" && <VerdictScreen />}
+      {screen === "ADM-500" && <SeedScreen />}
       {screen === "ADM-600" && <ParamStudioScreen />}
       {screen === "ADM-311" && <UserLedgerScreen />}
       {screen === "ADM-700" && <AuditLogScreen />}
