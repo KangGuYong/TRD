@@ -29,6 +29,11 @@ public class ApiExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(problem(404, e.getMessage()));
     }
 
+    @ExceptionHandler(EndorseConflictException.class)
+    public ResponseEntity<Map<String, Object>> handle(EndorseConflictException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(problem(409, e.getMessage()));
+    }
+
     @ExceptionHandler(FirebaseNotConfiguredException.class)
     public ResponseEntity<Map<String, Object>> handle(FirebaseNotConfiguredException e) {
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(problem(503, e.getMessage()));
