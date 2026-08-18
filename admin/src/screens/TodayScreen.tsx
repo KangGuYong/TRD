@@ -14,7 +14,9 @@ export default function TodayScreen({ goMerge }: { goMerge: () => void }) {
               <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 18px", borderRadius: 12, background: "rgba(216,72,60,0.08)", border: "1px solid rgba(216,72,60,0.2)", marginBottom: 20 }}>
                 <span style={{ width: 8, height: 8, borderRadius: 9, background: C.fading }} />
                 <b style={{ color: C.fading, fontSize: 13.5 }}>SLA 초과 {d.slaBreaches}건</b>
-                <span style={{ color: C.sub, fontSize: 12.5 }}>이의 제기 큐가 5영업일 기준을 넘겼습니다</span>
+                <span style={{ color: C.sub, fontSize: 12.5 }}>
+                  {d.alerts.length > 0 ? d.alerts.map((a) => a.title).join(" · ") : "SLA 기준을 넘긴 큐가 있습니다"}
+                </span>
               </div>
             )}
 
