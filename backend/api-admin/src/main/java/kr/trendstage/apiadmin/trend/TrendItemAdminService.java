@@ -75,7 +75,8 @@ public class TrendItemAdminService {
                                     String firstSeenAt, int submitterCount, String currentResult) {}
 
     public record SubmissionRow(String submissionId, String userHandle, int orderRank,
-                                 int confidence, Double submitterTi, String createdAt) {}
+                                 int confidence, Double submitterTi, String createdAt,
+                                 String platform, String oneLine, String evidenceUrl) {}
 
     public record TrendItemDetail(
             String id, String canonicalName, String category, String state,
@@ -133,7 +134,8 @@ public class TrendItemAdminService {
                         rankById.getOrDefault(s.getId(), Integer.MAX_VALUE), s.getConfidence(),
                         userGrades.findTopByUserIdOrderByComputedAtDesc(s.getUserId())
                                 .map(g -> g.getTrustIndex().doubleValue()).orElse(null),
-                        DISPLAY_FORMAT.format(s.getCreatedAt())))
+                        DISPLAY_FORMAT.format(s.getCreatedAt()),
+                        s.getSourcePlatform(), s.getOneLine(), s.getEvidenceUrl()))
                 .toList();
 
         Instant deadline = DeadlineWindow.effectiveDeadline(item.getFirstSeenAt(), item.getJudgmentDeadlineOverride());

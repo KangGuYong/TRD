@@ -138,8 +138,11 @@ export const fxTrendItemDetail: TrendItemDetail = {
   currentResult: null, currentReachLevel: null, currentScoreT: null, currentJudgedAt: null,
   previewResult: "HIT", previewReachLevel: "L3", previewScoreT: "0.6000",
   submissions: [
-    { submissionId: "sub-1", userHandle: "user_4410", orderRank: 1, confidence: 50, submitterTi: 0.63, createdAt: "2026-08-15 09:12" },
-    { submissionId: "sub-2", userHandle: "user_8821", orderRank: 2, confidence: 30, submitterTi: 0.51, createdAt: "2026-08-16 10:05" },
-    { submissionId: "sub-3", userHandle: "user_0092", orderRank: 3, confidence: 10, submitterTi: 0.38, createdAt: "2026-08-17 18:40" },
+    { submissionId: "sub-1", userHandle: "user_4410", orderRank: 1, confidence: 50, submitterTi: 0.63, createdAt: "2026-08-15 09:12",
+      platform: "인스타", oneLine: "친구들 사이에서 다들 이걸로 챌린지 영상 찍는 중", evidenceUrl: "https://instagram.com/p/example1" },
+    { submissionId: "sub-2", userHandle: "user_8821", orderRank: 2, confidence: 30, submitterTi: 0.51, createdAt: "2026-08-16 10:05",
+      platform: "X", oneLine: "타임라인에 관련 게시물이 갑자기 늘었음", evidenceUrl: "https://x.com/example/status/123" },
+    { submissionId: "sub-3", userHandle: "user_0092", orderRank: 3, confidence: 10, submitterTi: 0.38, createdAt: "2026-08-17 18:40",
+      platform: "디시", oneLine: "갤러리에도 관련 글이 올라오기 시작함", evidenceUrl: "https://gall.dcinside.com/example" },
   ],
 };

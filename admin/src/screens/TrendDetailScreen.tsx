@@ -133,20 +133,28 @@ export default function TrendDetailScreen({ trendItemId, onBack }: { trendItemId
         <div style={{ padding: "14px 20px", borderBottom: `1px solid ${C.line}`, background: "rgba(20,19,15,0.02)" }}>
           <b style={{ fontSize: 13.5 }}>제보 이력</b>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "60px 1fr 90px 90px 150px", padding: "13px 20px", borderBottom: `1px solid ${C.line}` }}>
-          {["순위", "제보자", "확신도", "TI", "시각"].map((h) => (
+        <div style={{ overflowX: "auto" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "50px 110px 80px 1fr 130px 70px 60px 140px", minWidth: 900, padding: "13px 20px", borderBottom: `1px solid ${C.line}` }}>
+          {["순위", "제보자", "플랫폼", "제보 근거(한 줄)", "근거 URL", "확신도", "TI", "시각"].map((h) => (
             <span key={h} style={{ font: "600 10.5px Pretendard", letterSpacing: ".06em", color: C.faint }}>{h}</span>
           ))}
         </div>
         {detail.submissions.map((s) => (
-          <div key={s.submissionId} style={{ display: "grid", gridTemplateColumns: "60px 1fr 90px 90px 150px", alignItems: "center", padding: "12px 20px", borderBottom: `1px solid rgba(20,19,15,0.05)` }}>
+          <div key={s.submissionId} style={{ display: "grid", gridTemplateColumns: "50px 110px 80px 1fr 130px 70px 60px 140px", minWidth: 900, alignItems: "center", padding: "12px 20px", borderBottom: `1px solid rgba(20,19,15,0.05)` }}>
             <span style={{ font: "600 12px ui-monospace, monospace" }}>{s.orderRank}</span>
             <span style={{ font: "600 12.5px Pretendard" }}>{s.userHandle}</span>
+            <span style={{ font: "500 11.5px Pretendard", color: C.faint }}>{s.platform}</span>
+            <span style={{ font: "500 12px Pretendard", paddingRight: 10 }}>{s.oneLine}</span>
+            <a href={s.evidenceUrl} target="_blank" rel="noreferrer"
+              style={{ font: "500 11px ui-monospace, monospace", color: C.peak, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {s.evidenceUrl}
+            </a>
             <span style={{ font: "500 11.5px ui-monospace, monospace", color: C.faint }}>c={s.confidence}</span>
             <span style={{ font: "500 11.5px ui-monospace, monospace", color: C.faint }}>{s.submitterTi != null ? s.submitterTi.toFixed(2) : "-"}</span>
             <span style={{ font: "500 11.5px ui-monospace, monospace", color: C.faint }}>{s.createdAt}</span>
           </div>
         ))}
+        </div>
       </Card>
 
       <div style={{ display: "flex", gap: 8, marginTop: 12 }}>

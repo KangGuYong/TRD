@@ -150,6 +150,7 @@ export interface TrendItemSummary {
 export interface SubmissionRow {
   submissionId: string; userHandle: string; orderRank: number;
   confidence: number; submitterTi: number | null; createdAt: string;
+  platform: string; oneLine: string; evidenceUrl: string;
 }
 export interface TrendItemDetail {
   id: string; canonicalName: string; category: string; state: string;
