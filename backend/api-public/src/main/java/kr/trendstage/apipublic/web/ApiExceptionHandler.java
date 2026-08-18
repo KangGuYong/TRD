@@ -24,6 +24,11 @@ public class ApiExceptionHandler {
         return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(problem(422, e.getMessage()));
     }
 
+    @ExceptionHandler(TrendNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handle(TrendNotFoundException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(problem(404, e.getMessage()));
+    }
+
     @ExceptionHandler(FirebaseNotConfiguredException.class)
     public ResponseEntity<Map<String, Object>> handle(FirebaseNotConfiguredException e) {
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(problem(503, e.getMessage()));
