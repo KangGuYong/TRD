@@ -2,6 +2,8 @@ package kr.trendstage.apipublic.service;
 
 import kr.trendstage.apipublic.web.GradeRequirementResponse;
 import kr.trendstage.apipublic.web.GradeStatusResponse;
+import kr.trendstage.apipublic.web.LedgerEntryResponse;
+import kr.trendstage.apipublic.web.LedgerListResponse;
 import kr.trendstage.domain.grade.Grade;
 import kr.trendstage.domain.grade.GradePolicy;
 import kr.trendstage.domain.grade.GradeStatus;
@@ -9,8 +11,10 @@ import kr.trendstage.domain.params.ParameterSet;
 import kr.trendstage.domain.score.ActiveScore;
 import kr.trendstage.domain.score.TrustIndex;
 import kr.trendstage.persistence.entity.ScoreLedgerEntry;
+import kr.trendstage.persistence.entity.TrendItem;
 import kr.trendstage.persistence.repo.ScoreLedgerRepository;
 import kr.trendstage.persistence.repo.SubmissionRepository;
+import kr.trendstage.persistence.repo.TrendItemRepository;
 import kr.trendstage.persistence.type.SubmissionResult;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,10 +39,12 @@ public class MeService {
 
     private final SubmissionRepository submissions;
     private final ScoreLedgerRepository ledger;
+    private final TrendItemRepository trends;
     private final Clock clock;
 
-    public MeService(SubmissionRepository submissions, ScoreLedgerRepository ledger, Clock clock) {
-        this.submissions = submissions; this.ledger = ledger; this.clock = clock;
+    public MeService(SubmissionRepository submissions, ScoreLedgerRepository ledger,
+                     TrendItemRepository trends, Clock clock) {
+        this.submissions = submissions; this.ledger = ledger; this.trends = trends; this.clock = clock;
     }
 
     @Transactional(readOnly = true)
@@ -69,5 +75,26 @@ public class MeService {
         return new GradeStatusResponse(
                 status.current().name(), GRADE_NAMES.get(status.current()),
                 ti, as, judged, GRADE_NAMES.get(status.next()), reqs, note);
+    }
+
+    @Transactional(readOnly = true)
+    public LedgerListResponse ledger(UUID userId) {
+        List<LedgerEntryResponse> items = ledger.findByUserIdOrderByCreatedAtDesc(userId).stream()
+                .map(e -> new LedgerEntryResponse(
+                        wordFor(e),
+                        e.getKind().name(),
+                        e.getDelta().doubleValue(),
+                        e.getReason(),
+                        e.getCreatedAt()))
+                .toList();
+        return new LedgerListResponse(items, null);
+    }
+
+    private String wordFor(ScoreLedgerEntry e) {
+        if (e.getSubmissionId() == null) return "계정 조정";
+        return submissions.findById(e.getSubmissionId())
+                .flatMap(s -> trends.findById(s.getTrendItemId()))
+                .map(TrendItem::getCanonicalName)
+                .orElse("(삭제된 항목)");
     }
 }
