@@ -1,5 +1,6 @@
 package kr.trendstage.apipublic.service;
 
+import kr.trendstage.apipublic.web.TrendNotFoundException;
 import kr.trendstage.apipublic.web.WatchItemResponse;
 import kr.trendstage.domain.trend.DisplayStage;
 import kr.trendstage.domain.trend.NameNormalizer;
@@ -11,6 +12,7 @@ import kr.trendstage.persistence.repo.TrendItemRepository;
 import kr.trendstage.persistence.repo.WatchRepository;
 import kr.trendstage.persistence.type.SubmissionResult;
 import kr.trendstage.persistence.type.TrendState;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,7 +33,11 @@ public class WatchService {
 
     @Transactional
     public void add(UUID userId, String keyword) {
-        watches.insertIfAbsent(userId, keyword, NameNormalizer.normalize(keyword));
+        try {
+            watches.insertIfAbsent(userId, keyword, NameNormalizer.normalize(keyword));
+        } catch (DataIntegrityViolationException e) {
+            throw new TrendNotFoundException("존재하지 않는 트렌드 키워드입니다");
+        }
     }
 
     @Transactional
