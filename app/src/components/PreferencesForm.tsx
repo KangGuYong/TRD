@@ -25,7 +25,7 @@ export function PreferencesForm({
     <View>
       {section !== "time" && (
         <View>
-          <Text style={s.h2}>관심 분야 3개만{"\n"}골라주세요</Text>
+          <Text style={[s.h2, section === "both" && s.h2Compact]}>관심 분야 3개만{"\n"}골라주세요</Text>
           <Text style={s.p}>{cats.length}/3 선택</Text>
           <View style={s.chipWrap}>
             {CATS.map((c) => {
@@ -41,8 +41,8 @@ export function PreferencesForm({
       )}
 
       {section !== "categories" && (
-        <View style={section === "both" ? { marginTop: 30 } : undefined}>
-          <Text style={s.h2}>몇 시에 알려드릴까요</Text>
+        <View style={section === "both" ? { marginTop: 24 } : undefined}>
+          <Text style={[s.h2, section === "both" && s.h2Compact]}>몇 시에 알려드릴까요</Text>
           <View style={{ gap: 9, marginTop: 16 }}>
             {TIMES.map((t) => {
               const on = hour === t.h;
@@ -65,6 +65,7 @@ export function PreferencesForm({
 
 const s = StyleSheet.create({
   h2: { fontSize: 30, fontWeight: "700", letterSpacing: -0.7, color: C.ink, lineHeight: 40 },
+  h2Compact: { fontSize: 20, lineHeight: 27 },
   p: { fontSize: 15, color: C.sub, lineHeight: 25, marginTop: 14 },
   chipWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 22 },
   chip: { paddingHorizontal: 16, paddingVertical: 13, borderRadius: 100, borderWidth: 1, borderColor: "rgba(20,19,15,0.12)", backgroundColor: "#fff" },

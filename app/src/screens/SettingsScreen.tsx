@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { useMyPreferences, useSavePreferences } from "../api/hooks";
 import type { Category } from "../api/types";
@@ -40,9 +40,9 @@ export default function SettingsScreen() {
   return (
     <Screen edges={["top", "bottom"]} style={s.wrap}>
       <H1>설정</H1>
-      <View style={{ marginTop: 20, flex: 1 }}>
+      <ScrollView style={{ marginTop: 20 }} contentContainerStyle={{ paddingBottom: 20 }} showsVerticalScrollIndicator={false}>
         <PreferencesForm cats={cats} onToggleCat={toggleCat} hour={hour} onSelectHour={setHour} />
-      </View>
+      </ScrollView>
       <Pressable onPress={onSave} disabled={cats.length !== 3 || save.isPending} style={[s.cta, { backgroundColor: cats.length === 3 ? C.ink : "rgba(20,19,15,0.1)" }]}>
         <Text style={{ color: cats.length === 3 ? "#fff" : "rgba(20,19,15,0.35)", fontWeight: "600", fontSize: 16 }}>
           {cats.length !== 3 ? `관심 분야 ${3 - cats.length}개 더 골라주세요` : "저장"}
