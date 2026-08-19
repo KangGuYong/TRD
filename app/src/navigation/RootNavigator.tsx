@@ -3,19 +3,21 @@ import { Text } from "react-native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { C } from "../theme";
-import type { HomeStackParamList } from "./types";
+import type { HomeStackParamList, MeStackParamList } from "./types";
 import HomeScreen from "../screens/HomeScreen";
 import DetailScreen from "../screens/DetailScreen";
 import SearchScreen from "../screens/SearchScreen";
 import SubmitScreen from "../screens/SubmitScreen";
 import WatchScreen from "../screens/WatchScreen";
 import MeScreen from "../screens/MeScreen";
+import SettingsScreen from "../screens/SettingsScreen";
 import { AuthGate } from "../components/AuthGate";
 
 const GatedSubmit = () => <AuthGate><SubmitScreen /></AuthGate>;
-const GatedMe = () => <AuthGate><MeScreen /></AuthGate>;
+const GatedWatch = () => <AuthGate><WatchScreen /></AuthGate>;
 
 const Stack = createNativeStackNavigator<HomeStackParamList>();
+const MeStackNav = createNativeStackNavigator<MeStackParamList>();
 const Tab = createBottomTabNavigator();
 
 function HomeStack() {
@@ -26,6 +28,17 @@ function HomeStack() {
     </Stack.Navigator>
   );
 }
+
+function MeStack() {
+  return (
+    <MeStackNav.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: C.bg } }}>
+      <MeStackNav.Screen name="Me" component={MeScreen} />
+      <MeStackNav.Screen name="Settings" component={SettingsScreen} options={{ headerShown: true, title: "설정", headerStyle: { backgroundColor: C.bg }, headerShadowVisible: false }} />
+    </MeStackNav.Navigator>
+  );
+}
+
+const GatedMe = () => <AuthGate><MeStack /></AuthGate>;
 
 const icon = (glyph: string) => ({ color }: { color: string }) => <Text style={{ color, fontSize: 18 }}>{glyph}</Text>;
 
@@ -42,7 +55,7 @@ export default function RootNavigator() {
       <Tab.Screen name="홈" component={HomeStack} options={{ tabBarIcon: icon("⌂") }} />
       <Tab.Screen name="검색" component={SearchScreen} options={{ tabBarIcon: icon("⌕") }} />
       <Tab.Screen name="제보" component={GatedSubmit} options={{ tabBarIcon: icon("＋") }} />
-      <Tab.Screen name="워치" component={WatchScreen} options={{ tabBarIcon: icon("◉") }} />
+      <Tab.Screen name="워치" component={GatedWatch} options={{ tabBarIcon: icon("◉") }} />
       <Tab.Screen name="나" component={GatedMe} options={{ tabBarIcon: icon("☺") }} />
     </Tab.Navigator>
   );
