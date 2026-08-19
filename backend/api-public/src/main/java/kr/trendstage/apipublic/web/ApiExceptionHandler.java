@@ -39,6 +39,11 @@ public class ApiExceptionHandler {
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(problem(503, e.getMessage()));
     }
 
+    @ExceptionHandler(PreferencesNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handle(PreferencesNotFoundException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(problem(404, e.getMessage()));
+    }
+
     private Map<String, Object> problem(int status, String detail) {
         return Map.of("type", "about:blank", "status", status, "detail", detail == null ? "" : detail);
     }
