@@ -90,24 +90,10 @@ export const useToggleWatch = () => {
   return useMutation({
     mutationFn: ({ keyword, on }: { keyword: string; on: boolean; trendId?: string }) =>
       on ? api.post("/v1/me/watch", { keyword }) : api.del(`/v1/me/watch/${encodeURIComponent(keyword)}`),
-    onMutate: async (variables) => {
-      if (!variables.trendId) return undefined;
-      const key = qk.detail(variables.trendId);
-      await qc.cancelQueries({ queryKey: key });
-      const previous = qc.getQueryData<TrendDetail>(key);
-      if (previous) qc.setQueryData<TrendDetail>(key, { ...previous, watched: variables.on });
-      return { previous, key };
-    },
-    onError: (_err, _variables, context) => {
-      if (context?.previous) qc.setQueryData(context.key, context.previous);
-    },
-    onSettled: (_data, _err, variables) => {
+    // 저장이 끝난 뒤 서버 값을 다시 읽어 버튼 상태를 맞춘다.
+    onSuccess: (_data, variables) => {
       qc.invalidateQueries({ queryKey: qk.watch });
-      // 상세는 낙관적 업데이트로 이미 최신이다. 여기서 즉시 refetch하면 재렌더가 한 번 더 돌아
-      // 버튼이 깜빡인다 — stale로만 표시해 두고 다음 진입 때 갱신한다.
-      if (variables.trendId) {
-        qc.invalidateQueries({ queryKey: qk.detail(variables.trendId), refetchType: "none" });
-      }
+      if (variables.trendId) qc.invalidateQueries({ queryKey: qk.detail(variables.trendId) });
     },
   });
 };
