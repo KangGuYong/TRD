@@ -72,7 +72,9 @@ export interface SubmissionMine {
   createdAt: string;
 }
 
+export type GradeRequirementKind = "JUDGED_COUNT" | "TRUST_INDEX" | "ACTIVE_SCORE";
 export interface GradeRequirement {
+  kind: GradeRequirementKind;
   label: string;
   current: number;
   required: number;

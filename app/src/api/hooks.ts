@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api } from "./client";
+import { api, ApiError } from "./client";
 import type {
   GradeStatus, Ledger, MeSummary, Preferences, SubmissionCreate, SubmissionMine,
   TrendDetail, TrendList, VoteResult, WatchItem,
@@ -49,6 +49,20 @@ export const useMySubmissions = () =>
 
 export const useWatch = () =>
   useQuery({ queryKey: qk.watch, queryFn: () => api.get<WatchItem[]>("/v1/me/watch") });
+
+export const useMyPreferences = (enabled = true) =>
+  useQuery({
+    queryKey: qk.prefs,
+    enabled,
+    queryFn: async (): Promise<Preferences | null> => {
+      try {
+        return await api.get<Preferences>("/v1/me/preferences");
+      } catch (e) {
+        if (e instanceof ApiError && e.status === 404) return null;
+        throw e;
+      }
+    },
+  });
 
 /* ── 변경 ── */
 export const useSubmit = () => {
