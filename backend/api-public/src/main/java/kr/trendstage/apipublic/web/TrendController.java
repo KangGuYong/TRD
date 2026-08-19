@@ -33,10 +33,12 @@ public class TrendController {
     /** { items: [...], nextCursor: null } (OpenAPI 목록 규약). */
     public record TrendListResponse(List<TrendSummaryResponse> items, String nextCursor) {}
 
-    /** 홈 "오늘의 5개" / 목록. daily=true면 5개로 끝(더 보기 없음). */
+    /** 홈 "오늘의 5개" / 목록. daily=true면 5개로 끝(더 보기 없음).
+     * 로그인 유저는 그날(KST) 안에서 고정된 개인화 5개, 비로그인은 실시간 전체 top-5. */
     @GetMapping
-    public TrendListResponse list(@RequestParam(name = "daily", defaultValue = "false") boolean daily) {
-        return new TrendListResponse(service.home(daily), null);
+    public TrendListResponse list(@RequestParam(name = "daily", defaultValue = "false") boolean daily, Authentication auth) {
+        UUID viewerId = auth != null ? (UUID) auth.getPrincipal() : null;
+        return new TrendListResponse(service.home(daily, viewerId), null);
     }
 
     /** 트렌드 항목 상세. 판정/투표/확산경로 포함. */
