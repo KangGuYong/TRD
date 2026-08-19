@@ -31,10 +31,7 @@ public class WatchService {
 
     @Transactional
     public void add(UUID userId, String keyword) {
-        String normalized = NameNormalizer.normalize(keyword);
-        if (!watches.existsByUserIdAndNormalizedKey(userId, normalized)) {
-            watches.save(new Watch(userId, keyword, normalized));
-        }
+        watches.insertIfAbsent(userId, keyword, NameNormalizer.normalize(keyword));
     }
 
     @Transactional

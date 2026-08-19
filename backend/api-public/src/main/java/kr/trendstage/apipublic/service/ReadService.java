@@ -24,9 +24,7 @@ public class ReadService {
     @Transactional
     public void markRead(UUID userId, UUID trendId) {
         if (!trends.existsById(trendId)) throw new TrendNotFoundException("존재하지 않는 항목입니다");
-        if (!reads.existsByUserIdAndTrendItemId(userId, trendId)) {
-            reads.save(new TrendRead(userId, trendId));
-        }
+        reads.insertIfAbsent(userId, trendId);
     }
 
     @Transactional(readOnly = true)
