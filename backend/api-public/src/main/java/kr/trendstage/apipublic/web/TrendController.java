@@ -41,8 +41,9 @@ public class TrendController {
 
     /** 트렌드 항목 상세. 판정/투표/확산경로 포함. */
     @GetMapping("/{id}")
-    public TrendDetailResponse detail(@PathVariable UUID id) {
-        return service.detail(id);
+    public TrendDetailResponse detail(@PathVariable UUID id, Authentication auth) {
+        UUID viewerId = auth != null ? (UUID) auth.getPrincipal() : null;
+        return service.detail(id, viewerId);
     }
 
     @PostMapping("/{id}/vote")

@@ -14,6 +14,7 @@ import kr.trendstage.persistence.repo.SubmissionRepository;
 import kr.trendstage.persistence.repo.TrendItemRepository;
 import kr.trendstage.persistence.repo.VerdictRepository;
 import kr.trendstage.persistence.repo.VoteRepository;
+import kr.trendstage.persistence.repo.WatchRepository;
 import kr.trendstage.persistence.type.SubmissionResult;
 import kr.trendstage.persistence.type.TrendState;
 import org.springframework.stereotype.Service;
@@ -43,11 +44,12 @@ public class TrendQueryService {
     private final SubmissionRepository submissions;
     private final VerdictRepository verdicts;
     private final VoteRepository votes;
+    private final WatchRepository watches;
 
     public TrendQueryService(TrendItemRepository trends, SubmissionRepository submissions,
-                             VerdictRepository verdicts, VoteRepository votes) {
+                             VerdictRepository verdicts, VoteRepository votes, WatchRepository watches) {
         this.trends = trends; this.submissions = submissions;
-        this.verdicts = verdicts; this.votes = votes;
+        this.verdicts = verdicts; this.votes = votes; this.watches = watches;
     }
 
     @Transactional(readOnly = true)
@@ -93,7 +95,7 @@ public class TrendQueryService {
     }
 
     @Transactional(readOnly = true)
-    public TrendDetailResponse detail(UUID id) {
+    public TrendDetailResponse detail(UUID id, UUID viewerId) {
         TrendItem item = trends.findById(id)
                 .filter(i -> i.getState() != TrendState.MERGED)
                 .orElseThrow(() -> new TrendNotFoundException("존재하지 않는 항목입니다"));
@@ -119,12 +121,15 @@ public class TrendQueryService {
         String voteCount = totalVotes == 0 ? null
                 : String.format("%,d명 참여 · 뜬다 %d%%", totalVotes, Math.round(willTrend * 100.0 / totalVotes));
 
+        boolean watched = viewerId != null
+                && watches.existsByUserIdAndNormalizedKey(viewerId, item.getNormalizedKey());
+
         return new TrendDetailResponse(
                 base.id(), base.word(), base.meaning(), base.stage(), base.stageLabel(),
                 base.lifeText(), base.pathText(), base.reachedCount(), base.ageShort(),
                 verdict, verdictWhy, reachLevel,
                 null, null, null, List.of(),
-                propagationPath, voteCount, false);
+                propagationPath, voteCount, watched);
     }
 
     private List<PropagationStepResponse> buildPropagationPath(UUID trendItemId) {
