@@ -90,7 +90,18 @@ export const useToggleWatch = () => {
   return useMutation({
     mutationFn: ({ keyword, on }: { keyword: string; on: boolean; trendId?: string }) =>
       on ? api.post("/v1/me/watch", { keyword }) : api.del(`/v1/me/watch/${encodeURIComponent(keyword)}`),
-    onSuccess: (_data, variables) => {
+    onMutate: async (variables) => {
+      if (!variables.trendId) return undefined;
+      const key = qk.detail(variables.trendId);
+      await qc.cancelQueries({ queryKey: key });
+      const previous = qc.getQueryData<TrendDetail>(key);
+      if (previous) qc.setQueryData<TrendDetail>(key, { ...previous, watched: variables.on });
+      return { previous, key };
+    },
+    onError: (_err, _variables, context) => {
+      if (context?.previous) qc.setQueryData(context.key, context.previous);
+    },
+    onSettled: (_data, _err, variables) => {
       qc.invalidateQueries({ queryKey: qk.watch });
       if (variables.trendId) qc.invalidateQueries({ queryKey: qk.detail(variables.trendId) });
     },
