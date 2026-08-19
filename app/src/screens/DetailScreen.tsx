@@ -88,9 +88,7 @@ export default function DetailScreen() {
                 style={[s.watchBtn, d.watched ? s.watchOff : s.watchOn, toggleWatch.isPending && { opacity: 0.5 }]}
               >
                 <Text style={[s.watchText, { color: d.watched ? C.ink : "#fff" }]}>
-                  {toggleWatch.isPending
-                    ? "처리 중…"
-                    : d.watched ? "워치에서 빼기" : "워치에 추가하고 알림 받기"}
+                  {d.watched ? "워치에서 빼기" : "워치에 추가하고 알림 받기"}
                 </Text>
               </Pressable>
               {toggleWatch.isError && (
