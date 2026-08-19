@@ -88,9 +88,12 @@ export const useVote = (trendId: string) => {
 export const useToggleWatch = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ keyword, on }: { keyword: string; on: boolean }) =>
+    mutationFn: ({ keyword, on }: { keyword: string; on: boolean; trendId?: string }) =>
       on ? api.post("/v1/me/watch", { keyword }) : api.del(`/v1/me/watch/${encodeURIComponent(keyword)}`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: qk.watch }),
+    onSuccess: (_data, variables) => {
+      qc.invalidateQueries({ queryKey: qk.watch });
+      if (variables.trendId) qc.invalidateQueries({ queryKey: qk.detail(variables.trendId) });
+    },
   });
 };
 

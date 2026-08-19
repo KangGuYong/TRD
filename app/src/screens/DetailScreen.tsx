@@ -2,7 +2,7 @@ import React from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useRoute, type RouteProp } from "@react-navigation/native";
 import { useTrendDetail, useToggleWatch, useVote } from "../api/hooks";
-import { Card, Muted, StageChip, StateView } from "../components/ui";
+import { Card, Muted, Screen, StageChip, StateView } from "../components/ui";
 import { C, STAGE_COLOR } from "../theme";
 import type { HomeStackParamList } from "../navigation/types";
 
@@ -13,7 +13,8 @@ export default function DetailScreen() {
   const toggleWatch = useToggleWatch();
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: C.bg }} contentContainerStyle={{ padding: 20, paddingBottom: 48 }}>
+    <Screen edges={["bottom"]}>
+    <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 20, paddingBottom: 48 }}>
       <StateView query={detail}>
         {(d) => {
           const color = STAGE_COLOR[d.stage];
@@ -82,7 +83,7 @@ export default function DetailScreen() {
 
               {/* 워치 */}
               <Pressable
-                onPress={() => toggleWatch.mutate({ keyword: d.word, on: !d.watched })}
+                onPress={() => toggleWatch.mutate({ keyword: d.word, on: !d.watched, trendId: params.id })}
                 style={[s.watchBtn, d.watched ? s.watchOff : s.watchOn]}
               >
                 <Text style={[s.watchText, { color: d.watched ? C.ink : "#fff" }]}>
@@ -94,6 +95,7 @@ export default function DetailScreen() {
         }}
       </StateView>
     </ScrollView>
+    </Screen>
   );
 }
 
