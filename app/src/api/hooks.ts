@@ -103,7 +103,11 @@ export const useToggleWatch = () => {
     },
     onSettled: (_data, _err, variables) => {
       qc.invalidateQueries({ queryKey: qk.watch });
-      if (variables.trendId) qc.invalidateQueries({ queryKey: qk.detail(variables.trendId) });
+      // 상세는 낙관적 업데이트로 이미 최신이다. 여기서 즉시 refetch하면 재렌더가 한 번 더 돌아
+      // 버튼이 깜빡인다 — stale로만 표시해 두고 다음 진입 때 갱신한다.
+      if (variables.trendId) {
+        qc.invalidateQueries({ queryKey: qk.detail(variables.trendId), refetchType: "none" });
+      }
     },
   });
 };
