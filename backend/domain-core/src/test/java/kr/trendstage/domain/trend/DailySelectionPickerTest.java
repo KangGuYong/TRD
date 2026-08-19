@@ -1,4 +1,4 @@
-package kr.trendstage.domain;
+package kr.trendstage.domain.trend;
 
 import kr.trendstage.domain.trend.DailySelectionPicker;
 import org.junit.jupiter.api.Test;
