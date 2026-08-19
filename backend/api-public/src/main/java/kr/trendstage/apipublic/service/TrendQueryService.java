@@ -5,13 +5,18 @@ import kr.trendstage.apipublic.web.TrendDetailResponse;
 import kr.trendstage.apipublic.web.TrendNotFoundException;
 import kr.trendstage.apipublic.web.TrendSummaryResponse;
 import kr.trendstage.domain.trend.DisplayStage;
+import kr.trendstage.domain.trend.DailySelectionPicker;
 import kr.trendstage.domain.trend.StageEvaluator;
 import kr.trendstage.domain.verdict.VerdictResult;
+import kr.trendstage.persistence.entity.DailySelection;
 import kr.trendstage.persistence.entity.Submission;
 import kr.trendstage.persistence.entity.TrendItem;
+import kr.trendstage.persistence.entity.UserPreference;
 import kr.trendstage.persistence.entity.Verdict;
+import kr.trendstage.persistence.repo.DailySelectionRepository;
 import kr.trendstage.persistence.repo.SubmissionRepository;
 import kr.trendstage.persistence.repo.TrendItemRepository;
+import kr.trendstage.persistence.repo.UserPreferenceRepository;
 import kr.trendstage.persistence.repo.VerdictRepository;
 import kr.trendstage.persistence.repo.VoteRepository;
 import kr.trendstage.persistence.repo.WatchRepository;
@@ -21,12 +26,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -38,35 +46,95 @@ import java.util.stream.Collectors;
 public class TrendQueryService {
 
     private static final int DAILY_LIMIT = 5;
-    private static final DateTimeFormatter PATH_DATE = DateTimeFormatter.ofPattern("MM-dd").withZone(ZoneId.of("Asia/Seoul"));
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
+    private static final DateTimeFormatter PATH_DATE = DateTimeFormatter.ofPattern("MM-dd").withZone(KST);
 
     private final TrendItemRepository trends;
     private final SubmissionRepository submissions;
     private final VerdictRepository verdicts;
     private final VoteRepository votes;
     private final WatchRepository watches;
+    private final DailySelectionRepository dailySelections;
+    private final UserPreferenceRepository preferences;
+    private final DailySelectionWriter selectionWriter;
 
     public TrendQueryService(TrendItemRepository trends, SubmissionRepository submissions,
-                             VerdictRepository verdicts, VoteRepository votes, WatchRepository watches) {
+                             VerdictRepository verdicts, VoteRepository votes, WatchRepository watches,
+                             DailySelectionRepository dailySelections, UserPreferenceRepository preferences,
+                             DailySelectionWriter selectionWriter) {
         this.trends = trends; this.submissions = submissions;
         this.verdicts = verdicts; this.votes = votes; this.watches = watches;
+        this.dailySelections = dailySelections; this.preferences = preferences;
+        this.selectionWriter = selectionWriter;
     }
 
     @Transactional(readOnly = true)
-    public List<TrendSummaryResponse> home(boolean daily) {
-        List<TrendSummaryResponse> all = trends.findByStateIn(List.of(TrendState.PENDING, TrendState.JUDGING))
+    public List<TrendSummaryResponse> home(boolean daily, UUID userId) {
+        if (daily && userId != null) {
+            return dailyForUser(userId);
+        }
+        List<TrendSummaryResponse> all = liveRanked();
+        return daily ? all.stream().limit(DAILY_LIMIT).toList() : all;
+    }
+
+    private List<TrendSummaryResponse> liveRanked() {
+        return trends.findByStateIn(List.of(TrendState.PENDING, TrendState.JUDGING))
                 .stream()
                 .map(this::toSummary)
                 .sorted(Comparator.comparingInt(r -> StageEvaluator.actionPriority(DisplayStage.valueOf(r.stage()))))
                 .collect(Collectors.toList());
-        return daily ? all.stream().limit(DAILY_LIMIT).toList() : all;
+    }
+
+    private List<TrendSummaryResponse> dailyForUser(UUID userId) {
+        LocalDate today = LocalDate.now(KST);
+        List<UUID> ids = dailySelections.findByUserIdAndSelectionDateOrderByRankAsc(userId, today)
+                .stream().map(DailySelection::getTrendItemId).toList();
+        if (ids.isEmpty()) {
+            ids = generateSelection(userId, today);
+        }
+        Map<UUID, TrendItem> byId = trends.findAllById(ids).stream()
+                .collect(Collectors.toMap(TrendItem::getId, it -> it));
+        return ids.stream()
+                .map(byId::get)
+                .filter(Objects::nonNull)
+                .map(this::toSummary)
+                .toList();
+    }
+
+    /** 오늘자 배정이 없을 때만 호출. 후보군을 계산해 선정하고 저장을 시도한 뒤, 실제 저장된(경쟁 시 상대방 것일 수도 있는) 결과를 다시 읽는다. */
+    private List<UUID> generateSelection(UUID userId, LocalDate today) {
+        List<TrendItem> candidates = trends.findByStateIn(List.of(TrendState.PENDING, TrendState.JUDGING));
+        List<DailySelectionPicker.Candidate> picked = candidates.stream()
+                .map(item -> new DailySelectionPicker.Candidate(
+                        item.getId(),
+                        item.getCategory() != null ? item.getCategory().name() : "",
+                        StageEvaluator.actionPriority(stageOf(item))))
+                .toList();
+
+        Set<String> preferredCategories = preferences.findByUserId(userId)
+                .map(UserPreference::getCategories)
+                .map(Set::of)
+                .orElseGet(Set::of);
+
+        List<UUID> selected = DailySelectionPicker.pick(picked, preferredCategories, DAILY_LIMIT);
+        if (selected.isEmpty()) return selected;
+
+        selectionWriter.trySave(userId, today, selected);
+
+        return dailySelections.findByUserIdAndSelectionDateOrderByRankAsc(userId, today)
+                .stream().map(DailySelection::getTrendItemId).toList();
+    }
+
+    private DisplayStage stageOf(TrendItem item) {
+        int reachedCount = submissions.findDistinctPlatforms(item.getId(), SubmissionResult.VOID).size();
+        boolean resolvedFading = item.getState() == TrendState.RESOLVED;
+        return StageEvaluator.fromReach(reachedCount, resolvedFading);
     }
 
     private TrendSummaryResponse toSummary(TrendItem item) {
         List<String> platforms = submissions.findDistinctPlatforms(item.getId(), SubmissionResult.VOID);
         int reachedCount = platforms.size();
-        boolean resolvedFading = item.getState() == TrendState.RESOLVED;   // 잠정 근사
-        DisplayStage stage = StageEvaluator.fromReach(reachedCount, resolvedFading);
+        DisplayStage stage = stageOf(item);
 
         String meaning = submissions.findFirstByTrendItemIdOrderByCreatedAtAsc(item.getId())
                 .map(Submission::getOneLine).orElse("");
