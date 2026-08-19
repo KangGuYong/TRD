@@ -62,4 +62,12 @@ class EngineGoldenTest {
         // TI만 충분하고 AS가 부족하면 승급 불가
         assertEquals(Grade.L1, GradePolicy.evaluate(50, 0.60, 100).current());
     }
+
+    @Test void grade_요구항목은_kind로_구분된다() {
+        GradeStatus gs = GradePolicy.evaluate(17, 0.48, 186); // L2 → L3 요구
+        assertEquals(3, gs.requirements().size());
+        assertEquals(GradeRequirementKind.JUDGED_COUNT, gs.requirements().get(0).kind());
+        assertEquals(GradeRequirementKind.TRUST_INDEX, gs.requirements().get(1).kind());
+        assertEquals(GradeRequirementKind.ACTIVE_SCORE, gs.requirements().get(2).kind());
+    }
 }

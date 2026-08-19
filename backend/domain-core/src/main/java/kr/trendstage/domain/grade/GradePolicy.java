@@ -46,20 +46,20 @@ public final class GradePolicy {
 
         List<GradeRequirement> reqs = new ArrayList<>();
         if (nextReq != null) {
-            reqs.add(req("판정 완료", judgedCount, nextReq.minJudged, 0));
-            reqs.add(req("신뢰도 지수 TI", trustIndex, nextReq.minTi, 2));
-            reqs.add(req("활동 점수 AS", activeScore, nextReq.minAs, 0));
+            reqs.add(req(GradeRequirementKind.JUDGED_COUNT, "판정 완료", judgedCount, nextReq.minJudged, 0));
+            reqs.add(req(GradeRequirementKind.TRUST_INDEX, "신뢰도 지수 TI", trustIndex, nextReq.minTi, 2));
+            reqs.add(req(GradeRequirementKind.ACTIVE_SCORE, "활동 점수 AS", activeScore, nextReq.minAs, 0));
         }
         return new GradeStatus(current, next, reqs);
     }
 
-    private static GradeRequirement req(String label, double cur, double required, int decimals) {
+    private static GradeRequirement req(GradeRequirementKind kind, String label, double cur, double required, int decimals) {
         boolean met = cur >= required;
         double gap = Math.max(0, required - cur);
         String fmt = "%." + decimals + "f";
         String basis = met
                 ? String.format(Locale.US, label + " " + fmt + " / 요구치 " + fmt + " · 충족", cur, required)
                 : String.format(Locale.US, label + " " + fmt + " / 요구치 " + fmt + " / 부족분 " + fmt, cur, required, gap);
-        return new GradeRequirement(label, cur, required, met, basis);
+        return new GradeRequirement(kind, label, cur, required, met, basis);
     }
 }
