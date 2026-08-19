@@ -21,7 +21,8 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   const res = await fetch(`${BASE_URL}${path}`, {
     method,
     headers: {
-      "Content-Type": "application/json",
+      // 본문이 없는 요청(DELETE 등)에는 Content-Type을 붙이지 않는다 — 규격에 맞지 않고 일부 스택이 거부한다.
+      ...(body === undefined ? {} : { "Content-Type": "application/json" }),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: body === undefined ? undefined : JSON.stringify(body),

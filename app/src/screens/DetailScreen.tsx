@@ -84,12 +84,20 @@ export default function DetailScreen() {
               {/* 워치 */}
               <Pressable
                 onPress={() => toggleWatch.mutate({ keyword: d.word, on: !d.watched, trendId: params.id })}
-                style={[s.watchBtn, d.watched ? s.watchOff : s.watchOn]}
+                disabled={toggleWatch.isPending}
+                style={[s.watchBtn, d.watched ? s.watchOff : s.watchOn, toggleWatch.isPending && { opacity: 0.5 }]}
               >
                 <Text style={[s.watchText, { color: d.watched ? C.ink : "#fff" }]}>
-                  {d.watched ? "워치에서 빼기" : "워치에 추가하고 알림 받기"}
+                  {toggleWatch.isPending
+                    ? "처리 중…"
+                    : d.watched ? "워치에서 빼기" : "워치에 추가하고 알림 받기"}
                 </Text>
               </Pressable>
+              {toggleWatch.isError && (
+                <Text style={s.watchError}>
+                  {toggleWatch.error instanceof Error ? toggleWatch.error.message : "요청에 실패했습니다"}
+                </Text>
+              )}
             </>
           );
         }}
@@ -136,4 +144,5 @@ const s = StyleSheet.create({
   watchOn: { backgroundColor: C.ink },
   watchOff: { backgroundColor: "transparent", borderWidth: 1, borderColor: "rgba(20,19,15,0.16)" },
   watchText: { fontWeight: "600", fontSize: 15 },
+  watchError: { marginTop: 10, fontSize: 13, color: C.fading, textAlign: "center", lineHeight: 20 },
 });
