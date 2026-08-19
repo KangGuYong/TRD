@@ -19,8 +19,8 @@ public interface SubmissionRepository extends JpaRepository<Submission, UUID> {
     List<Submission> findByTrendItemId(UUID trendItemId);
 
     /** 서로 다른 최초 목격 플랫폼(제보 자체가 근거, 외부 지표 아님). 홈 카드 경로 표시용. */
-    @Query("select distinct s.sourcePlatform from Submission s where s.trendItemId = :id and s.result <> kr.trendstage.persistence.type.SubmissionResult.VOID")
-    List<String> findDistinctPlatforms(@Param("id") UUID trendItemId);
+    @Query("select distinct s.sourcePlatform from Submission s where s.trendItemId = :id and s.result <> :excluded")
+    List<String> findDistinctPlatforms(@Param("id") UUID trendItemId, @Param("excluded") SubmissionResult excluded);
 
     List<Submission> findByUserIdOrderByCreatedAtDesc(UUID userId);
 
@@ -39,4 +39,7 @@ public interface SubmissionRepository extends JpaRepository<Submission, UUID> {
     long countByCreatedAtAfter(Instant since);
 
     long countByCreatedAtAfterAndSeedTrue(Instant since);
+
+    /** 나 탭 제보권 표시용 — 이번 주(월요일 0시 KST 이후) 유효 제보 수. */
+    long countByUserIdAndCreatedAtAfterAndResultNot(UUID userId, Instant since, SubmissionResult excluded);
 }
