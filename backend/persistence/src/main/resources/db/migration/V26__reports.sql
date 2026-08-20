@@ -35,3 +35,4 @@ COMMENT ON COLUMN reports.submission_id IS '1차 처리(hide/request-explanation
 CREATE INDEX idx_reports_status ON reports(status);
 CREATE INDEX idx_reports_trend_item_id ON reports(trend_item_id);
 CREATE INDEX idx_reports_submission_id ON reports(submission_id);
+CREATE INDEX idx_reports_reporter_id ON reports(reporter_id);
