@@ -9,32 +9,16 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "kr.trendstage.app",
-      "googleServicesFile": "./GoogleService-Info.plist"
+      "bundleIdentifier": "kr.trendstage.app"
     },
     "android": {
-      "package": "kr.trendstage.app",
-      "googleServicesFile": "./google-services.json"
+      "package": "kr.trendstage.app"
     },
     "plugins": [
       "expo-font",
       "expo-notifications",
       "expo-asset",
-      "expo-secure-store",
-      "@react-native-firebase/app",
-      "@react-native-firebase/auth",
-      [
-        "@react-native-google-signin/google-signin",
-        {
-          "iosUrlScheme": "com.googleusercontent.apps.28225918429-3fguidun2kn07h0tntrchvkfuos8bfrh"
-        }
-      ],
-      [
-        "expo-build-properties",
-        {
-          "ios": { "useFrameworks": "static" }
-        }
-      ]
+      "expo-secure-store"
     ]
   }
 }

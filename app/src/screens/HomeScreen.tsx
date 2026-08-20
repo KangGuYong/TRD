@@ -3,7 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { useDailyTrends, useMeSummary } from "../api/hooks";
 import type { TrendSummary } from "../api/types";
-import { Card, H1, Muted, StageChip, StateView } from "../components/ui";
+import { Card, H1, Muted, Screen, StageChip, StateView } from "../components/ui";
 import { C, STAGE_COLOR, STAGE_TINT } from "../theme";
 import { useReads } from "../state/reads";
 import type { HomeNav } from "../navigation/types";
@@ -20,7 +20,8 @@ export default function HomeScreen() {
   };
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: C.bg }} contentContainerStyle={{ padding: 20, paddingTop: 8, paddingBottom: 40 }}>
+    <Screen>
+    <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 20, paddingTop: 8, paddingBottom: 40 }}>
       <View style={s.head}>
         <View>
           <Muted style={{ fontSize: 12.5 }}>오늘</Muted>
@@ -81,6 +82,7 @@ export default function HomeScreen() {
         }}
       </StateView>
     </ScrollView>
+    </Screen>
   );
 }
 

@@ -1,13 +1,14 @@
 import React from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { useWatch } from "../api/hooks";
-import { H1, Muted, StageChip, StateView } from "../components/ui";
+import { H1, Muted, Screen, StageChip, StateView } from "../components/ui";
 import { C } from "../theme";
 
 export default function WatchScreen() {
   const q = useWatch();
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: C.bg }} contentContainerStyle={{ padding: 20, paddingTop: 8 }}>
+    <Screen>
+    <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 20, paddingTop: 8 }}>
       <H1>워치</H1>
       <Muted style={{ marginTop: 4, marginBottom: 20 }}>급상승 진입 시 즉시 알림</Muted>
 
@@ -29,6 +30,7 @@ export default function WatchScreen() {
         </StateView>
       </View>
     </ScrollView>
+    </Screen>
   );
 }
 

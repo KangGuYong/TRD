@@ -31,15 +31,14 @@ export default function SettingsScreen() {
 
   if (prefs.isLoading) {
     return (
-      <Screen edges={["top", "bottom"]} style={s.center}>
+      <Screen edges={[]} style={s.center}>
         <ActivityIndicator color={C.ink} />
       </Screen>
     );
   }
 
   return (
-    <Screen edges={["top", "bottom"]} style={s.wrap}>
-      <H1>설정</H1>
+    <Screen edges={[]} style={s.wrap}>
       <ScrollView style={{ marginTop: 20 }} contentContainerStyle={{ paddingBottom: 20 }} showsVerticalScrollIndicator={false}>
         <PreferencesForm cats={cats} onToggleCat={toggleCat} hour={hour} onSelectHour={setHour} />
       </ScrollView>

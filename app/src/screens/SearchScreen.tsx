@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { useSearchTrends } from "../api/hooks";
-import { Card, H1, Muted, StageChip } from "../components/ui";
+import { Card, H1, Muted, Screen, StageChip } from "../components/ui";
 import { C, STAGE_COLOR } from "../theme";
 import type { HomeNav } from "../navigation/types";
 
@@ -13,7 +13,8 @@ export default function SearchScreen() {
   const hit = search.data?.items?.[0];
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: C.bg }} contentContainerStyle={{ padding: 20, paddingTop: 8 }}>
+    <Screen>
+    <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 20, paddingTop: 8 }}>
       <H1>이거 아직 써도 돼?</H1>
       <Muted style={{ marginTop: 4, marginBottom: 16 }}>단어를 입력하면 유효기간을 판정해드려요.</Muted>
 
@@ -50,6 +51,7 @@ export default function SearchScreen() {
         </View>
       )}
     </ScrollView>
+    </Screen>
   );
 }
 

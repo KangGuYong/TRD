@@ -1,10 +1,11 @@
 import React, { useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useAuth } from "../state/auth";
+import { Screen } from "../components/ui";
 import { C } from "../theme";
 
 export default function SignInScreen() {
-  const { signInWithGoogle, signInWithEmail, signUpWithEmail, resetPassword } = useAuth();
+  const { signInWithEmail, signUpWithEmail, resetPassword } = useAuth();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -36,7 +37,7 @@ export default function SignInScreen() {
     });
 
   return (
-    <View style={s.wrap}>
+    <Screen edges={["top", "bottom"]} style={s.wrap}>
       <View style={{ flex: 1, justifyContent: "center" }}>
         <View style={s.bars}>
           {([[C.seed, 16], [C.rising, 38], [C.peak, 70], [C.fading, 30]] as [string, number][]).map(([c, h], i) => (
@@ -85,15 +86,15 @@ export default function SignInScreen() {
         </View>
       </View>
 
-      <Pressable onPress={() => run(signInWithGoogle)} disabled={busy} style={[s.cta, busy && { opacity: 0.6 }]}>
-        {busy ? <ActivityIndicator color="#fff" /> : <Text style={s.ctaText}>구글로 계속하기</Text>}
-      </Pressable>
-    </View>
+      {/* 구글 로그인: Expo Go에서 OAuth 리다이렉트를 처리할 방법이 없어 임시 비활성화.
+          개발 빌드(dev client)로 전환하면 auth.tsx의 signInWithGoogle을 다시 연결할 것. */}
+      <Text style={s.googleNotice}>구글 로그인은 준비 중입니다. 이메일로 이용해주세요.</Text>
+    </Screen>
   );
 }
 
 const s = StyleSheet.create({
-  wrap: { flex: 1, backgroundColor: C.bg, padding: 26, paddingTop: 70, paddingBottom: 44 },
+  wrap: { padding: 26, paddingTop: 20, paddingBottom: 20 },
   bars: { flexDirection: "row", gap: 7, alignItems: "flex-end", height: 74, marginBottom: 34 },
   h2: { fontSize: 30, fontWeight: "700", letterSpacing: -0.7, color: C.ink, lineHeight: 40 },
   p: { fontSize: 15, color: C.sub, lineHeight: 25, marginTop: 14 },
@@ -105,4 +106,5 @@ const s = StyleSheet.create({
   ctaText: { color: "#fff", fontWeight: "600", fontSize: 16 },
   ctaOutline: { marginTop: 16, paddingVertical: 15, borderRadius: 13, alignItems: "center", borderWidth: 1.5, borderColor: C.ink },
   ctaOutlineText: { color: C.ink, fontWeight: "600", fontSize: 15 },
+  googleNotice: { textAlign: "center", fontSize: 12.5, color: C.sub },
 });

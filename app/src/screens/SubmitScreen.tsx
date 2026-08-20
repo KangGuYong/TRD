@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useMySubmissions, useSubmit } from "../api/hooks";
 import type { Category } from "../api/types";
-import { Card, H1, Muted, StateView } from "../components/ui";
+import { Card, H1, Muted, Screen, StateView } from "../components/ui";
 import { C, STAGE_COLOR } from "../theme";
 
 const CATS: { key: Category; label: string }[] = [
@@ -16,7 +16,8 @@ const CONF_LABEL: Record<number, string> = { 10: "가볍게", 30: "꽤 확실", 
 export default function SubmitScreen() {
   const [tab, setTab] = useState<"new" | "mine">("new");
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: C.bg }} contentContainerStyle={{ padding: 20, paddingTop: 8, paddingBottom: 48 }}>
+    <Screen>
+    <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 20, paddingTop: 8, paddingBottom: 48 }}>
       <H1>제보</H1>
       <Muted style={{ marginTop: 4 }}>올리는 건 사람, 채점은 기계가 합니다.</Muted>
 
@@ -27,6 +28,7 @@ export default function SubmitScreen() {
 
       {tab === "new" ? <NewSubmission /> : <MySubmissions />}
     </ScrollView>
+    </Screen>
   );
 }
 

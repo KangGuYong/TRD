@@ -1,6 +1,19 @@
 import React from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { SafeAreaView, type Edge } from "react-native-safe-area-context";
 import { C, STAGE_COLOR, STAGE_LABEL, STAGE_TINT, type Stage } from "../theme";
+
+/**
+ * 화면 루트 래퍼. 기본은 상단만(노치/상태바) — 하단은 탭 바가, 헤더 있는 화면은 헤더가 이미 처리한다.
+ * 탭 바/헤더가 없는 화면(온보딩 등)은 edges로 필요한 변을 추가로 지정한다.
+ */
+export function Screen({ children, edges = ["top"], style }: { children: React.ReactNode; edges?: Edge[]; style?: any }) {
+  return (
+    <SafeAreaView edges={edges} style={[{ flex: 1, backgroundColor: C.bg }, style]}>
+      {children}
+    </SafeAreaView>
+  );
+}
 
 export function StageChip({ stage, label }: { stage: Stage; label?: string }) {
   const color = STAGE_COLOR[stage];

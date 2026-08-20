@@ -16,8 +16,8 @@ spring:
 # Firebase 서비스 계정 키 JSON 경로. 미설정 시 앱은 정상 기동하되 인증이 필요한 /v1 요청은 401.
 # 환경변수 FIREBASE_CREDENTIALS_PATH로만 주입한다 — 여기 기본값을 두면 안 됨(FirebaseConfig의
 # @ConditionalOnProperty가 "설정 안 됨"으로 인식하지 못해 빈 파일 경로로 초기화를 시도하게 된다).
-# firebase:
-#   credentials-path: ${FIREBASE_CREDENTIALS_PATH}
+firebase:
+  credentials-path: ${FIREBASE_CREDENTIALS_PATH}
 
 # 온프레미스 한국어 임베딩(KURE-v1, TEI). infra/docker-compose의 embeddings 서비스(M2).
 embedding:
