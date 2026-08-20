@@ -126,3 +126,32 @@ export interface VoteResult {
   willTrend: boolean;
   voteCount: string;
 }
+
+export type ReportReason = "DEFAMATION" | "BUSINESS_INTERFERENCE" | "OTHER";
+export type ReportStatus = "OPEN" | "EXPLAINING" | "DECIDED";
+export type ReportDecisionType = "RESTORE" | "HIDE_PERMANENT" | "EDIT_RESTORE";
+
+export interface ReportCreate {
+  trendItemId: string;
+  reason: ReportReason;
+  detail?: string;
+}
+export interface ReportMine {
+  id: string;
+  trendItemId: string;
+  status: ReportStatus;
+  reason: ReportReason;
+  decision: ReportDecisionType | null;
+  decisionNote: string | null;
+  createdAt: string;
+  decidedAt: string | null;
+}
+export interface ReportReceived {
+  id: string;
+  trendItemId: string;
+  reason: ReportReason;
+  detail: string | null;
+  explanationDeadline: string | null;
+  explanationSubmitted: boolean;
+  status: ReportStatus;
+}
