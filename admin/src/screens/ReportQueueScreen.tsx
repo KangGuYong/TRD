@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useReportQueue, fetchReportSubmissionCandidates, hideReport, requestExplanation, decideReport } from "../api/hooks";
 import { ApiError, USE_FIXTURES } from "../api/client";
+import * as fx from "../fixtures";
 import { Card, StateView, Btn, Label } from "../components/ui";
 import { C } from "../theme";
 import { useRole, CAN } from "../state/role";
@@ -46,6 +47,10 @@ function ReportCard({ report }: { report: ReportQueueItem }) {
   const [candidates, setCandidates] = useState<ReportSubmissionCandidate[] | null>(null);
   const [loadingCandidates, setLoadingCandidates] = useState(false);
   const [selected, setSelected] = useState<string | null>(report.submissionId);
+  useEffect(() => {
+    setSelected(report.submissionId);
+  }, [report.submissionId]);
+
   const [note, setNote] = useState("");
   const [decision, setDecision] = useState<"RESTORE" | "HIDE_PERMANENT" | "EDIT_RESTORE">("RESTORE");
   const [newName, setNewName] = useState("");
@@ -60,7 +65,7 @@ function ReportCard({ report }: { report: ReportQueueItem }) {
     if (opening && !candidates) {
       setLoadingCandidates(true);
       try {
-        setCandidates(USE_FIXTURES ? [] : await fetchReportSubmissionCandidates(report.id));
+        setCandidates(USE_FIXTURES ? fx.fxReportSubmissionCandidates : await fetchReportSubmissionCandidates(report.id));
       } catch (e) {
         flash(e instanceof ApiError ? e.message : "제보 원문을 불러오지 못했습니다");
       } finally {
