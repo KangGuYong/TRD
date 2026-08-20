@@ -1,7 +1,8 @@
-import React from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import React, { useState } from "react";
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useRoute, type RouteProp } from "@react-navigation/native";
-import { useTrendDetail, useToggleWatch, useVote } from "../api/hooks";
+import { useCreateReport, useTrendDetail, useToggleWatch, useVote } from "../api/hooks";
+import type { ReportReason } from "../api/types";
 import { Card, Muted, Screen, StageChip, StateView } from "../components/ui";
 import { C, STAGE_COLOR } from "../theme";
 import type { HomeStackParamList } from "../navigation/types";
@@ -96,6 +97,9 @@ export default function DetailScreen() {
                   {toggleWatch.error instanceof Error ? toggleWatch.error.message : "요청에 실패했습니다"}
                 </Text>
               )}
+
+              {/* 신고 */}
+              <ReportSection trendId={params.id} />
             </>
           );
         }}
@@ -121,6 +125,64 @@ function VoteBtn({ label, onPress, busy }: { label: string; onPress: () => void;
   );
 }
 
+const REPORT_REASONS: { key: ReportReason; label: string }[] = [
+  { key: "DEFAMATION", label: "명예훼손" },
+  { key: "BUSINESS_INTERFERENCE", label: "영업방해" },
+  { key: "OTHER", label: "기타" },
+];
+
+function ReportSection({ trendId }: { trendId: string }) {
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState<ReportReason | null>(null);
+  const [detail, setDetail] = useState("");
+  const report = useCreateReport();
+
+  if (report.isSuccess) {
+    return (
+      <View style={{ marginTop: 22 }}>
+        <Muted style={{ color: C.rising }}>신고가 접수됐습니다. 검토 후 처리됩니다.</Muted>
+      </View>
+    );
+  }
+
+  const submit = () => {
+    if (!reason) return;
+    report.mutate({ trendItemId: trendId, reason, detail: detail.trim() || undefined });
+  };
+
+  return (
+    <View style={{ marginTop: 22 }}>
+      <Pressable onPress={() => setOpen((o) => !o)}>
+        <Text style={s.reportToggle}>{open ? "신고 취소" : "신고하기"}</Text>
+      </Pressable>
+      {open && (
+        <Card style={{ marginTop: 10 }}>
+          <Text style={s.sectionLabel}>신고 사유</Text>
+          <View style={{ flexDirection: "row", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
+            {REPORT_REASONS.map((r) => {
+              const on = reason === r.key;
+              return (
+                <Pressable key={r.key} onPress={() => setReason(r.key)} style={[s.reasonChip, on && { backgroundColor: C.ink, borderColor: C.ink }]}>
+                  <Text style={{ color: on ? "#fff" : C.ink, fontWeight: "500", fontSize: 12.5 }}>{r.label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          <TextInput value={detail} onChangeText={setDetail} placeholder="상세 내용 (선택)" placeholderTextColor="rgba(20,19,15,0.35)"
+            style={[s.reportInput, { marginTop: 10 }]} multiline />
+          {report.isError && <Muted style={{ color: C.fading, marginTop: 8 }}>{report.error instanceof Error ? report.error.message : "신고 접수에 실패했습니다"}</Muted>}
+          <Pressable onPress={submit} disabled={!reason || report.isPending}
+            style={[s.reportSubmit, { backgroundColor: reason ? C.fading : "rgba(20,19,15,0.1)" }]}>
+            <Text style={{ color: reason ? "#fff" : "rgba(20,19,15,0.35)", fontWeight: "600", fontSize: 13.5 }}>
+              {report.isPending ? "접수 중…" : "신고 접수"}
+            </Text>
+          </Pressable>
+        </Card>
+      )}
+    </View>
+  );
+}
+
 const s = StyleSheet.create({
   word: { fontSize: 36, fontWeight: "700", letterSpacing: -0.9, color: C.ink, marginTop: 12 },
   verdict: { fontSize: 17, fontWeight: "600", marginTop: 12 },
@@ -143,4 +205,8 @@ const s = StyleSheet.create({
   watchOff: { backgroundColor: "transparent", borderWidth: 1, borderColor: "rgba(20,19,15,0.16)" },
   watchText: { fontWeight: "600", fontSize: 15 },
   watchError: { marginTop: 10, fontSize: 13, color: C.fading, textAlign: "center", lineHeight: 20 },
+  reportToggle: { fontSize: 13, fontWeight: "600", color: C.sub },
+  reasonChip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 100, borderWidth: 1, borderColor: "rgba(20,19,15,0.12)", backgroundColor: "#fff" },
+  reportInput: { backgroundColor: "#fff", borderWidth: 1, borderColor: "rgba(20,19,15,0.1)", borderRadius: 12, paddingHorizontal: 13, paddingVertical: 12, fontSize: 14, color: C.ink, minHeight: 60, textAlignVertical: "top" },
+  reportSubmit: { marginTop: 12, paddingVertical: 13, borderRadius: 12, alignItems: "center" },
 });
