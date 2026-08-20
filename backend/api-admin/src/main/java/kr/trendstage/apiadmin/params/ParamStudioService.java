@@ -14,6 +14,7 @@ import kr.trendstage.domain.verdict.VerdictResult;
 import kr.trendstage.persistence.entity.ApprovalRequest;
 import kr.trendstage.persistence.entity.ParameterDraft;
 import kr.trendstage.persistence.entity.Verdict;
+import kr.trendstage.persistence.params.CurrentParameterSetResolver;
 import kr.trendstage.persistence.repo.ApprovalRequestRepository;
 import kr.trendstage.persistence.repo.ParameterDraftRepository;
 import kr.trendstage.persistence.repo.VerdictRepository;
@@ -48,10 +49,12 @@ public class ParamStudioService {
     private final ObjectMapper objectMapper;
     private final Clock clock;
     private final EntityManager entityManager;
+    private final CurrentParameterSetResolver currentParameterSetResolver;
 
     public ParamStudioService(ParameterDraftRepository drafts, ApprovalRequestRepository approvals,
                                VerdictRepository verdicts, AuditLogService auditLogService,
-                               ObjectMapper objectMapper, Clock clock, EntityManager entityManager) {
+                               ObjectMapper objectMapper, Clock clock, EntityManager entityManager,
+                               CurrentParameterSetResolver currentParameterSetResolver) {
         this.drafts = drafts;
         this.approvals = approvals;
         this.verdicts = verdicts;
@@ -59,6 +62,7 @@ public class ParamStudioService {
         this.objectMapper = objectMapper;
         this.clock = clock;
         this.entityManager = entityManager;
+        this.currentParameterSetResolver = currentParameterSetResolver;
     }
 
     @Transactional
@@ -90,7 +94,7 @@ public class ParamStudioService {
     @Transactional
     public ParameterDraft simulate(UUID actorId, AdminRole actorRole) {
         ParameterDraft draft = getOrCreateActiveDraft(actorId);
-        ParameterSet draftParams = toParameterSet(draft.getPayload());
+        ParameterSet draftParams = draft.toParameterSet(objectMapper);
 
         Instant since = clock.instant().minus(Duration.ofDays(SIM_WINDOW_DAYS));
         List<VerdictSnapshot> snapshots = verdicts.findCurrentNonVoidSince(since).stream()
@@ -126,9 +130,7 @@ public class ParamStudioService {
     }
 
     public ParameterSet currentOperationalParams() {
-        // ParameterSetProvider(scheduler 모듈 전용, 내용은 어차피 defaults() 고정)와 동일한 값.
-        // APPLIED 드래프트를 실제로 반영하는 배선은 이번 스코프 밖(설계서 비범위 참고).
-        return ParameterSet.defaults();
+        return currentParameterSetResolver.resolve();
     }
 
     private VerdictSnapshot toSnapshot(Verdict v) {
@@ -140,21 +142,6 @@ public class ParamStudioService {
             return new VerdictSnapshot(v.getResult(), reach, distinctSubmitters, distinctPlatforms);
         } catch (Exception e) {
             throw new IllegalStateException("evidence_json 파싱 실패: verdict=" + v.getId(), e);
-        }
-    }
-
-    private ParameterSet toParameterSet(String payloadJson) {
-        try {
-            var node = objectMapper.readTree(payloadJson);
-            ParameterSet d = ParameterSet.defaults();
-            return new ParameterSet(
-                    node.get("submitterTarget").asInt(), node.get("hitThreshold").asDouble(),
-                    d.bandL2, d.bandL3, d.bandL4,
-                    d.mL1, d.mL2, d.mL3, d.mL4,
-                    d.wRank1, d.wRank2, d.wRank3, d.wRankRest,
-                    d.halflifeDays, d.tiAlpha, d.tiBeta);
-        } catch (Exception e) {
-            throw new IllegalStateException("payload 파싱 실패", e);
         }
     }
 
