@@ -98,8 +98,8 @@ export const fxAdminAccounts: AdminAccountSummary[] = [
 ];
 
 export const fxApprovals: ApprovalRequestView[] = [
-  { id: "ap1", actionType: "PARAM_APPLY", targetRef: "pd-17", requestedByName: "김운영", approvals: 0, status: "PENDING", reason: "O1 백테스트 결과 반영 — submitterTarget 20→18", createdAt: "2026-08-07 11:20", resolvedAt: null },
-  { id: "ap2", actionType: "PARAM_APPLY", targetRef: "pd-12", requestedByName: "박관리", approvals: 1, status: "PARTIAL", reason: "hitThreshold 0.20→0.22 보정", createdAt: "2026-08-05 09:40", resolvedAt: null },
+  { id: "ap1", actionType: "PARAM_APPLY", targetRef: "pd-17", requestedBy: "admin-fx-1", requestedByName: "김운영", approvals: 0, status: "PENDING", reason: "O1 백테스트 결과 반영 — submitterTarget 20→18", createdAt: "2026-08-07 11:20", resolvedAt: null },
+  { id: "ap2", actionType: "PARAM_APPLY", targetRef: "pd-12", requestedBy: "admin-fx-2", requestedByName: "박관리", approvals: 1, status: "PARTIAL", reason: "hitThreshold 0.20→0.22 보정", createdAt: "2026-08-05 09:40", resolvedAt: null },
 ];
 
 const fxJudged: JudgedItem[] = [

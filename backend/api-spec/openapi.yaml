@@ -1031,6 +1031,7 @@ components:
         id: { type: string, format: uuid }
         actionType: { type: string, enum: [SANCTION, GRADE_ADJUST, PARAM_APPLY, LEDGER_ADJ_OVER100] }
         targetRef: { type: string, format: uuid }
+        requestedBy: { type: string, format: uuid }
         requestedByName: { type: string }
         status: { type: string, enum: [PENDING, PARTIAL, APPROVED, REJECTED, EXECUTED] }
         approvals: { type: integer, description: 현재 승인 수 (0~2) }

@@ -87,7 +87,7 @@ export default function ApprovalsScreen() {
                 <div style={{ padding: "26px 20px", font: "500 13px Pretendard", color: C.faint }}>대기 중인 승인 요청이 없습니다.</div>
               )}
               {rows.map((row) => {
-                const isRequester = principal != null && row.requestedByName === principal.displayName;
+                const isRequester = principal != null && row.requestedBy === principal.id;
                 const disabled = !canConfirm || isRequester || busyId === row.id;
                 return (
                   <div key={row.id} style={{ display: "grid", gridTemplateColumns: "140px 90px 110px 1fr 90px 130px 170px", alignItems: "center", padding: "14px 20px", borderBottom: "1px solid rgba(20,19,15,0.05)" }}>

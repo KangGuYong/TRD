@@ -34,7 +34,7 @@ public class ApprovalController {
     }
 
     public record ApprovalRequestResponse(String id, String actionType, String targetRef,
-                                           String requestedByName, int approvals, String status,
+                                           String requestedBy, String requestedByName, int approvals, String status,
                                            String reason, String createdAt, String resolvedAt) {}
     public record RejectRequest(String reason) {}
 
@@ -64,7 +64,7 @@ public class ApprovalController {
         int approvalCount = (req.getApprover1() != null ? 1 : 0) + (req.getApprover2() != null ? 1 : 0);
         return new ApprovalRequestResponse(
                 req.getId().toString(), req.getActionType(), req.getTargetRef().toString(),
-                requestedByName, approvalCount, req.getStatus().name(), extractReason(req.getPayload()),
+                req.getRequestedBy().toString(), requestedByName, approvalCount, req.getStatus().name(), extractReason(req.getPayload()),
                 DISPLAY_FORMAT.format(req.getCreatedAt()),
                 req.getResolvedAt() == null ? null : DISPLAY_FORMAT.format(req.getResolvedAt()));
     }

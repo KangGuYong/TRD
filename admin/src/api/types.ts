@@ -165,6 +165,7 @@ export interface ApprovalRequestView {
   id: string;
   actionType: "SANCTION" | "GRADE_ADJUST" | "PARAM_APPLY" | "LEDGER_ADJ_OVER100";
   targetRef: string;
+  requestedBy: string;
   requestedByName: string;
   approvals: number;
   status: "PENDING" | "PARTIAL" | "APPROVED" | "REJECTED" | "EXECUTED";
