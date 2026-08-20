@@ -160,3 +160,15 @@ export interface TrendItemDetail {
   previewResult: string | null; previewReachLevel: string | null; previewScoreT: string | null;
   submissions: SubmissionRow[];
 }
+
+export interface ApprovalRequestView {
+  id: string;
+  actionType: "SANCTION" | "GRADE_ADJUST" | "PARAM_APPLY" | "LEDGER_ADJ_OVER100";
+  targetRef: string;
+  requestedByName: string;
+  approvals: number;
+  status: "PENDING" | "PARTIAL" | "APPROVED" | "REJECTED" | "EXECUTED";
+  reason: string | null;
+  createdAt: string;
+  resolvedAt: string | null;
+}
