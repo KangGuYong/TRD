@@ -22,6 +22,7 @@ import kr.trendstage.persistence.repo.VoteRepository;
 import kr.trendstage.persistence.repo.WatchRepository;
 import kr.trendstage.persistence.type.SubmissionResult;
 import kr.trendstage.persistence.type.TrendState;
+import kr.trendstage.persistence.type.TrendVisibility;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -78,7 +79,7 @@ public class TrendQueryService {
     }
 
     private List<TrendSummaryResponse> liveRanked() {
-        return trends.findByStateIn(List.of(TrendState.PENDING, TrendState.JUDGING))
+        return trends.findByStateInAndVisibility(List.of(TrendState.PENDING, TrendState.JUDGING), TrendVisibility.PUBLIC)
                 .stream()
                 .map(this::toSummary)
                 .sorted(Comparator.comparingInt(r -> StageEvaluator.actionPriority(DisplayStage.valueOf(r.stage()))))
@@ -103,7 +104,7 @@ public class TrendQueryService {
 
     /** 오늘자 배정이 없을 때만 호출. 후보군을 계산해 선정하고 저장을 시도한 뒤, 실제 저장된(경쟁 시 상대방 것일 수도 있는) 결과를 다시 읽는다. */
     private List<UUID> generateSelection(UUID userId, LocalDate today) {
-        List<TrendItem> candidates = trends.findByStateIn(List.of(TrendState.PENDING, TrendState.JUDGING));
+        List<TrendItem> candidates = trends.findByStateInAndVisibility(List.of(TrendState.PENDING, TrendState.JUDGING), TrendVisibility.PUBLIC);
         List<DailySelectionPicker.Candidate> picked = candidates.stream()
                 .map(item -> new DailySelectionPicker.Candidate(
                         item.getId(),
@@ -166,6 +167,7 @@ public class TrendQueryService {
     public TrendDetailResponse detail(UUID id, UUID viewerId) {
         TrendItem item = trends.findById(id)
                 .filter(i -> i.getState() != TrendState.MERGED)
+                .filter(i -> i.getVisibility() == TrendVisibility.PUBLIC)
                 .orElseThrow(() -> new TrendNotFoundException("존재하지 않는 항목입니다"));
 
         TrendSummaryResponse base = toSummary(item);
