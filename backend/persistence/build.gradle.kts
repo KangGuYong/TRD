@@ -12,6 +12,9 @@ dependencies {
     api(project(":domain-core"))
     api("org.springframework.boot:spring-boot-starter-data-jpa")
 
+    // ParameterDraft.toParameterSet()이 payload(JSONB)를 파싱하는 데 필요(버전은 BOM이 결정).
+    implementation("com.fasterxml.jackson.core:jackson-databind")
+
     // 구현 세부(마이그레이션·드라이버·벡터)는 전파 불필요.
     implementation("org.flywaydb:flyway-core")
     implementation("org.flywaydb:flyway-database-postgresql")
