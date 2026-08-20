@@ -21,6 +21,8 @@ tags:
     description: 앱 · 제보/동의
   - name: app-me
     description: 앱 · 등급/원장/설정/워치
+  - name: app-reports
+    description: 앱 · 신고/소명
   - name: admin-queues
     description: 콘솔 · 큐(병합/어뷰징/이의/신고)
   - name: admin-trends
@@ -148,6 +150,61 @@ paths:
       responses:
         '201': { description: 동의 처리됨 }
         '409': { description: 이미 동의/제보한 유저 }
+
+  # ─────────────────────────────  앱 · 신고  ─────────────────────────────
+  /v1/reports:
+    post:
+      tags: [app-reports]
+      summary: 신고 접수 (대상은 TrendItem — 개별 제보 원문은 유저에게 노출되지 않음)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReportCreate' }
+      responses:
+        '201':
+          description: 접수됨
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReportMine' }
+  /v1/reports/me:
+    get:
+      tags: [app-reports]
+      summary: 내가 접수한 신고 목록 + 처리 결과
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/ReportMine' } }
+  /v1/reports/received:
+    get:
+      tags: [app-reports]
+      summary: 나를 지목해 소명을 요구한 신고 목록 (로그인 유저 = 지목된 submission의 작성자)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/ReportReceived' } }
+  /v1/reports/{id}/explanation:
+    post:
+      tags: [app-reports]
+      summary: 소명 제출
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              properties:
+                text: { type: string, maxLength: 2000 }
+      responses:
+        '200': { description: 제출됨 }
+        '403': { description: 소명 대상으로 지목되지 않음 }
+        '409': { description: 소명을 제출할 수 있는 상태(EXPLAINING)가 아님 }
 
   # ─────────────────────────────  앱 · 나  ─────────────────────────────
   /v1/me/grade:
@@ -659,7 +716,7 @@ paths:
   /admin/reports:
     get:
       tags: [admin-queues]
-      summary: 신고 콘텐츠 큐 (ADM-410 · 신고자 비식별)
+      summary: 신고 콘텐츠 큐 (ADM-410 · OPEN/EXPLAINING만 · 신고자 비식별)
       security: [{ cookieAuth: [] }]
       responses:
         '200':
@@ -667,10 +724,64 @@ paths:
           content:
             application/json:
               schema: { type: array, items: { $ref: '#/components/schemas/Report' } }
+  /admin/reports/{id}/submissions:
+    get:
+      tags: [admin-queues]
+      summary: 해당 트렌드의 제보 원문 목록 — 관리자가 소명 대상을 지목할 후보(자동 추정 없음)
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/ReportSubmissionCandidate' } }
+  /admin/reports/{id}/hide:
+    post:
+      tags: [admin-queues]
+      summary: 즉시 비공개 + 소명 요청 (1차 처리)
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [submissionId]
+              properties:
+                submissionId: { type: string, format: uuid, description: 관리자가 지목한 문제 제보 }
+                note: { type: string }
+      responses:
+        '200':
+          description: 처리됨
+          content: { application/json: { schema: { $ref: '#/components/schemas/Report' } } }
+        '422': { description: submissionId 누락 또는 해당 트렌드에 속하지 않는 제보 }
+  /admin/reports/{id}/request-explanation:
+    post:
+      tags: [admin-queues]
+      summary: 공개 유지한 채 소명 요청 (1차 처리)
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [submissionId]
+              properties:
+                submissionId: { type: string, format: uuid }
+                note: { type: string }
+      responses:
+        '200':
+          description: 처리됨
+          content: { application/json: { schema: { $ref: '#/components/schemas/Report' } } }
+        '422': { description: submissionId 누락 또는 해당 트렌드에 속하지 않는 제보 }
   /admin/reports/{id}/decide:
     post:
       tags: [admin-queues]
-      summary: 신고 결정 (복원 / 영구비공개 / 수정후복원)
+      summary: 신고 최종 결정 (복원 / 영구비공개 / 수정후복원) — OPERATOR 이상
       security: [{ cookieAuth: [] }]
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       requestBody:
@@ -683,8 +794,13 @@ paths:
               properties:
                 decision: { type: string, enum: [RESTORE, HIDE_PERMANENT, EDIT_RESTORE] }
                 note: { type: string }
+                newCanonicalName: { type: string, description: EDIT_RESTORE일 때 필수 }
       responses:
-        '200': { description: 처리됨 }
+        '200':
+          description: 처리됨
+          content: { application/json: { schema: { $ref: '#/components/schemas/Report' } } }
+        '403': { description: OPERATOR 미만 }
+        '422': { description: EXPLAINING 상태가 아니거나 EDIT_RESTORE인데 newCanonicalName 누락 }
   /admin/seeding:
     post:
       tags: [admin-trends]
@@ -1108,12 +1224,57 @@ components:
         createdAt: { type: string, format: date-time }
     Report:
       type: object
+      description: 신고자(reporterId)는 관리자 응답에 절대 포함하지 않는다(비식별 원칙).
       properties:
         id: { type: string, format: uuid }
-        targetType: { type: string }
-        targetId: { type: string, format: uuid }
-        status: { type: string }
+        trendItemId: { type: string, format: uuid }
+        reason: { type: string, enum: [DEFAMATION, BUSINESS_INTERFERENCE, OTHER] }
+        detail: { type: [string, 'null'] }
+        status: { type: string, enum: [OPEN, EXPLAINING, DECIDED] }
+        submissionId: { type: [string, 'null'], format: uuid, description: 1차 처리 전에는 null }
+        explanationDeadline: { type: [string, 'null'] }
+        explanationText: { type: [string, 'null'] }
+        decision: { type: [string, 'null'], enum: [RESTORE, HIDE_PERMANENT, EDIT_RESTORE, null] }
+        decisionNote: { type: [string, 'null'] }
+        createdAt: { type: string }
+    ReportSubmissionCandidate:
+      type: object
+      description: 관리자가 소명 대상을 지목할 때 보는 원문 목록(병합검수 화면과 동일 뷰).
+      properties:
+        submissionId: { type: string, format: uuid }
+        handle: { type: string }
+        rawInput: { type: string }
+        oneLine: { type: string }
+        evidenceUrl: { type: string }
+        createdAt: { type: string }
+    ReportCreate:
+      type: object
+      required: [trendItemId, reason]
+      properties:
+        trendItemId: { type: string, format: uuid }
+        reason: { type: string, enum: [DEFAMATION, BUSINESS_INTERFERENCE, OTHER] }
+        detail: { type: string, maxLength: 1000 }
+    ReportMine:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        trendItemId: { type: string, format: uuid }
+        status: { type: string, enum: [OPEN, EXPLAINING, DECIDED] }
+        reason: { type: string, enum: [DEFAMATION, BUSINESS_INTERFERENCE, OTHER] }
+        decision: { type: [string, 'null'] }
+        decisionNote: { type: [string, 'null'] }
         createdAt: { type: string, format: date-time }
+        decidedAt: { type: [string, 'null'], format: date-time }
+    ReportReceived:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        trendItemId: { type: string, format: uuid }
+        reason: { type: string, enum: [DEFAMATION, BUSINESS_INTERFERENCE, OTHER] }
+        detail: { type: [string, 'null'] }
+        explanationDeadline: { type: [string, 'null'], format: date-time }
+        explanationSubmitted: { type: boolean }
+        status: { type: string, enum: [OPEN, EXPLAINING, DECIDED] }
     SeedingStats:
       type: object
       properties:
