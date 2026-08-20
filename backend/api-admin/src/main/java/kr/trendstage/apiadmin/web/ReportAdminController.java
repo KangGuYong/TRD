@@ -23,7 +23,7 @@ import java.util.UUID;
  */
 @RestController
 @RequestMapping("/admin/reports")
-public class ReportController {
+public class ReportAdminController {
 
     private static final DateTimeFormatter DISPLAY_FORMAT =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.of("Asia/Seoul"));
@@ -31,7 +31,7 @@ public class ReportController {
     private final ReportAdminService service;
     private final UserRepository users;
 
-    public ReportController(ReportAdminService service, UserRepository users) {
+    public ReportAdminController(ReportAdminService service, UserRepository users) {
         this.service = service;
         this.users = users;
     }
