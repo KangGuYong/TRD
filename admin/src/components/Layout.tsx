@@ -3,7 +3,7 @@ import { C, ROLE_LABEL, type Role } from "../theme";
 import { useRole } from "../state/role";
 import { useAuth } from "../state/auth";
 
-export type ScreenId = "ADM-010" | "ADM-100" | "ADM-110" | "ADM-111" | "ADM-200" | "ADM-500" | "ADM-600" | "ADM-620" | "ADM-311" | "ADM-700" | "ADM-800" | "stub";
+export type ScreenId = "ADM-010" | "ADM-100" | "ADM-110" | "ADM-111" | "ADM-200" | "ADM-410" | "ADM-500" | "ADM-600" | "ADM-620" | "ADM-311" | "ADM-700" | "ADM-800" | "stub";
 
 const NAV: { group: string; items: { id: ScreenId | "stub"; label: string; code: string; badge?: number }[] }[] = [
   { group: "큐", items: [
@@ -11,7 +11,7 @@ const NAV: { group: string; items: { id: ScreenId | "stub"; label: string; code:
     { id: "ADM-100", label: "병합 검수", code: "ADM-100", badge: 24 },
     { id: "stub", label: "어뷰징", code: "ADM-300", badge: 6 },
     { id: "stub", label: "이의 제기", code: "ADM-400", badge: 3 },
-    { id: "stub", label: "신고 콘텐츠", code: "ADM-410", badge: 2 },
+    { id: "ADM-410", label: "신고 콘텐츠", code: "ADM-410", badge: 2 },
   ]},
   { group: "트렌드", items: [
     { id: "ADM-110", label: "항목 목록", code: "ADM-110" },
