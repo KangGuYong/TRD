@@ -66,7 +66,8 @@ public class ReportAdminService {
         Report report = requireOpen(reportId);
         requireSubmissionBelongsToReport(report, submissionId);
 
-        TrendItem item = trends.findById(report.getTrendItemId()).orElseThrow();
+        TrendItem item = trends.findById(report.getTrendItemId())
+                .orElseThrow(() -> new AdminValidationException("트렌드 항목을 찾을 수 없습니다: " + report.getTrendItemId()));
         item.applyVisibility(TrendVisibility.TEMP_HIDDEN);
 
         report.moveToExplaining(submissionId, clock.instant().plus(EXPLANATION_WINDOW));
@@ -95,7 +96,8 @@ public class ReportAdminService {
             throw new AdminValidationException("EDIT_RESTORE는 newCanonicalName이 필수입니다");
         }
 
-        TrendItem item = trends.findById(report.getTrendItemId()).orElseThrow();
+        TrendItem item = trends.findById(report.getTrendItemId())
+                .orElseThrow(() -> new AdminValidationException("트렌드 항목을 찾을 수 없습니다: " + report.getTrendItemId()));
         switch (decision) {
             case RESTORE -> item.applyVisibility(TrendVisibility.PUBLIC);
             case HIDE_PERMANENT -> item.applyVisibility(TrendVisibility.PERMANENT_HIDDEN);
