@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, ApiError } from "./client";
 import type {
-  GradeStatus, Ledger, MeSummary, Preferences, SubmissionCreate, SubmissionMine,
+  GradeStatus, Ledger, MeSummary, Preferences, ReportCreate, ReportMine, ReportReceived, SubmissionCreate, SubmissionMine,
   TrendDetail, TrendList, VoteResult, WatchItem,
 } from "./types";
 
@@ -15,6 +15,8 @@ export const qk = {
   mySubs: ["submissions", "me"] as const,
   watch: ["me", "watch"] as const,
   prefs: ["me", "preferences"] as const,
+  myReports: ["reports", "me"] as const,
+  receivedReports: ["reports", "received"] as const,
 };
 
 /* ── 조회 ── */
@@ -111,5 +113,27 @@ export const useSavePreferences = () => {
   return useMutation({
     mutationFn: (body: Preferences) => api.put<Preferences>("/v1/me/preferences", body),
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.prefs }),
+  });
+};
+
+export const useMyReports = () =>
+  useQuery({ queryKey: qk.myReports, queryFn: () => api.get<ReportMine[]>("/v1/reports/me") });
+
+export const useReceivedReports = () =>
+  useQuery({ queryKey: qk.receivedReports, queryFn: () => api.get<ReportReceived[]>("/v1/reports/received") });
+
+export const useCreateReport = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: ReportCreate) => api.post<ReportMine>("/v1/reports", body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.myReports }),
+  });
+};
+
+export const useSubmitExplanation = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, text }: { id: string; text: string }) => api.post<void>(`/v1/reports/${id}/explanation`, { text }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.receivedReports }),
   });
 };

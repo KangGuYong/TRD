@@ -44,6 +44,21 @@ public class ApiExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(problem(404, e.getMessage()));
     }
 
+    @ExceptionHandler(ReportNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handle(ReportNotFoundException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(problem(404, e.getMessage()));
+    }
+
+    @ExceptionHandler(ExplanationForbiddenException.class)
+    public ResponseEntity<Map<String, Object>> handle(ExplanationForbiddenException e) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(problem(403, e.getMessage()));
+    }
+
+    @ExceptionHandler(ExplanationConflictException.class)
+    public ResponseEntity<Map<String, Object>> handle(ExplanationConflictException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(problem(409, e.getMessage()));
+    }
+
     private Map<String, Object> problem(int status, String detail) {
         return Map.of("type", "about:blank", "status", status, "detail", detail == null ? "" : detail);
     }

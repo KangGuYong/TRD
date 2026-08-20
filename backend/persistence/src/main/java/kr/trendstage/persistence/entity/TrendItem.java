@@ -3,6 +3,7 @@ package kr.trendstage.persistence.entity;
 import jakarta.persistence.*;
 import kr.trendstage.persistence.type.TrendCategory;
 import kr.trendstage.persistence.type.TrendState;
+import kr.trendstage.persistence.type.TrendVisibility;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -65,6 +66,11 @@ public class TrendItem {
     @Column(name = "judgment_deadline_override")
     private Instant judgmentDeadlineOverride;
 
+    /** 신고 처리 결과의 표시 계층(ADM-410, B1). 판정/점수 파이프라인과 완전히 분리(R2) — 비공개돼도 채점은 그대로 진행. */
+    @Enumerated(EnumType.STRING) @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(nullable = false)
+    private TrendVisibility visibility = TrendVisibility.PUBLIC;
+
     protected TrendItem() {}
 
     public TrendItem(String canonicalName, String normalizedKey, TrendCategory category, Instant firstSeenAt) {
@@ -87,8 +93,12 @@ public class TrendItem {
     public void markMergeChecked(Instant at) { this.mergeCheckedAt = at; }
     public Instant getJudgmentDeadlineOverride() { return judgmentDeadlineOverride; }
     public void extendJudgmentDeadline(Instant newDeadline) { this.judgmentDeadlineOverride = newDeadline; }
+    public TrendVisibility getVisibility() { return visibility; }
 
     public void transitionTo(TrendState next) { this.state = next; }
+
+    /** ADM-410 신고 처리(hide/decide)가 호출. 판정 엔진·score_ledger와 무관한 순수 표시 계층 변경(R2). */
+    public void applyVisibility(TrendVisibility next) { this.visibility = next; }
 
     /** 병합 패자로 표기. state=MERGED와 merged_into는 함께여야 한다(DDL CHECK). */
     public void mergeInto(UUID survivorId) {

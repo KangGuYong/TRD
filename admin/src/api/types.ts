@@ -173,3 +173,25 @@ export interface ApprovalRequestView {
   createdAt: string;
   resolvedAt: string | null;
 }
+
+export interface ReportSubmissionCandidate {
+  submissionId: string;
+  handle: string;
+  rawInput: string;
+  oneLine: string;
+  evidenceUrl: string;
+  createdAt: string;
+}
+export interface ReportQueueItem {
+  id: string;
+  trendItemId: string;
+  reason: "DEFAMATION" | "BUSINESS_INTERFERENCE" | "OTHER";
+  detail: string | null;
+  status: "OPEN" | "EXPLAINING" | "DECIDED";
+  submissionId: string | null;
+  explanationDeadline: string | null;
+  explanationText: string | null;
+  decision: "RESTORE" | "HIDE_PERMANENT" | "EDIT_RESTORE" | null;
+  decisionNote: string | null;
+  createdAt: string;
+}

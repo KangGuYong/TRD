@@ -2,6 +2,7 @@ package kr.trendstage.persistence.repo;
 
 import kr.trendstage.persistence.entity.TrendItem;
 import kr.trendstage.persistence.type.TrendState;
+import kr.trendstage.persistence.type.TrendVisibility;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
@@ -18,4 +19,7 @@ public interface TrendItemRepository extends JpaRepository<TrendItem, UUID> {
 
     /** cluster_merge 배치 대상: 아직 임베딩 유사도 비교를 안 한 활성 항목(03 §2③). */
     List<TrendItem> findByStateInAndMergeCheckedAtIsNull(List<TrendState> states);
+
+    /** api-public 공개 조회 필터링용 — visibility=PUBLIC만 노출(신고 처리 결과 반영, ADM-410). */
+    List<TrendItem> findByStateInAndVisibility(List<TrendState> states, TrendVisibility visibility);
 }
