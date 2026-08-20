@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, USE_FIXTURES } from "./client";
 import * as fx from "../fixtures";
-import type { AdminAccountSummary, ApprovalRequestView, AdminUserDetail, AuditEntry, MergeCandidate, MergePreview, ParameterDraftView, QueueSummary, SeedAccuracyRow, SeedSubmissionRequest, SeedSubmissionResult, TrendItemSummary, TrendItemDetail, VerdictListResponse } from "./types";
+import type { AdminAccountSummary, ApprovalRequestView, AdminUserDetail, AuditEntry, MergeCandidate, MergePreview, ParameterDraftView, QueueSummary, ReportQueueItem, ReportSubmissionCandidate, SeedAccuracyRow, SeedSubmissionRequest, SeedSubmissionResult, TrendItemSummary, TrendItemDetail, VerdictListResponse } from "./types";
 
 /** 픽스처 on이면 즉시 픽스처, off면 실 API. 동일 훅으로 백엔드 전환. */
 function useData<T>(key: unknown[], path: string, fixture: T) {
@@ -83,3 +83,18 @@ export const approveApproval = (id: string) =>
 
 export const rejectApproval = (id: string, reason: string) =>
   api.post<ApprovalRequestView>(`/admin/approvals/${id}/reject`, { reason });
+
+export const useReportQueue = () =>
+  useData<ReportQueueItem[]>(["admin", "reports"], "/admin/reports", fx.fxReportQueue);
+
+export const fetchReportSubmissionCandidates = (reportId: string) =>
+  api.get<ReportSubmissionCandidate[]>(`/admin/reports/${reportId}/submissions`);
+
+export const hideReport = (reportId: string, submissionId: string, note?: string) =>
+  api.post<ReportQueueItem>(`/admin/reports/${reportId}/hide`, { submissionId, note });
+
+export const requestExplanation = (reportId: string, submissionId: string, note?: string) =>
+  api.post<ReportQueueItem>(`/admin/reports/${reportId}/request-explanation`, { submissionId, note });
+
+export const decideReport = (reportId: string, decision: "RESTORE" | "HIDE_PERMANENT" | "EDIT_RESTORE", note: string, newCanonicalName?: string) =>
+  api.post<ReportQueueItem>(`/admin/reports/${reportId}/decide`, { decision, note, newCanonicalName });
