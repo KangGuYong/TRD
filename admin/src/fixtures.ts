@@ -1,5 +1,5 @@
 /** dev 시연용 데이터. 관리자 콘솔.dc.html 예시를 반영. 실 API로 대체됨. */
-import type { AdminAccountSummary, AdminUserDetail, AuditEntry, ImminentItem, JudgedItem, MergeCandidate, MergePreview, ParameterDraftView, QueueSummary, SeedAccuracyRow, SimulationSummary, TrendItemDetail, TrendItemSummary, VerdictListResponse } from "./api/types";
+import type { AdminAccountSummary, ApprovalRequestView, AdminUserDetail, AuditEntry, ImminentItem, JudgedItem, MergeCandidate, MergePreview, ParameterDraftView, QueueSummary, SeedAccuracyRow, SimulationSummary, TrendItemDetail, TrendItemSummary, VerdictListResponse } from "./api/types";
 
 export const fxQueueSummary: QueueSummary = {
   slaBreaches: 3,
@@ -95,6 +95,11 @@ export const fxAdminAccounts: AdminAccountSummary[] = [
   { id: "a2", loginId: "op_kim", displayName: "김운영", role: "OPERATOR", lastLoginAt: "2026-08-07 16:41", disabledAt: null, createdAt: "2026-07-05 11:30" },
   { id: "a3", loginId: "auditor_lee", displayName: "이감사", role: "AUDITOR", lastLoginAt: "2026-08-06 14:03", disabledAt: null, createdAt: "2026-07-10 09:00" },
   { id: "a4", loginId: "reviewer_old", displayName: "퇴사자", role: "REVIEWER", lastLoginAt: "2026-06-01 09:00", disabledAt: "2026-06-15 00:00", createdAt: "2026-05-01 09:00" },
+];
+
+export const fxApprovals: ApprovalRequestView[] = [
+  { id: "ap1", actionType: "PARAM_APPLY", targetRef: "pd-17", requestedByName: "김운영", approvals: 0, status: "PENDING", reason: "O1 백테스트 결과 반영 — submitterTarget 20→18", createdAt: "2026-08-07 11:20", resolvedAt: null },
+  { id: "ap2", actionType: "PARAM_APPLY", targetRef: "pd-12", requestedByName: "박관리", approvals: 1, status: "PARTIAL", reason: "hitThreshold 0.20→0.22 보정", createdAt: "2026-08-05 09:40", resolvedAt: null },
 ];
 
 const fxJudged: JudgedItem[] = [
