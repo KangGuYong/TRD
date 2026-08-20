@@ -1,8 +1,8 @@
-import React from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import React, { useState } from "react";
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
-import { useMeSummary, useMyGrade, useMyLedger, useMySubmissions, useWatch } from "../api/hooks";
-import type { GradeRequirementKind } from "../api/types";
+import { useMeSummary, useMyGrade, useMyLedger, useMyReports, useMySubmissions, useReceivedReports, useSubmitExplanation, useWatch } from "../api/hooks";
+import type { GradeRequirementKind, ReportReceived } from "../api/types";
 import { Card, H1, Muted, Screen, StateView } from "../components/ui";
 import type { MeNav } from "../navigation/types";
 import { useAuth } from "../state/auth";
@@ -27,6 +27,8 @@ export default function MeScreen() {
   const summary = useMeSummary();
   const watch = useWatch();
   const mySubs = useMySubmissions();
+  const myReports = useMyReports();
+  const receivedReports = useReceivedReports();
 
   return (
     <Screen>
@@ -173,6 +175,39 @@ export default function MeScreen() {
         </StateView>
       </View>
 
+      {/* 받은 소명요청 */}
+      <View style={{ marginTop: 11 }}>
+        <StateView query={receivedReports} empty={(d) => d.length === 0}>
+          {(items) => (
+            <Card>
+              <Text style={s.sectionTitle}>받은 소명요청</Text>
+              <View style={{ gap: 10, marginTop: 12 }}>
+                {items.map((r) => <ReceivedRow key={r.id} report={r} />)}
+              </View>
+            </Card>
+          )}
+        </StateView>
+      </View>
+
+      {/* 내가 접수한 신고 */}
+      <View style={{ marginTop: 11 }}>
+        <StateView query={myReports} empty={(d) => d.length === 0}>
+          {(items) => (
+            <Card>
+              <Text style={s.sectionTitle}>내가 접수한 신고</Text>
+              <View style={{ gap: 10, marginTop: 12 }}>
+                {items.map((r) => (
+                  <View key={r.id} style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                    <Text style={s.reqLabel}>{REASON_LABEL[r.reason]}</Text>
+                    <Muted style={{ fontSize: 12 }}>{REPORT_STATUS_LABEL[r.status]}</Muted>
+                  </View>
+                ))}
+              </View>
+            </Card>
+          )}
+        </StateView>
+      </View>
+
       <Pressable onPress={() => nav.navigate("Settings")} style={s.settingsRow}>
         <Text style={s.settingsText}>⚙ 설정 — 관심 분야 · 알림 시간</Text>
       </Pressable>
@@ -186,6 +221,42 @@ function SubStat({ label, value, color }: { label: string; value: number; color:
     <View>
       <Text style={{ fontSize: 20, fontWeight: "700", color }}>{value}</Text>
       <Muted style={{ fontSize: 11, marginTop: 2 }}>{label}</Muted>
+    </View>
+  );
+}
+
+const REASON_LABEL: Record<string, string> = { DEFAMATION: "명예훼손", BUSINESS_INTERFERENCE: "영업방해", OTHER: "기타" };
+const REPORT_STATUS_LABEL: Record<string, string> = { OPEN: "접수됨", EXPLAINING: "소명 대기", DECIDED: "처리 완료" };
+
+function ReceivedRow({ report }: { report: ReportReceived }) {
+  const [text, setText] = useState("");
+  const submit = useSubmitExplanation();
+  const canSubmit = report.status === "EXPLAINING" && !report.explanationSubmitted;
+
+  return (
+    <View style={{ padding: 12, borderRadius: 10, backgroundColor: "rgba(20,19,15,0.03)" }}>
+      <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+        <Text style={{ fontSize: 13, fontWeight: "600", color: C.ink }}>{REASON_LABEL[report.reason]}</Text>
+        <Muted style={{ fontSize: 11.5 }}>{REPORT_STATUS_LABEL[report.status]}</Muted>
+      </View>
+      {!!report.detail && <Muted style={{ fontSize: 12, marginTop: 4 }}>{report.detail}</Muted>}
+      {report.explanationDeadline && <Muted style={{ fontSize: 11, marginTop: 4 }}>소명 기한: {report.explanationDeadline}</Muted>}
+      {canSubmit && (
+        <View style={{ marginTop: 8 }}>
+          <TextInput value={text} onChangeText={setText} placeholder="소명 내용을 입력하세요" placeholderTextColor="rgba(20,19,15,0.35)"
+            style={{ backgroundColor: "#fff", borderRadius: 10, borderWidth: 1, borderColor: "rgba(20,19,15,0.1)", padding: 10, fontSize: 13, color: C.ink, minHeight: 50, textAlignVertical: "top" }} multiline />
+          <Pressable onPress={() => text.trim() && submit.mutate({ id: report.id, text: text.trim() })} disabled={!text.trim() || submit.isPending}
+            style={{ marginTop: 8, alignSelf: "flex-start", paddingVertical: 8, paddingHorizontal: 14, borderRadius: 8, backgroundColor: text.trim() ? C.ink : "rgba(20,19,15,0.1)" }}>
+            <Text style={{ color: text.trim() ? "#fff" : "rgba(20,19,15,0.35)", fontWeight: "600", fontSize: 12.5 }}>
+              {submit.isPending ? "제출 중…" : "소명 제출"}
+            </Text>
+          </Pressable>
+          {submit.isError && <Muted style={{ color: C.fading, fontSize: 11.5, marginTop: 6 }}>{submit.error instanceof Error ? submit.error.message : "제출에 실패했습니다"}</Muted>}
+        </View>
+      )}
+      {report.explanationSubmitted && report.status === "EXPLAINING" && (
+        <Muted style={{ fontSize: 11.5, marginTop: 6, color: C.rising }}>소명이 제출됐습니다. 결정을 기다리는 중입니다.</Muted>
+      )}
     </View>
   );
 }
