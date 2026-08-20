@@ -449,6 +449,24 @@ paths:
       responses:
         '200': { description: 승인 반영 (2/2면 실행) }
         '409': { description: 요청자 본인이거나 이미 승인함 }
+  /admin/approvals/{id}/reject:
+    post:
+      tags: [admin-governance]
+      summary: 반려 — 대상을 DRAFT 등 재수정 가능한 상태로 되돌린다
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, description: 반려 사유(필수) }
+      responses:
+        '200': { description: 반려됨 }
+        '409': { description: 이미 처리된 요청 }
   /admin/audit-log:
     get:
       tags: [admin-governance]
@@ -1012,9 +1030,13 @@ components:
       properties:
         id: { type: string, format: uuid }
         actionType: { type: string, enum: [SANCTION, GRADE_ADJUST, PARAM_APPLY, LEDGER_ADJ_OVER100] }
-        requestedBy: { type: string }
+        targetRef: { type: string, format: uuid }
+        requestedByName: { type: string }
         status: { type: string, enum: [PENDING, PARTIAL, APPROVED, REJECTED, EXECUTED] }
         approvals: { type: integer, description: 현재 승인 수 (0~2) }
+        reason: { type: [string, 'null'] }
+        createdAt: { type: string }
+        resolvedAt: { type: [string, 'null'] }
     AuditEntry:
       type: object
       properties:
