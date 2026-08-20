@@ -10,7 +10,7 @@ import java.util.UUID;
 
 /**
  * 2인 승인 요청. DB CHECK 제약(approver1_not_requester 등)이 요청자≠승인자를 강제한다(V6).
- * 이번 스코프는 요청 생성(PENDING)까지만 — 실제 승인 클릭 플로우는 범위 밖.
+ * 상태 전이는 ApprovalService(api-admin)가 행 잠금(findByIdForUpdate) 하에서만 호출한다.
  */
 @Entity
 @Table(name = "approval_requests")
@@ -28,6 +28,12 @@ public class ApprovalRequest {
     @Column(name = "requested_by", nullable = false)
     private UUID requestedBy;
 
+    @Column(name = "approver_1")
+    private UUID approver1;
+
+    @Column(name = "approver_2")
+    private UUID approver2;
+
     @Enumerated(EnumType.STRING) @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     @Column(nullable = false)
     private ApprovalStatus status = ApprovalStatus.PENDING;
@@ -39,6 +45,9 @@ public class ApprovalRequest {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt = Instant.now();
 
+    @Column(name = "resolved_at")
+    private Instant resolvedAt;
+
     protected ApprovalRequest() {}
 
     public ApprovalRequest(String actionType, UUID targetRef, UUID requestedBy, String payload) {
@@ -48,11 +57,37 @@ public class ApprovalRequest {
         this.payload = payload;
     }
 
+    /** 1차 승인. */
+    public void approveFirst(UUID approverId) {
+        this.approver1 = approverId;
+        this.status = ApprovalStatus.PARTIAL;
+    }
+
+    /** 2차 승인 — 승인자가 1차 승인자와 달라야 한다는 검증은 ApprovalService가 먼저 한다. */
+    public void approveSecond(UUID approverId, Instant now) {
+        this.approver2 = approverId;
+        this.status = ApprovalStatus.APPROVED;
+        this.resolvedAt = now;
+    }
+
+    /** 2/2 승인 후 대상 작업 실행까지 성공했을 때. */
+    public void markExecuted() {
+        this.status = ApprovalStatus.EXECUTED;
+    }
+
+    public void reject(Instant now) {
+        this.status = ApprovalStatus.REJECTED;
+        this.resolvedAt = now;
+    }
+
     public UUID getId() { return id; }
     public String getActionType() { return actionType; }
     public UUID getTargetRef() { return targetRef; }
     public UUID getRequestedBy() { return requestedBy; }
+    public UUID getApprover1() { return approver1; }
+    public UUID getApprover2() { return approver2; }
     public ApprovalStatus getStatus() { return status; }
     public String getPayload() { return payload; }
     public Instant getCreatedAt() { return createdAt; }
+    public Instant getResolvedAt() { return resolvedAt; }
 }
