@@ -10,4 +10,7 @@ import java.util.UUID;
 
 public interface ParameterDraftRepository extends JpaRepository<ParameterDraft, UUID> {
     Optional<ParameterDraft> findFirstByStatusInOrderByCreatedAtDesc(List<ParamStatus> statuses);
+
+    /** 운영에 반영된 최신 파라미터 — CurrentParameterSetResolver가 사용. */
+    Optional<ParameterDraft> findFirstByStatusOrderByAppliedAtDesc(ParamStatus status);
 }
