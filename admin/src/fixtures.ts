@@ -1,5 +1,5 @@
 /** dev 시연용 데이터. 관리자 콘솔.dc.html 예시를 반영. 실 API로 대체됨. */
-import type { AdminAccountSummary, ApprovalRequestView, AdminUserDetail, AuditEntry, ImminentItem, JudgedItem, MergeCandidate, MergePreview, ParameterDraftView, QueueSummary, SeedAccuracyRow, SimulationSummary, TrendItemDetail, TrendItemSummary, VerdictListResponse } from "./api/types";
+import type { AdminAccountSummary, ApprovalRequestView, AdminUserDetail, AuditEntry, ImminentItem, JudgedItem, MergeCandidate, MergePreview, ParameterDraftView, QueueSummary, ReportQueueItem, SeedAccuracyRow, SimulationSummary, TrendItemDetail, TrendItemSummary, VerdictListResponse } from "./api/types";
 
 export const fxQueueSummary: QueueSummary = {
   slaBreaches: 3,
@@ -100,6 +100,19 @@ export const fxAdminAccounts: AdminAccountSummary[] = [
 export const fxApprovals: ApprovalRequestView[] = [
   { id: "ap1", actionType: "PARAM_APPLY", targetRef: "pd-17", requestedBy: "admin-fx-1", requestedByName: "김운영", approvals: 0, status: "PENDING", reason: "O1 백테스트 결과 반영 — submitterTarget 20→18", createdAt: "2026-08-07 11:20", resolvedAt: null },
   { id: "ap2", actionType: "PARAM_APPLY", targetRef: "pd-12", requestedBy: "admin-fx-2", requestedByName: "박관리", approvals: 1, status: "PARTIAL", reason: "hitThreshold 0.20→0.22 보정", createdAt: "2026-08-05 09:40", resolvedAt: null },
+];
+
+export const fxReportQueue: ReportQueueItem[] = [
+  {
+    id: "rp-1", trendItemId: "ti-1", reason: "DEFAMATION", detail: "특정 인물을 비하하는 표현이 포함돼 있습니다",
+    status: "OPEN", submissionId: null, explanationDeadline: null, explanationText: null,
+    decision: null, decisionNote: null, createdAt: "2026-08-19 14:20",
+  },
+  {
+    id: "rp-2", trendItemId: "ti-3", reason: "BUSINESS_INTERFERENCE", detail: "경쟁사 비방성 제보로 의심됩니다",
+    status: "EXPLAINING", submissionId: "sub-1", explanationDeadline: "2026-08-21 09:12", explanationText: null,
+    decision: null, decisionNote: null, createdAt: "2026-08-18 09:00",
+  },
 ];
 
 const fxJudged: JudgedItem[] = [
