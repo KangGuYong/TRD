@@ -7,6 +7,7 @@ import MergeQueueScreen from "./screens/MergeQueueScreen";
 import VerdictScreen from "./screens/VerdictScreen";
 import SeedScreen from "./screens/SeedScreen";
 import ParamStudioScreen from "./screens/ParamStudioScreen";
+import ApprovalsScreen from "./screens/ApprovalsScreen";
 import UserLedgerScreen from "./screens/UserLedgerScreen";
 import AuditLogScreen from "./screens/AuditLogScreen";
 import AdminAccountsScreen from "./screens/AdminAccountsScreen";
@@ -23,6 +24,7 @@ const TITLE: Record<ScreenId, string> = {
   "ADM-200": "판정 관리",
   "ADM-500": "시딩 관리",
   "ADM-600": "파라미터 스튜디오",
+  "ADM-620": "승인 대기함",
   "ADM-311": "유저 상세 · 원장",
   "ADM-700": "감사 로그",
   "ADM-800": "관리자 계정",
@@ -65,6 +67,7 @@ function Console() {
       {screen === "ADM-200" && <VerdictScreen />}
       {screen === "ADM-500" && <SeedScreen />}
       {screen === "ADM-600" && <ParamStudioScreen />}
+      {screen === "ADM-620" && <ApprovalsScreen />}
       {screen === "ADM-311" && <UserLedgerScreen />}
       {screen === "ADM-700" && <AuditLogScreen />}
       {screen === "ADM-800" && <AdminAccountsScreen />}
