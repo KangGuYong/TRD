@@ -1,5 +1,5 @@
 /** dev 시연용 데이터. 관리자 콘솔.dc.html 예시를 반영. 실 API로 대체됨. */
-import type { AdminAccountSummary, ApprovalRequestView, AdminUserDetail, AuditEntry, ImminentItem, JudgedItem, MergeCandidate, MergePreview, ParameterDraftView, QueueSummary, ReportQueueItem, ReportSubmissionCandidate, SeedAccuracyRow, SimulationSummary, TrendItemDetail, TrendItemSummary, VerdictListResponse } from "./api/types";
+import type { AdminAccountSummary, ApprovalRequestView, AdminUserDetail, AuditEntry, ClusterMergeResult, ImminentItem, JudgedItem, MergeCandidate, MergePreview, ParameterDraftView, QueueSummary, ReportQueueItem, ReportSubmissionCandidate, SeedAccuracyRow, SimulationSummary, TrendItemDetail, TrendItemSummary, VerdictListResponse } from "./api/types";
 
 export const fxQueueSummary: QueueSummary = {
   slaBreaches: 3,
@@ -70,6 +70,10 @@ export const fxParamDraft: ParameterDraftView = {
   hitThreshold: 0.2,
   currentHitThreshold: 0.2,
   simResult: null,
+};
+
+export const fxClusterMergeResult: ClusterMergeResult = {
+  candidates: 8, autoMerged: 1, queued: 2, separated: 5, failed: 0,
 };
 
 export const fxUser: AdminUserDetail = {
