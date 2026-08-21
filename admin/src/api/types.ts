@@ -143,6 +143,14 @@ export interface SeedAccuracyRow {
   trustIndex: number;
 }
 
+export interface ClusterMergeResult {
+  candidates: number;
+  autoMerged: number;
+  queued: number;
+  separated: number;
+  failed: number;
+}
+
 export interface TrendItemSummary {
   id: string; canonicalName: string; category: string; state: string;
   firstSeenAt: string; submitterCount: number; currentResult: string | null;
