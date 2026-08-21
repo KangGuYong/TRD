@@ -31,6 +31,8 @@ tags:
     description: 콘솔 · 유저 원장/제재
   - name: admin-governance
     description: 콘솔 · 파라미터 스튜디오/2인 승인/감사 로그
+  - name: admin-batch-jobs
+    description: 콘솔 · 배치 작업 수동 실행
 
 security:
   - bearerAuth: []
@@ -870,6 +872,22 @@ paths:
       responses:
         '202': { description: 2인 승인 대기 생성됨 }
 
+  # ─────────────────────────────  콘솔 · 배치 작업  ─────────────────────────
+  /admin/batch-jobs/cluster-merge/run:
+    post:
+      tags: [admin-batch-jobs]
+      summary: cluster_merge 배치 수동 실행 (OPERATOR 이상)
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200':
+          description: 실행 완료
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClusterMergeResult"
+        '409':
+          description: 이미 실행 중(크론 또는 다른 관리자가 실행 중)
+
 components:
   securitySchemes:
     bearerAuth:
@@ -1310,3 +1328,12 @@ components:
         role: { type: string, enum: [REVIEWER, OPERATOR, ADMIN, AUDITOR] }
         twofaEnabled: { type: boolean }
         lastLoginAt: { type: [string, 'null'], format: date-time }
+    ClusterMergeResult:
+      type: object
+      required: [candidates, autoMerged, queued, separated, failed]
+      properties:
+        candidates: { type: integer }
+        autoMerged: { type: integer }
+        queued: { type: integer }
+        separated: { type: integer }
+        failed: { type: integer }
