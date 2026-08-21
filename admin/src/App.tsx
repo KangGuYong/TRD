@@ -9,6 +9,7 @@ import SeedScreen from "./screens/SeedScreen";
 import ParamStudioScreen from "./screens/ParamStudioScreen";
 import ApprovalsScreen from "./screens/ApprovalsScreen";
 import ReportQueueScreen from "./screens/ReportQueueScreen";
+import BatchJobsScreen from "./screens/BatchJobsScreen";
 import UserLedgerScreen from "./screens/UserLedgerScreen";
 import AuditLogScreen from "./screens/AuditLogScreen";
 import AdminAccountsScreen from "./screens/AdminAccountsScreen";
@@ -30,6 +31,7 @@ const TITLE: Record<ScreenId, string> = {
   "ADM-311": "유저 상세 · 원장",
   "ADM-700": "감사 로그",
   "ADM-800": "관리자 계정",
+  "ADM-900": "배치 관리",
   stub: "준비 중",
 };
 
@@ -74,6 +76,7 @@ function Console() {
       {screen === "ADM-311" && <UserLedgerScreen />}
       {screen === "ADM-700" && <AuditLogScreen />}
       {screen === "ADM-800" && <AdminAccountsScreen />}
+      {screen === "ADM-900" && <BatchJobsScreen />}
       {screen === "stub" && (
         <div style={{ maxWidth: 700, padding: 40, textAlign: "center", color: C.faint, font: "500 14px Pretendard" }}>
           이 화면은 준비 중입니다. P0(ADM-010·100·600·311·700) 다음 순서로 구현됩니다 — 05 §E.
