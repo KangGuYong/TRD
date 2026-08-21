@@ -3,7 +3,7 @@ import { C, ROLE_LABEL, type Role } from "../theme";
 import { useRole } from "../state/role";
 import { useAuth } from "../state/auth";
 
-export type ScreenId = "ADM-010" | "ADM-100" | "ADM-110" | "ADM-111" | "ADM-200" | "ADM-410" | "ADM-500" | "ADM-600" | "ADM-620" | "ADM-311" | "ADM-700" | "ADM-800" | "stub";
+export type ScreenId = "ADM-010" | "ADM-100" | "ADM-110" | "ADM-111" | "ADM-200" | "ADM-410" | "ADM-500" | "ADM-600" | "ADM-620" | "ADM-311" | "ADM-700" | "ADM-800" | "ADM-900" | "stub";
 
 const NAV: { group: string; items: { id: ScreenId | "stub"; label: string; code: string; badge?: number }[] }[] = [
   { group: "큐", items: [
@@ -28,6 +28,7 @@ const NAV: { group: string; items: { id: ScreenId | "stub"; label: string; code:
     { id: "stub", label: "등급 정책", code: "ADM-610" },
     { id: "ADM-700", label: "감사 로그", code: "ADM-700" },
     { id: "ADM-800", label: "관리자 계정", code: "ADM-800" },
+    { id: "ADM-900", label: "배치 관리", code: "ADM-900" },
   ]},
 ];
 
