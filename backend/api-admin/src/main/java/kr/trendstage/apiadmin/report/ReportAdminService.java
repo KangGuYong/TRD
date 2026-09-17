@@ -24,8 +24,9 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * ADM-410 신고 콘텐츠 큐. 4h 자동 임시비공개는 의도적으로 없음 — 사람이 명시적으로 판단하기
- * 전까지는 절대 비공개되지 않는다(설계서 §범위). visibility는 순수 표시 계층 — 판정/점수와 분리(R2).
+ * ADM-410 신고 콘텐츠 큐. 4h SLA 초과 시 자동 임시비공개(TEMP_HIDDEN)는 정책으로 확정됐고(R4 개정, 2026-09-17,
+ * P1) SP3의 sla_watch 잡이 수행한다 — 이 서비스는 사람의 결정(수동 임시비공개/복원/영구 비공개)만 다룬다.
+ * visibility는 순수 표시 계층 — 판정/점수와 분리(R2).
  */
 @Service
 public class ReportAdminService {
