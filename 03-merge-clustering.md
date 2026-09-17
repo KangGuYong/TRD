@@ -1,6 +1,6 @@
 # 병합 · 클러스터링 상세 설계 (v0.2)
 
-> 개정 2026-09-17: 외부 지표(baseline·소급 재수집) 서술 제거, RESOLVED 병합 금지(P4), 클레임·멱등키·부분 UNIQUE 명시. 근거: `docs/superpowers/specs/2026-09-17-design-review-design.md` §2.3.
+> 개정 2026-09-17: 외부 지표 서술 제거, RESOLVED 병합 금지(P4), 클레임·멱등키 명시. 근거: `docs/superpowers/specs/2026-09-17-design-review-design.md` §2.3.
 
 > 시스템 설계서 3.2절의 상세화. 이 단계가 틀리면 뒤의 판정 엔진이 아무리 정교해도 소용없다.
 
@@ -64,11 +64,13 @@
 
 ## 3. 유형 1: 제보 → 기존 클러스터 편입
 
+아래는 SP2 목표 절차다. 현행 코드(`MergeService.merge()`)가 실제로 하는 것은 3·4·5·6·7(dedup)·8·10(감사로그) 뿐 — 0(멱등키)·1의 `FOR UPDATE`·2(RESOLVED 가드)·9(큐 상태 전이는 컨트롤러가 별도 트랜잭션에서 수행)는 없다.
+
 ```
 BEGIN TRANSACTION
   0. 멱등키 검사: merge_queue.decision_key = :Idempotency-Key 가 이미 있으면 이전 결과 반환
   1. SELECT ... FROM trend_items WHERE id IN (:target, :source) ORDER BY id FOR UPDATE   ← id 오름차순(데드락 회피)
-  2. 상태 가드: 두 항목 모두 PENDING. JUDGING → 409(재시도), RESOLVED → 409(병합 불가, §3.2)
+  2. 상태 가드: 두 항목 모두 PENDING. JUDGING → 409(재시도), RESOLVED → 409(병합 불가, §3.2)   ← **미구현(SP2)**. 현행 가드는 MERGED뿐이라 RESOLVED도 병합된다
   3. submissions.trend_item_id = :target
   4. aliases[] 에 신규 정규화 키 추가
   5. canonical_name 재결정
@@ -144,7 +146,7 @@ DELETE 금지 이유 셋:
 |---|---|
 | 양쪽 모두 PENDING | 문제 없음. 판정 전이라 점수 미발생 |
 | 하나라도 JUDGING | 409. 판정 트랜잭션이 끝난 뒤 재시도 |
-| 하나라도 RESOLVED | **병합 거부(409)** (P4). 판정 후 병합(`ADJ` 상쇄 경로, R2)은 Phase 2(O9) |
+| 하나라도 RESOLVED | **병합 거부(409)** (P4) — **미구현(SP2)**, 현행은 그대로 병합되어 이중 점수가 난다. 판정 후 병합(`ADJ` 상쇄 경로, R2)은 Phase 2(O9) |
 
 ADJ 경로를 도입할 때는 영향받은 유저에게 **자동 통보 필수.** 점수가 소리 없이 바뀌면 반드시 분쟁이 된다.
 
@@ -174,9 +176,9 @@ ADJ 경로를 도입할 때는 영향받은 유저에게 **자동 통보 필수.
 | 행 잠금 | 병합 트랜잭션에서 두 항목을 id 오름차순 `FOR UPDATE`(§3 1번) |
 | 낙관적 락 | `trend_items.version` 으로 커밋 시점 충돌 감지 → "다른 검수자가 이미 처리했습니다" 후 최신 상태 재표시 |
 | 멱등성 키 | `Idempotency-Key` 헤더 → `merge_queue.decision_key UNIQUE`. 같은 키 재요청은 이전 결과 반환 |
-| 완전일치 유일성 | `trend_items(normalized_key) WHERE state <> 'MERGED'` 부분 UNIQUE. 제보 삽입이 충돌하면 기존 항목에 합류(조회-후-삽입 레이스 제거) |
+| 완전일치 유일성 | `trend_items.normalized_key`에 **전체 UNIQUE가 이미 있다**(`V24:15`). `watches.normalized_key`가 이를 FK로 참조하므로(`V24:19`) 부분 UNIQUE로 바꿀 수 없다 — PostgreSQL에서 부분 유니크 인덱스는 FK 대상이 될 수 없다. 남은 문제는 tombstone이다: `TrendItem.mergeInto()`가 패자의 키를 그대로 두고 완전일치 조회가 MERGED를 거르지 않아 **신규 제보가 이미 병합된 죽은 클러스터에 붙는다.** 조회가 `merged_into`를 따라 승자에 합류하도록 고친다(**미구현(SP2)**) |
 
-현행은 트랜잭션만 구현돼 있다(잠금·클레임·멱등키·부분 UNIQUE 없음). SP2에서 구현.
+현행은 트랜잭션과 `trend_items.version` 낙관적 락, 그리고 `normalized_key` UNIQUE만 있다(행 잠금·클레임·멱등키·상태 가드 없음). SP2에서 구현.
 
 ---
 
