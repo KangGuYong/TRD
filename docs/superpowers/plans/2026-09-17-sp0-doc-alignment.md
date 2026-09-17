@@ -1344,7 +1344,7 @@ AUDITOR는 **전 영역 읽기**다 — 신고 큐·파라미터 드래프트 �
 바꾸기:
 ```
 - `ADJ` 추가 시 **사유 필수 + 승인자 표시**(`score_ledger.approved_by_admin_id`). 100점 초과는 2인 승인.
-- 마스킹 해제는 서버 엔드포인트(`POST /admin/users/{id}/unmask`)를 거쳐 `PII_VIEW`가 기록된다. 클라이언트 토글로 해제하지 않는다.
+- 마스킹 해제는 서버 엔드포인트(`POST /admin/users/{id}/unmask`)를 거쳐 `PII_VIEW`가 기록되어야 한다 — **미구현(SP3)**. 현행 `UserLedgerScreen`은 클라이언트 토글(`setMasked`)일 뿐이라 서버에 아무 기록도 남지 않는다.
 ```
 
 - [ ] **Step 8: ADM-410 정책 확정**

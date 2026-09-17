@@ -89,6 +89,24 @@
 
 **O6. 계정 위생.** 부트스트랩 ADMIN 비밀번호 영구·평문 env, 변경 엔드포인트 없음, 90일 미접속 비활성화 없음.
 
+### 1.4.1 API 표면 — 스펙과 구현의 삼중 괴리 (SP0 Task 6에서 발견)
+
+`05-screen-endpoint-map.md`를 컨트롤러와 한 줄씩 대조한 결과, **세 가지 어긋남이 동시에** 존재했다.
+
+| 유형 | 예 |
+|---|---|
+| (a) 문서가 "스펙 미포함(🔶)"이라 했으나 `openapi.yaml`에 이미 있음 | `/v1/me/summary`, `/v1/me/reads`, `/admin/users/**`, `/admin/sanctions`, `/admin/appeals`, `/admin/abuse-flags`, `/admin/grade-policy` |
+| (b) 스펙에 있고 문서가 ✅라 했으나 **컨트롤러가 없음** | `POST /v1/appeals`, `/admin/users/**`, `/admin/sanctions`, `/admin/appeals`, `/admin/abuse-flags`, `/admin/grade-policy`, `POST /admin/accounts/{id}/role` |
+| (c) 문서·스펙의 경로가 실제 컨트롤러와 다름 | `/admin/trends` → 실제 `/admin/trend-items` · `/admin/seeding` → `/admin/seed/submissions`·`/admin/seed/accuracy` · `/admin/parameter-drafts`(POST, 다중) → `/admin/params/draft`(PUT, 단일 활성) · `/admin/merge-queue/{id}/action` → `/merge`·`/separate`·`/void` · `/admin/trends/{id}/exceptions` → `/admin/verdicts/{id}/...` |
+
+**운영·법무에 직결되는 세 건(직접 확인함):**
+
+1. **`POST /v1/appeals`는 404다.** `api-public`에 appeals 컨트롤러가 아예 없다. 이의 제기는 CLAUDE.md 법무 체크리스트 항목이고 약관에 처리 기한(5영업일)을 명시해야 하는 절차인데, **유저가 이의를 제기할 수단 자체가 없다.** 등급·판정을 공개하기 전에 반드시 필요 → SP3(ADM-400과 짝).
+2. **관리자 권한 부여·회수가 불가능하다.** `AdminAccountController`에 있는 것은 create·disable·enable뿐이고 `POST /admin/accounts/{id}/role`은 스펙에만 있다. 역할을 바꾸려면 계정을 새로 만드는 수밖에 없는데, 이는 P8(신규 계정 7일 승인권 유예)과 정면으로 부딪친다 → SP3.
+3. **검색이 동작하지 않는다.** `TrendController.list()`는 `daily`만 읽는다. 스펙이 선언한 `q`·`category`·`sort`·`cursor`는 전부 **조용히 무시**된다 — 앱의 "검색 판정" 화면과 제보 시 중복 감지(`GET /v1/trends?q=`)가 성립하지 않는다. 03 §1이 말하는 "중복 감지 누락"의 실제 원인 → SP2(정규화와 함께).
+
+`/v1/reports` 계열(유저 측 신고·소명)은 구현·스펙 모두 있으나 화면-엔드포인트 맵에서 통째로 빠져 있었다 — 문서가 기능의 존재 자체를 놓친 사례.
+
 ### 1.5 문서
 
 - CLAUDE.md: R5(누적치→증가분)가 외부 지표 전제. "⚠ first_seen_at이 바뀌면 baseline 재계산" 경고는 존재하지 않는 baseline을 가리킴. 상세 문서 경로가 `docs/`로 적혀 있으나 실제는 저장소 루트.
