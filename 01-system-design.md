@@ -31,6 +31,8 @@
                                     [제보권 리필 · 배지 갱신]
 ```
 
+> 판정 엔진 단계의 `JudgeService`는 SP1에서 신설한다(현행은 `VerdictRunner`/`VerdictAdminService`가 판정 로직을 각각 보유). **제보권 리필** 단계는 현행 미구현(3.3 참조, SP1) — 다이어그램은 목표 구조이며 두 단계 모두 지금 배치가 도는 것은 아니다.
+
 핵심 분리 원칙 세 가지.
 
 1. **제보(주관)와 판정(객관)의 분리** — 사람은 후보를 올리고, 기계가 채점한다.
@@ -152,7 +154,7 @@ submitterTarget = max( 하한 , 최근 N일 활성 제보자 수 × 비율 )
 | 0.55 ≤ T < 0.75 | HIT | L3 크로스플랫폼 | 1.0 |
 | T ≥ 0.75 | HIT | L4 매스 | 1.5 |
 
-판정은 `JudgeService` 하나가 수행하며 배치(`verdict_runner`)·관리자 재판정·파라미터 시뮬레이션이 같은 서비스와 같은 파라미터 소스(`ParameterSetProvider`)를 쓴다(P6). 항목은 `PENDING → JUDGING → RESOLVED`로 전이하고, 판정·원장 기록·제보 result·항목 상태 변경이 한 트랜잭션이다.
+판정은 `JudgeService` 하나가 수행하며 배치(`verdict_runner`)·관리자 재판정·파라미터 시뮬레이션이 같은 서비스와 같은 파라미터 소스(`ParameterSetProvider`)를 쓴다(P6) — **`JudgeService`는 SP1에서 신설한다. 현행은 `VerdictRunner`와 `VerdictAdminService`가 판정 로직을 각각 들고 있고, 재판정은 승인된 파라미터 대신 `ParameterSet.defaults()`를 쓴다.** 항목은 `PENDING → JUDGING → RESOLVED`로 전이하고, 판정·원장 기록·제보 result·항목 상태 변경이 한 트랜잭션이다.
 
 ### 4.4 VOID — 판정 공식의 출력이 아니라 사건의 결과
 
@@ -265,7 +267,7 @@ AS = Σ Δ_i × d_i ,    d_i = 0.5 ^ (원장 기록일로부터 경과일 / 90) 
 ## 9. API 설계 (초안)
 
 ```
-POST   /v1/submissions              제보 등록 (제보권 차감)
+POST   /v1/submissions              제보 등록 (제보권 차감 — 현행 미구현, 3.3 참조)
 GET    /v1/submissions/me           내 제보 목록 + 판정 상태
 POST   /v1/trends/{id}/endorse      동의(중복 제보 전환)
 GET    /v1/trends                   관측 중/판정 완료 목록, 필터·정렬
@@ -285,9 +287,9 @@ GET    /v1/leaderboard              상위 10 (동의자 한정)
 | 주기 | 잡 | 내용 |
 |---|---|---|
 | 일 1회 | `cluster_merge` | 신규 제보 임베딩 병합, 운영자 큐 적재. ADM-900 수동 실행 가능 |
-| 일 1회 | `verdict_runner` | D+14 도달 항목 판정(`JudgeService`) → `verdicts` + `score_ledger` + 제보 result + 항목 RESOLVED |
-| 1시간 | `sla_watch` | 신고 4h → 자동 임시 비공개 / 병합 24h → 판정 유예 연장 / 90일 미접속 관리자 비활성화 (SP3) |
-| 주 1회(월 00:00) | `grade_recalc` | AS·TI 재계산, 승급, 제보권 리필 |
+| 일 1회 | `verdict_runner` | D+14 도달 항목 판정(현행 자체 로직, `JudgeService` 통합은 SP1에서 신설) → `verdicts` + `score_ledger` + 제보 result + 항목 RESOLVED |
+| 1시간 | `sla_watch` | **미구현(SP3)**. 신고 4h → 자동 임시 비공개 / 병합 24h → 판정 유예 연장 / 90일 미접속 관리자 비활성화 |
+| 주 1회(월 00:00) | `grade_recalc` | AS·TI 재계산, 승급, 제보권 리필(SP1에서 신설) |
 | 일 1회 | `abuse_scan` | **미구현(Phase 2)**. 어뷰징 룰 실행 → `abuse_flags` |
 | 월 1회 | `l4_quota` | **미구현(Phase 3)**. L4 정원 재산정 |
 
