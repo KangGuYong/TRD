@@ -105,7 +105,9 @@ WHERE trend_item_id = :target AND result <> 'VOID'
 ### ⚠ first_seen_at 이 바뀌면 order_rank 재계산, 판정 후면 병합 금지
 
 병합으로 `first_seen_at`이 앞당겨지면 `order_rank`와 (SP4 이후) 시간 분포 신호가 바뀐다.
-판정 전(PENDING)이면 병합 트랜잭션 안에서 재계산한다 — **빼먹어도 에러가 나지 않고 선점 가중치만 조용히 틀린다. 반드시 테스트 케이스로 걸어둘 것.** 판정 후(RESOLVED)면 **병합 자체를 거부(409)**한다 — 흡수된 제보가 다음 판정에서 원장에 다시 실려 이중 점수가 된다. 판정 후 병합(ADJ 상쇄 경로)은 Phase 2(O9).
+판정 전(PENDING)이면 병합 트랜잭션 안에서 재계산한다 — **빼먹어도 에러가 나지 않고 선점 가중치만 조용히 틀린다. 반드시 테스트 케이스로 걸어둘 것.** 판정 후(RESOLVED)면 **병합 자체를 거부(409)**해야 한다 — 흡수된 제보가 다음 판정에서 원장에 다시 실려 이중 점수가 된다. 판정 후 병합(ADJ 상쇄 경로)은 Phase 2(O9).
+
+> **미구현(SP2).** 현행 `MergeService`의 가드는 `MERGED`뿐이고 `cluster_merge` 후보 스캔은 RESOLVED를 포함하므로, ≥0.85 자동 병합 경로에서 이중 점수가 지금도 발생할 수 있다. 게다가 상태만 보는 가드로는 부족하다 — SP1 전까지 배치 판정이 `state`를 flush하지 못해 판정된 항목도 `PENDING`으로 남으므로, 가드는 `verdicts.existsByTrendItemIdAndSupersedesIsNull(id)`를 함께 봐야 한다. **SP1이 SP2에 선행해야 하는 이유.**
 
 ### ⚠ 같은 유저의 중복 제보는 VOID 처리
 
