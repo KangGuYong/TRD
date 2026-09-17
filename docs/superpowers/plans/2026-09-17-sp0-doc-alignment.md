@@ -13,6 +13,14 @@
 - 작업 트리에 미커밋 변경(`.gitignore`, `README.md`, `backend/app/src/main/resources/application.yml`)이 있다. **이 파일들은 건드리지 말고 커밋에 포함시키지 말 것.** `git add`는 항상 파일명을 명시한다.
 - 편집은 Edit 도구(정확 문자열 교체)로 한다. 파일을 통째로 Write하지 않는다.
 
+**전 태스크 공통 규약 — 미구현 표기**
+
+문서가 아직 없는 것을 현재형으로 서술하면 읽는 사람(과 에이전트)이 존재한다고 믿고 그 위에 코드를 쌓는다. `JudgeService`·`ApprovalGate`·`sla_watch`·`SlaNotifier`·제보권 쿼터·`TrendSignal` 확장·다축 신호·큐 클레임/HELD/멱등키·`ApprovalGate` executor 3종·`PII_VIEW` 기록·`AdminUserController`는 **전부 코드에 없다.**
+
+- 이것들을 언급할 때는 `**미구현(SPn)**` 를 문장 **앞**에 붙이거나 `(SPn에서 신설)`로 닫는다. 꼬리에 붙은 맨 `(SPn)`은 "출처 표시"로 읽혀 표기 구실을 못 한다.
+- 예외: "선행 조건: …(SP1)" 처럼 문장 자체가 미래형인 경우는 추가 표기 불필요.
+- 반대로 `ParameterSetProvider`·`GradePolicy`·`merge_queue`·`TEMP_HIDDEN`·ADM-900·`/admin/reports/**`·≥0.85 자동 병합은 **실재한다**. 이것들을 미구현으로 적지 말 것.
+
 **용어 (스펙 §2 참조):** P1~P10 = 정책 결정, SP0~SP4 = 서브프로젝트, O8~O10 = 신규 열린 결정, R4/R5 = 개정 원칙.
 
 ---
@@ -1049,8 +1057,8 @@ TI   = (HIT+2)/(HIT+MISS+5)  (180일, α2 β3, 초기 0.4)
 바꾸기:
 ```
 | 일 1회 | `cluster_merge` | 처리済 마킹 + 멱등키. 회색지대는 큐 적재만. ADM-900 수동 실행(같은 ShedLock 이름, 실행 중 409) |
-| 일 1회 | `verdict_runner` | `JudgeService.judge()` 순회. **재실행이 점수 두 번 주면 안 됨** — `verdicts` 부분 UNIQUE + `score_ledger(verdict_id, submission_id)` UNIQUE로 DB가 보장 |
-| 1시간 | `sla_watch` | 신고 4h→`TEMP_HIDDEN`+에스컬레이션 / 병합 24h→`grace_until` +24h / 90일 미접속 관리자 비활성화. 통보는 `SlaNotifier`(Phase 1 로그) — SP3 |
+| 일 1회 | `verdict_runner` | `JudgeService.judge()` 순회(**SP1에서 신설**). **재실행이 점수 두 번 주면 안 됨** — `verdicts` 부분 UNIQUE + `score_ledger(verdict_id, submission_id)` UNIQUE로 DB가 보장 |
+| 1시간 | `sla_watch` | **미구현(SP3)**. 신고 4h→`TEMP_HIDDEN`+에스컬레이션 / 병합 24h→`grace_until` +24h / 90일 미접속 관리자 비활성화. 통보는 `SlaNotifier`(Phase 1 로그) |
 | 주 1회(월 00:00) | `grade_recalc` | AS/TI 재계산·승급·제보권 리필(**이월 없음**) |
 | 일 1회 | `abuse_scan` | **미구현(Phase 2)**. 플래그 INSERT만(R4) |
 | 월 1회 | `l4_quota` | **미구현(Phase 3)**. 정원 재산정, 초과분 L3 이동(페널티 아님 표기) |
@@ -1085,7 +1093,7 @@ GET  /v1/trends/{id}/metrics    지표 시계열(L2+)
 ```
 바꾸기:
 ```
-| 2인 승인(4-eyes) | 유저제재·등급수동조정·파라미터적용·상쇄원장 100점 초과·**관리자 계정 생성/권한 변경**. 서버 한 곳 `ApprovalGate.require(kind, amount)`가 강제, `approval_requests` 상태머신(요청→1인→2인→실행), 요청자≠승인자 검증, 신규 계정 7일 승인권 유예(P8) |
+| 2인 승인(4-eyes) | 유저제재·등급수동조정·파라미터적용·상쇄원장 100점 초과·**관리자 계정 생성/권한 변경**. 서버 한 곳 `ApprovalGate.require(kind, amount)`가 강제(**미구현(SP3)** — 현행은 `PARAM_APPLY` executor 하나뿐이고 재판정이 승인 경로를 우회), `approval_requests` 상태머신(요청→1인→2인→실행), 요청자≠승인자 검증, 신규 계정 7일 승인권 유예(P8) |
 | 감사 로그 | **Phase 0부터 필수**(ADM-700, 소급 불가). 상태변경·원장추가·정책변경·**조회행위**(`PII_VIEW`는 서버 엔드포인트에서 기록, 클라 토글 금지)·인증 기록. API는 `detail` 포함. 해시체인/WORM |
 ```
 
@@ -1292,8 +1300,8 @@ AUDITOR는 **전 영역 읽기**다 — 신고 큐·파라미터 드래프트 �
 ```
 바꾸기:
 ```
-| 신고 콘텐츠 | 4시간 | 자동 임시 비공개 (`sla_watch`, 정책 확정 P1) |
-| 병합 검수 | 24시간 | 판정 유예 자동 연장 +24h (`sla_watch`) |
+| 신고 콘텐츠 | 4시간 | 자동 임시 비공개 (정책 확정 P1 · `sla_watch` **미구현(SP3)**) |
+| 병합 검수 | 24시간 | 판정 유예 자동 연장 +24h (`sla_watch` **미구현(SP3)** — 현행은 화면 배너뿐, 연장은 수동) |
 | 어뷰징 플래그 | 48시간 | 상위 역할 에스컬레이션 (Phase 2) |
 | 이의 제기 | 5영업일 | 알림 + 대시보드 적색 (Phase 2) |
 
@@ -1345,7 +1353,7 @@ AUDITOR는 **전 영역 읽기**다 — 신고 큐·파라미터 드래프트 �
 ```
 바꾸기:
 ```
-- **정책 확정(2026-09-17, P1)**: 4h 자동 임시 비공개는 `sla_watch` 잡이 수행한다. 임시 비공개는 가역적 보전 조치라 R4와 양립(R4 개정). 확정(복원/영구 비공개)은 사람. 수동 임시 비공개는 OPERATOR/ADMIN(REVIEWER 불가).
+- **정책 확정(2026-09-17, P1)**: 4h 자동 임시 비공개는 `sla_watch` 잡이 수행한다 — **잡은 미구현(SP3)이며 현재는 자동 비공개가 일어나지 않는다.** 임시 비공개는 가역적 보전 조치라 R4와 양립(R4 개정). 확정(복원/영구 비공개)은 사람. 수동 임시 비공개는 OPERATOR/ADMIN(REVIEWER 불가).
 - 신고자 정보는 처리자에게도 **비식별 처리** (보복 방지)
 ```
 
