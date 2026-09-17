@@ -31,7 +31,7 @@
                                     [제보권 리필 · 배지 갱신]
 ```
 
-> 판정 엔진 단계의 `JudgeService`는 SP1에서 신설한다(현행은 `VerdictRunner`/`VerdictAdminService`가 판정 로직을 각각 보유). **제보권 리필** 단계는 현행 미구현(3.3 참조, SP1) — 다이어그램은 목표 구조이며 두 단계 모두 지금 배치가 도는 것은 아니다.
+> 이 다이어그램은 목표 구조다. `JudgeService`는 SP1에서 신설(현행은 `VerdictRunner`/`VerdictAdminService`가 판정 로직을 각각 보유). `verdict_runner`는 매일 실행되어 `verdicts`·`score_ledger`는 정상 기록하지만, self-invocation으로 트랜잭션이 걸리지 않아(4.3 참조) 제보 result·항목 상태는 갱신되지 않고 TI는 0.4에 고정된다(SP1에서 수정). **제보권 리필** 단계는 현행 미구현(3.3 참조, SP1).
 
 핵심 분리 원칙 세 가지.
 
@@ -154,11 +154,13 @@ submitterTarget = max( 하한 , 최근 N일 활성 제보자 수 × 비율 )
 | 0.55 ≤ T < 0.75 | HIT | L3 크로스플랫폼 | 1.0 |
 | T ≥ 0.75 | HIT | L4 매스 | 1.5 |
 
-판정은 `JudgeService` 하나가 수행하며 배치(`verdict_runner`)·관리자 재판정·파라미터 시뮬레이션이 같은 서비스와 같은 파라미터 소스(`ParameterSetProvider`)를 쓴다(P6) — **`JudgeService`는 SP1에서 신설한다. 현행은 `VerdictRunner`와 `VerdictAdminService`가 판정 로직을 각각 들고 있고, 재판정은 승인된 파라미터 대신 `ParameterSet.defaults()`를 쓴다.** 항목은 `PENDING → JUDGING → RESOLVED`로 전이하고, 판정·원장 기록·제보 result·항목 상태 변경이 한 트랜잭션이다.
+판정은 `JudgeService` 하나가 수행하며 배치(`verdict_runner`)·관리자 재판정·파라미터 시뮬레이션이 같은 서비스와 같은 파라미터 소스(`ParameterSetProvider`)를 쓴다(P6) — **`JudgeService`는 SP1에서 신설한다. 현행은 `VerdictRunner`와 `VerdictAdminService`가 판정 로직을 각각 들고 있고, 재판정은 승인된 파라미터 대신 `ParameterSet.defaults()`를 쓴다.** 항목은 `PENDING → JUDGING → RESOLVED`로 전이하고, 판정·원장 기록·제보 result·항목 상태 변경이 한 트랜잭션이어야 한다 — **SP1의 목표 상태다.** 현행 `VerdictRunner`는 `run()`이 같은 빈의 `@Transactional protected judgeOne()`을 직접 호출해(self-invocation) 프록시를 타지 못하므로 **트랜잭션이 걸리지 않는다.** `verdicts`·`score_ledger`는 명시 save라 저장되지만 `submissions.result`와 `trend_items.state`는 dirty-check에 의존해 flush되지 않는다 — 제보는 계속 PENDING이고 TI는 0.4에 고정된다. `JUDGING` 상태도 현재는 설정되지 않는다.
 
 ### 4.4 VOID — 판정 공식의 출력이 아니라 사건의 결과
 
-VOID는 `verdict_runner`가 계산하는 값이 아니다(P5). 아래 사건이 발생하면 **그 시점에** 제보가 VOID 처리되고 제보권이 반환된다. 판정 배치는 VOID 제보를 집계에서 제외할 뿐이다.
+VOID는 `verdict_runner`가 계산하는 값이 아니다(P5). 아래 사건이 발생하면 **그 시점에** 제보가 VOID 처리되고, 원칙적으로 제보권이 반환되어야 한다. 판정 배치는 VOID 제보를 집계에서 제외할 뿐이다.
+
+> 제보권 반환은 3.3의 쿼터 시스템 자체가 **미구현**이라 지금은 일어나지 않는다(코드 주석: "VOID면 제보권 반환은 QuotaService 도입 후 처리"). SP1에서 쿼터 시스템과 함께 구현.
 
 - 항목이 VOID됨(관리자 VOID 처리, 병합 시 흡수) → 해당 항목의 모든 제보
 - 병합 후 같은 유저의 제보가 중복됨 → 늦은 쪽 (03 §4.4)
@@ -287,9 +289,9 @@ GET    /v1/leaderboard              상위 10 (동의자 한정)
 | 주기 | 잡 | 내용 |
 |---|---|---|
 | 일 1회 | `cluster_merge` | 신규 제보 임베딩 병합, 운영자 큐 적재. ADM-900 수동 실행 가능 |
-| 일 1회 | `verdict_runner` | D+14 도달 항목 판정(현행 자체 로직, `JudgeService` 통합은 SP1에서 신설) → `verdicts` + `score_ledger` + 제보 result + 항목 RESOLVED |
+| 일 1회 | `verdict_runner` | D+14 도달 항목 판정(현행 자체 로직, `JudgeService` 통합은 SP1에서 신설) → `verdicts` + `score_ledger` 기록. **제보 result·항목 RESOLVED 전이는 self-invocation으로 현재 반영되지 않음(4.3 참조, SP1에서 수정)** |
 | 1시간 | `sla_watch` | **미구현(SP3)**. 신고 4h → 자동 임시 비공개 / 병합 24h → 판정 유예 연장 / 90일 미접속 관리자 비활성화 |
-| 주 1회(월 00:00) | `grade_recalc` | AS·TI 재계산, 승급, 제보권 리필(SP1에서 신설) |
+| 주 1회(월 00:00) | `grade_recalc` | AS 재계산(정상, `score_ledger` 기반), 승급. **TI는 `submissions.result` 미반영으로 0.4 고정(4.3 참조, SP1에서 수정)**. 제보권 리필(SP1에서 신설) |
 | 일 1회 | `abuse_scan` | **미구현(Phase 2)**. 어뷰징 룰 실행 → `abuse_flags` |
 | 월 1회 | `l4_quota` | **미구현(Phase 3)**. L4 정원 재산정 |
 
