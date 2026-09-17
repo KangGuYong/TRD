@@ -164,9 +164,19 @@ ParamStudioService.simulate (시뮬)            ─┼→ JudgeService.judge(ite
 
 **병합 (SP2)**
 - 두 항목 id 오름차순 `SELECT … FOR UPDATE`. 상태 가드: `PENDING`만 병합 가능, `JUDGING` 409 재시도, `RESOLVED` 409.
+
+  > ⚠ **상태만 보는 가드는 SP1 전까지 동작하지 않는다.** A1(self-invocation) 때문에 배치가 판정한 항목도 `trend_items.state`는 `PENDING`으로 남는다 — `state == PENDING` 가드가 이미 판정된 항목을 통과시켜 이중 점수를 낸다. 가드는 `verdicts.existsByTrendItemIdAndSupersedesIsNull(id)`를 **함께** 봐야 한다(배치·관리자 코드가 이미 쓰는 술어). 이것이 SP1이 SP2에 선행해야 하는 진짜 이유다. 게다가 `ClusterMergeCandidateService:72`의 후보 스캔이 RESOLVED를 포함하므로 ≥0.85 자동 병합 경로에서 **지금도 실제로 발생 가능**하다.
 - `Idempotency-Key` → `merge_queue.decision_key UNIQUE`. 재요청은 이전 결과 반환.
 - **완전일치 조회가 tombstone을 따라가게 한다.** UNIQUE는 이미 존재하므로(A3 정정) 추가하지 않는다. ~~부분 UNIQUE~~는 **채택 불가** — `watches.normalized_key`가 이 컬럼을 FK로 참조하는데(`V24:19`) PostgreSQL에서 부분 UNIQUE 인덱스는 FK 대상이 될 수 없다. 대신 `SubmissionService`의 완전일치 조회가 `state = 'MERGED'` 항목을 만나면 `merged_into`를 따라 승자에 합류하도록 고친다. UNIQUE 충돌 시 재조회 후 합류(현재는 조회-후-삽입이라 레이스).
-- 큐 상태 모델: `PENDING → CLAIMED → (MERGED | SEPARATED | VOIDED | HELD)`, `HELD` 3회 → `ESCALATED`. 클레임 15분 만료. VOID 사유 필수.
+- 큐 상태 모델: `PENDING → CLAIMED → (MERGED | SEPARATED | VOIDED | HELD)`, `HELD` 3회 → `ESCALATED`. 클레임 15분 만료. VOID 사유 필수. (현행 `MergeQueueStatus`는 `{PENDING, MERGED, VOIDED, SKIPPED}` — `SKIPPED`가 오늘의 "분리"이므로 개명 포함.)
+
+**SP2에 추가로 편입 — SP0 중 발견**
+
+- **정규화가 사실상 없다.** `NameNormalizer.normalize()`는 NFC → `strip()` → 공백 축약 → 소문자화가 전부다. 03 문서가 표로 정리한 특수문자 제거·조사 탈락·반복 문자 축약·영한 혼용·외래어 표기 흔들림은 **전혀 구현돼 있지 않다.** 그래서 03 §1의 전제 예시부터 깨진다 — `두바이초콜릿`과 `두바이 초콜릿`은 오늘 완전일치로 병합되지 않는다. "완전일치에서 대부분이 걸러진다"는 서술은 성립하지 않으며, 임베딩 단계가 그만큼 과부하를 받는다.
+- **`aliases[]`는 쓰기 전용.** `MergeService:154-157`만 기록하고 어떤 조회도 읽지 않는다. 표기 변형 흡수에 기여하지 않는다.
+- **분리(split)는 존재하지 않는다.** `MergeService.recordSeparateDecision()`은 감사 로그만 남기는 *후보 기각*이며 클러스터를 쪼개지 않는다. 03 §5의 "분리 시 최소 7일 관측"은 전부 미래 설계다.
+- **병합 큐에 테스트가 하나도 없다.** `src/test` 어디에도 `MergeQueue` 참조가 없다. 잠금·멱등·상태 가드를 넣기 전에 회귀 테스트부터 필요하다.
+- 유예 연장은 `grace_until`이 아니라 **`trend_items.judgment_deadline_override`**(`V16`)이며, API는 **일 단위 1~7일**에 상한 **D+21**(`MAX_GRACE_DAYS=7`)이다. 시간당 잡이 "+24h"를 무한 연장하는 설계는 이 API로 표현되지 않는다 — 상한 도달 시 에스컬레이션으로 바꾼다.
 
 **콘솔 통제·SLA (SP3)**
 - `ApprovalGate.require(kind, amount)` — rejudge(ADJ 합계 > 100), 계정 생성/권한 변경, 향후 제재·등급 조정이 공통 호출. executor: SANCTION·GRADE_ADJUST·LEDGER_ADJ_OVER100.
