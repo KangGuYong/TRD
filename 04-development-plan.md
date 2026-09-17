@@ -118,12 +118,13 @@ backend/
 │   ├─ score/          ScoreEngine (HIT/MISS/VOID Δ, TI, AS)
 │   ├─ verdict/        VerdictEngine (TrendSignal → T, reach_level 판정)
 │   ├─ grade/          GradePolicy (승급 AND 조건, 강등 4주 규칙)
-│   ├─ merge/          Normalizer, MergeService, OrderRankCalculator
+│   ├─ trend/          NameNormalizer (정규화 — NFC·조사탈락·반복축약)
+│   ├─ vote/           투표 집계(판정 입력 아님 · R1)
 │   └─ params/         ParameterSet (가중치·임계값·반감기 주입 객체)
-├─ persistence/        # JPA/JDBC, Flyway, append-only 트리거
+├─ persistence/        # JPA/JDBC, Flyway, append-only 트리거. order_rank는 저장 컬럼이 아니라 뷰 매핑(`SubmissionOrderRank`, `@Immutable`, V11)
 ├─ api-public/         # /v1/** 앱 API + JWT 필터체인
-├─ api-admin/          # /admin/** 콘솔 API + 세션·RBAC·2FA · ApprovalGate
-├─ merge/              # 클러스터 병합 후보 추출·병합 트랜잭션 (배치·관리자 공용)
+├─ api-admin/          # /admin/** 콘솔 API + 세션·RBAC·2FA · ApprovalGate(**미구현(SP3)** — 현행 `ApprovalService`+`ParamApplyExecutor`)
+├─ merge/              # 클러스터 병합·임베딩: `MergeService`·`ClusterMergeCandidateService`·`MergeComputation`·`EmbeddingClient` (배치·관리자 공용)
 ├─ scheduler/          # 배치 잡 + ShedLock (목록 순회만, 트랜잭션은 서비스 빈)
 ├─ api-spec/           # OpenAPI (앱/콘솔 타입 코드생성 원본)
 ├─ audit/              # admin_audit_log (조회행위 포함), 해시체인
