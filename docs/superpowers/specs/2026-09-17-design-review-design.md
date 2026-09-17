@@ -61,7 +61,7 @@
 
 **A2. VOID가 존재하지 않는다 (⑤).** `VerdictComputation.run(signal, false, …)` 하드코딩. 동일 유저 중복 제보 VOID·제보권 반환·쿼터 반환 모두 TODO. `MergeService.dedupSameUserSubmissions`는 표시만 한다.
 
-**A3. 병합 무결성 (⑥).** `MergeService.merge()`는 `findById`(잠금 없음), 상태 가드는 `MERGED`뿐 → **RESOLVED 항목도 병합**되어 흡수된 제보가 다음 판정에서 원장에 다시 실린다. `trend_items.normalized_key`에 UNIQUE 없음(V3·V9는 비고유 인덱스) → 완전일치 병합 레이스에서 중복 항목. `Idempotency-Key`는 05 문서에만 있고 컨트롤러는 받지 않는다. `MergeService.preview()`의 `baselineShifted`는 피벗 잔재.
+**A3. 병합 무결성 (⑥).** `MergeService.merge()`는 `findById`(잠금 없음), 상태 가드는 `MERGED`뿐 → **RESOLVED 항목도 병합**되어 흡수된 제보가 다음 판정에서 원장에 다시 실린다. ~~`trend_items.normalized_key`에 UNIQUE 없음~~ → **정정(2026-09-17, SP0 중 발견)**: `V24__watches_trend_item_fk.sql:15`가 이미 **전체 UNIQUE**(`trend_items_normalized_key_key`)를 걸었고 `watches.normalized_key`가 `:19`에서 이를 **FK로 참조**한다(`ON UPDATE CASCADE`). 따라서 중복 항목 레이스는 DB가 막고 있다. 남은 실제 문제는 다른 것이다 — `TrendItem.mergeInto()`가 패자의 `normalized_key`를 그대로 두므로 tombstone(MERGED) 항목이 키를 영구 점유하고, `SubmissionService`의 완전일치 조회가 MERGED를 거르지 않아 **신규 제보가 이미 병합된 죽은 클러스터에 붙는다.** `Idempotency-Key`는 05 문서에만 있고 컨트롤러는 받지 않는다. `MergeService.preview()`의 `baselineShifted`는 피벗 잔재.
 
 **A4. 재판정이 승인된 파라미터를 무시한다.** `VerdictAdminService.java:137 ParameterSet p = ParameterSet.defaults()` — 배치는 `ParameterSetProvider`를 쓰므로 같은 항목이 배치와 재판정에서 다른 결과를 낼 수 있다.
 
@@ -165,7 +165,7 @@ ParamStudioService.simulate (시뮬)            ─┼→ JudgeService.judge(ite
 **병합 (SP2)**
 - 두 항목 id 오름차순 `SELECT … FOR UPDATE`. 상태 가드: `PENDING`만 병합 가능, `JUDGING` 409 재시도, `RESOLVED` 409.
 - `Idempotency-Key` → `merge_queue.decision_key UNIQUE`. 재요청은 이전 결과 반환.
-- `trend_items(normalized_key) WHERE state <> 'MERGED'` 부분 UNIQUE. `SubmissionService`는 삽입 충돌 시 기존 항목 합류.
+- **완전일치 조회가 tombstone을 따라가게 한다.** UNIQUE는 이미 존재하므로(A3 정정) 추가하지 않는다. ~~부분 UNIQUE~~는 **채택 불가** — `watches.normalized_key`가 이 컬럼을 FK로 참조하는데(`V24:19`) PostgreSQL에서 부분 UNIQUE 인덱스는 FK 대상이 될 수 없다. 대신 `SubmissionService`의 완전일치 조회가 `state = 'MERGED'` 항목을 만나면 `merged_into`를 따라 승자에 합류하도록 고친다. UNIQUE 충돌 시 재조회 후 합류(현재는 조회-후-삽입이라 레이스).
 - 큐 상태 모델: `PENDING → CLAIMED → (MERGED | SEPARATED | VOIDED | HELD)`, `HELD` 3회 → `ESCALATED`. 클레임 15분 만료. VOID 사유 필수.
 
 **콘솔 통제·SLA (SP3)**

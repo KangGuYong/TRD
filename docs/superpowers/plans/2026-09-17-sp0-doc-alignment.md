@@ -638,7 +638,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 ```
 # 병합 · 클러스터링 상세 설계 (v0.2)
 
-> 개정 2026-09-17: 외부 지표(baseline·소급 재수집) 서술 제거, RESOLVED 병합 금지(P4), 클레임·멱등키·부분 UNIQUE 명시. 근거: `docs/superpowers/specs/2026-09-17-design-review-design.md` §2.3.
+> 개정 2026-09-17: 외부 지표 서술 제거, RESOLVED 병합 금지(P4), 클레임·멱등키 명시. 근거: `docs/superpowers/specs/2026-09-17-design-review-design.md` §2.3.
 ```
 
 - [ ] **Step 2: §1 세 가지 붕괴**
@@ -805,7 +805,7 @@ ADJ 경로를 도입할 때는 영향받은 유저에게 **자동 통보 필수.
 | 행 잠금 | 병합 트랜잭션에서 두 항목을 id 오름차순 `FOR UPDATE`(§3 1번) |
 | 낙관적 락 | `trend_items.version` 으로 커밋 시점 충돌 감지 → "다른 검수자가 이미 처리했습니다" 후 최신 상태 재표시 |
 | 멱등성 키 | `Idempotency-Key` 헤더 → `merge_queue.decision_key UNIQUE`. 같은 키 재요청은 이전 결과 반환 |
-| 완전일치 유일성 | `trend_items(normalized_key) WHERE state <> 'MERGED'` 부분 UNIQUE. 제보 삽입이 충돌하면 기존 항목에 합류(조회-후-삽입 레이스 제거) |
+| 완전일치 유일성 | `trend_items.normalized_key`에 **전체 UNIQUE가 이미 있다**(`V24:15`, `watches`가 FK로 참조하므로 부분 UNIQUE로 바꿀 수 없다). 남은 문제는 tombstone — `mergeInto()`가 패자의 키를 그대로 두고 완전일치 조회가 MERGED를 거르지 않아 **신규 제보가 죽은 클러스터에 붙는다.** 조회가 `merged_into`를 따라가도록 고친다(**미구현(SP2)**) |
 
 현행은 트랜잭션만 구현돼 있다(잠금·클레임·멱등키·부분 UNIQUE 없음). SP2에서 구현.
 ```
@@ -999,7 +999,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 ```
 바꾸기:
 ```
-| `trend_items` | `canonical_name`, `aliases text[]`, `first_seen_at`, `state`, `version`(낙관적 락), `merged_into`(tombstone). `(normalized_key) WHERE state <> 'MERGED'` 부분 UNIQUE — SP2 |
+| `trend_items` | `canonical_name`, `aliases text[]`, `first_seen_at`, `state`, `version`(낙관적 락), `merged_into`(tombstone). `normalized_key` 전체 UNIQUE(`V24`, `watches`가 FK 참조) — MERGED 항목이 키를 점유하므로 완전일치 조회가 `merged_into`를 따라가야 한다(**미구현(SP2)**) |
 ```
 
 - [ ] **Step 8: §5.2 공식**
