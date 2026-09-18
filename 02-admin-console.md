@@ -123,7 +123,7 @@
 | 어뷰징 플래그 | 48시간 | 상위 역할 에스컬레이션 (Phase 2) |
 | 이의 제기 | 5영업일 | 알림 + 대시보드 적색 (Phase 2) |
 
-큐 카운트·최장 대기·뱃지는 전부 `GET /admin/queues/summary` 하나에서 온다. 목표는 미구현 큐를 0이 아니라 **"미구현"** 으로 표시하는 것이다(정책 P10). **미구현(SP0.5·SP3)** — 현행 ADM-300/400/410 타일은 0 고정(`QueueSummaryService.summarize()`가 세 큐 모두 `count=0, oldest="-", slaExceeded=false`를 반환 — 신고 큐(ADM-410)는 `ReportAdminController`로 실재하는데도 0으로 뜬다), 사이드바 뱃지(`admin/src/components/Layout.tsx`의 `badge: 24/6/3/2`)는 하드코딩이다.
+큐 카운트·최장 대기·뱃지는 전부 `GET /admin/queues/summary` 하나에서 온다. 목표는 미구현 큐를 0이 아니라 **"미구현"** 으로 표시하는 것이다(정책 P10). ADM-410(신고 콘텐츠)은 실데이터 (OPEN+EXPLAINING 카운트, OPEN 4h SLA 초과 검사), ADM-300/400은 `available=false`로 '미구현' 표시. 사이드바 뱃지는 `useQueueSummary()` API에 연동. **미구현(SP3)** — ADM-410 4h 초과 시 자동 임시 비공개(`sla_watch`)는 아직 미구현.
 
 > 신고 콘텐츠 4시간은 명예훼손·영업방해 대응 시간이라 다른 큐와 성격이 다르다. **미처리 시 자동 임시 비공개**로 넘어가게 설계해야 야간·주말 공백을 메울 수 있다.
 

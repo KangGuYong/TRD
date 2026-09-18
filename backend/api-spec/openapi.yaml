@@ -23,6 +23,8 @@ tags:
     description: 앱 · 등급/원장/설정/워치
   - name: app-reports
     description: 앱 · 신고/소명
+  - name: admin-auth
+    description: 콘솔 · 인증
   - name: admin-queues
     description: 콘솔 · 큐(병합/어뷰징/이의/신고)
   - name: admin-trends
@@ -298,6 +300,33 @@ paths:
           content:
             application/json:
               schema: { type: array, items: { $ref: '#/components/schemas/LeaderboardEntry' } }
+
+  # ─────────────────────────────  콘솔 · 인증  ─────────────────────────────
+  /admin/auth/csrf:
+    get:
+      tags: [admin-auth]
+      summary: CSRF 쿠키 발급 (SPA 부팅용) — 응답에 XSRF-TOKEN 쿠키
+      responses:
+        '200': { description: OK (본문 없음) }
+  /admin/auth/login:
+    post:
+      tags: [admin-auth]
+      summary: 관리자 로그인 — X-XSRF-TOKEN 헤더 필수. 5회 연속 실패 시 15분 잠금
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [loginId, password]
+              properties:
+                loginId: { type: string }
+                password: { type: string }
+      responses:
+        '200': { description: 로그인 성공 — 세션 ID·CSRF 토큰 교체 }
+        '401': { description: 아이디 또는 비밀번호 불일치 }
+        '403': { description: CSRF 토큰 누락·불일치 또는 비활성 계정 }
+        '423': { description: 연속 실패로 잠금 중 }
 
   # ─────────────────────────────  콘솔 · 큐  ─────────────────────────────
   /admin/queues/summary:
@@ -899,7 +928,7 @@ components:
       type: apiKey
       in: cookie
       name: TRD_ADMIN_SESSION
-      description: 콘솔 세션(2FA · 30분 타임아웃). RBAC는 서버 권한 매트릭스로 강제(02 §1.1)
+      description: 콘솔 세션(30분 타임아웃, 2FA 미구현). 쓰기 요청은 XSRF-TOKEN 쿠키 값을 X-XSRF-TOKEN 헤더로 보내야 한다. RBAC는 서버 권한 매트릭스로 강제(02 §1.1)
 
   parameters:
     TrendId:
@@ -1087,6 +1116,7 @@ components:
               count: { type: integer }
               oldest: { type: string, example: "26h" }
               slaExceeded: { type: boolean }
+              available: { type: boolean, description: "false면 큐 자체가 미구현(Phase 2) — count는 의미 없음" }
         alerts:
           type: array
           items:

@@ -312,7 +312,7 @@ GET  /v1/leaderboard            상위 10(동의자 한정) — 미구현: 컨�
 
 ## 12. 환경 · DevOps
 
-- 로컬: `infra/docker-compose`(Postgres+pgvector, 임베딩 TEI). Redis는 Phase 2에 추가(§2.5). **미구현(SP0.5)** — `application.yml`의 DB 기본 호스트가 여전히 사설 IP(`192.168.0.56`)로 박혀 있다. `localhost` 기본값 + 로컬 오버라이드로 전환해야 한다.
+- 로컬: `infra/docker-compose`(Postgres+pgvector, 임베딩 TEI). Redis는 Phase 2에 추가(§2.5). DB 기본 호스트는 `localhost:5433` (다른 호스트는 `DB_URL` 환경변수).
 - CI: 백엔드(Gradle test), 앱/콘솔(typecheck·lint·build), OpenAPI 계약 검증.
 - 환경 분리: local/staging/prod 프로파일. Firebase 서비스 계정 키는 시크릿 매니저. 로컬 오버라이드는 `application-local.yml`(gitignore).
 - 배포: 백엔드 컨테이너, 앱 EAS Build+OTA, 콘솔 정적 호스팅(내부망/VPN).

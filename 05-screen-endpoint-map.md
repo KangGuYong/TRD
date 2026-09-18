@@ -71,7 +71,13 @@
 ### ADM-010 · 오늘의 작업
 | 상호작용 | API | 스펙 | 구현 | 권한 | 비고 |
 |---|---|:--:|:--:|:--:|---|
-| 큐 카운트·SLA초과·시스템알림·시딩비중 | `GET /admin/queues/summary` | ✅ | ✅ | R/O/A/Au | **미구현(SP0.5·SP3)** 부분: ADM-300/400/410 타일은 0 고정(`QueueSummaryService.java:81-83`, 실재하는 신고 큐(ADM-410) 포함), 사이드바 뱃지 하드코딩(`admin/src/components/Layout.tsx:11-14`) |
+| 큐 카운트·SLA초과·시스템알림·시딩비중 | `GET /admin/queues/summary` | ✅ | ✅ | R/O/A/Au | ADM-410은 실데이터(OPEN+EXPLAINING, OPEN 4h SLA), ADM-300/400은 `available=false`로 '미구현' 표시. 사이드바 뱃지도 같은 API |
+
+### 콘솔 인증
+| 상호작용 | API | 스펙 | 구현 | 권한 | 비고 |
+|---|---|:--:|:--:|:--:|---|
+| CSRF 쿠키 발급(SPA 부팅용) | `GET /admin/auth/csrf` | ✅ | ✅ | 전체 | 응답에 XSRF-TOKEN 쿠키 |
+| 로그인 | `POST /admin/auth/login` | ✅ | ✅ | 전체 | X-XSRF-TOKEN 헤더 필수, 5회 실패 15분 잠금(423) |
 
 ### ADM-100 · 병합 검수 큐 ★
 | 상호작용 | API | 스펙 | 구현 | 권한 |
