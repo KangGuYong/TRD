@@ -1,0 +1,106 @@
+package kr.trendstage.admin;
+
+import kr.trendstage.persistence.entity.AdminAccount;
+import kr.trendstage.persistence.repo.AdminAccountRepository;
+import kr.trendstage.persistence.type.AdminRole;
+import kr.trendstage.support.AbstractIntegrationTest;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.web.servlet.ResultActions;
+
+import java.time.Duration;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+class AdminLoginLockoutTest extends AbstractIntegrationTest {
+
+    private static final String PASSWORD = "correct-horse-1";
+
+    @Autowired AdminAccountRepository accounts;
+    @Autowired PasswordEncoder passwordEncoder;
+
+    private String loginId;
+    private UUID accountId;
+
+    @BeforeEach
+    void createAccount() {
+        loginId = "lock-" + UUID.randomUUID();
+        AdminAccount a = accounts.saveAndFlush(
+                new AdminAccount(loginId, "잠금테스트", AdminRole.OPERATOR, passwordEncoder.encode(PASSWORD)));
+        accountId = a.getId();
+    }
+
+    private ResultActions login(String password) throws Exception {
+        return mvc.perform(post("/admin/auth/login")
+                .with(csrf().asHeader())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"loginId\":\"" + loginId + "\",\"password\":\"" + password + "\"}"));
+    }
+
+    private int failedCount() {
+        return jdbc.queryForObject("SELECT failed_login_count FROM admin_accounts WHERE id = ?",
+                Integer.class, accountId);
+    }
+
+    private boolean lockedUntilSet() {
+        return jdbc.queryForObject("SELECT locked_until IS NOT NULL FROM admin_accounts WHERE id = ?",
+                Boolean.class, accountId);
+    }
+
+    @Test
+    void fourFailuresDoNotLock_andCounterPersists() throws Exception {
+        for (int i = 0; i < 4; i++) login("wrong").andExpect(status().isUnauthorized());
+        // 카운터가 예외와 함께 롤백되지 않았는지(noRollbackFor 회귀)
+        assertThat(failedCount()).isEqualTo(4);
+        assertThat(lockedUntilSet()).isFalse();
+    }
+
+    @Test
+    void fifthFailureLocks_andIsAudited() throws Exception {
+        for (int i = 0; i < 5; i++) login("wrong").andExpect(status().isUnauthorized());
+
+        assertThat(lockedUntilSet()).isTrue();
+        Integer audits = jdbc.queryForObject(
+                "SELECT count(*) FROM admin_audit_log WHERE action = 'LOGIN_LOCKED' AND target_id = ?",
+                Integer.class, accountId);
+        assertThat(audits).isEqualTo(1);
+    }
+
+    @Test
+    void lockedAccountRejectsEvenCorrectPasswordWith423() throws Exception {
+        for (int i = 0; i < 5; i++) login("wrong");
+
+        login(PASSWORD)
+                .andExpect(status().isLocked())
+                .andExpect(jsonPath("$.status").value(423))
+                .andExpect(jsonPath("$.detail").value("로그인 시도 횟수를 초과했습니다. 잠시 후 다시 시도하세요"));
+    }
+
+    @Test
+    void lockExpiresAfter15Minutes_andSuccessResets() throws Exception {
+        for (int i = 0; i < 5; i++) login("wrong");
+
+        clock.advance(Duration.ofMinutes(15).plusSeconds(1));
+
+        login(PASSWORD).andExpect(status().isOk());
+        assertThat(failedCount()).isZero();
+        assertThat(lockedUntilSet()).isFalse();
+    }
+
+    @Test
+    void successResetsCounter() throws Exception {
+        for (int i = 0; i < 3; i++) login("wrong");
+        login(PASSWORD).andExpect(status().isOk());
+        for (int i = 0; i < 4; i++) login("wrong").andExpect(status().isUnauthorized());
+
+        assertThat(lockedUntilSet()).isFalse();
+    }
+}
