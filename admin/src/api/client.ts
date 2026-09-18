@@ -5,11 +5,26 @@ export class ApiError extends Error {
   }
 }
 
+/** CSRF: 서버가 발급한 XSRF-TOKEN 쿠키를 쓰기 요청 헤더로 되돌려 보낸다(쿠키-헤더 이중 제출). */
+const CSRF_COOKIE = "XSRF-TOKEN";
+const CSRF_HEADER = "X-XSRF-TOKEN";
+
+function readCookie(name: string): string | null {
+  const match = document.cookie.split("; ").find((c) => c.startsWith(name + "="));
+  return match ? decodeURIComponent(match.slice(name.length + 1)) : null;
+}
+
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (method !== "GET") {
+    // 매 요청마다 쿠키를 새로 읽는다 — 로그인 직후 서버가 토큰을 교체해도 따로 처리할 필요가 없다.
+    const token = readCookie(CSRF_COOKIE);
+    if (token) headers[CSRF_HEADER] = token;
+  }
   const res = await fetch(path, {
     method,
     credentials: "include",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   if (!res.ok) {
@@ -33,5 +48,10 @@ export const api = {
   put: <T>(p: string, b?: unknown) => request<T>("PUT", p, b),
 };
 
-/** dev 시연용 픽스처 사용 여부. 백엔드 /admin 미구현 동안 기본 on. VITE_USE_FIXTURES=false 로 실 API 전환. */
-export const USE_FIXTURES = (import.meta.env.VITE_USE_FIXTURES ?? "true") !== "false";
+/** SPA 부팅·로그인 직전에 호출 — XSRF-TOKEN 쿠키를 받아 둔다. */
+export async function ensureCsrf(): Promise<void> {
+  await request<void>("GET", "/admin/auth/csrf");
+}
+
+/** 시연용 픽스처 사용 여부. 기본은 실제 API — VITE_USE_FIXTURES=true 를 명시했을 때만 픽스처. */
+export const USE_FIXTURES = (import.meta.env.VITE_USE_FIXTURES ?? "false") === "true";

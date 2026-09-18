@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { api, ApiError, USE_FIXTURES } from "../api/client";
+import { api, ApiError, ensureCsrf, USE_FIXTURES } from "../api/client";
 import type { Role } from "../theme";
 
 export type AdminPrincipal = { id: string; loginId: string; displayName: string; role: Role };
@@ -18,7 +18,7 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 /**
- * fixture 모드(VITE_USE_FIXTURES=true, 기본값)에서는 백엔드 없이 화면을 볼 수 있어야 하므로
+ * fixture 모드(VITE_USE_FIXTURES=true일 때만)에서는 백엔드 없이 화면을 볼 수 있어야 하므로
  * 로그인을 생략하고 곧바로 인증됨으로 취급한다(principal은 null — 역할은 기존 RoleProvider 데모 전환이 담당).
  * 실제 모드에서는 세션 쿠키 유무를 /admin/me로 확인한다.
  */
@@ -27,13 +27,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (USE_FIXTURES) return;
-    api.get<AdminPrincipal>("/admin/me")
+    ensureCsrf()
+      .catch(() => {})
+      .then(() => api.get<AdminPrincipal>("/admin/me"))
       .then((principal) => setState({ status: "authenticated", principal }))
       .catch(() => setState({ status: "unauthenticated" }));
   }, []);
 
   const login = async (loginId: string, password: string) => {
     try {
+      await ensureCsrf();
       const principal = await api.post<AdminPrincipal>("/admin/auth/login", { loginId, password });
       setState({ status: "authenticated", principal });
     } catch (e) {
