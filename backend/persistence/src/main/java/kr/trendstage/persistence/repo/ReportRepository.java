@@ -17,4 +17,10 @@ public interface ReportRepository extends JpaRepository<Report, UUID> {
 
     /** /v1/reports/received — 나를 지목해 소명을 요구한 신고(내 submission을 지목한 것들). */
     List<Report> findBySubmissionIdInOrderByCreatedAtDesc(List<UUID> submissionIds);
+
+    /** ADM-010 큐 요약 — 결정이 남은 신고 수(OPEN + EXPLAINING). */
+    long countByStatusIn(List<ReportStatus> statuses);
+
+    /** ADM-010 SLA — 1차 처리(OPEN) 대기 중인 신고, 오래된 순. */
+    List<Report> findByStatusOrderByCreatedAtAsc(ReportStatus status);
 }
