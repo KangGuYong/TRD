@@ -28,10 +28,6 @@ tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {
     archiveFileName.set("trend-radar.jar")
 }
 
-tasks.withType<Test> {
-    useJUnitPlatform()
-}
-
 // Docker Engine 29+는 최소 API 1.44를 요구한다. Boot 3.3.5가 관리하는 Testcontainers 1.19.8은
 // 구버전 API로 요청해 400이 나므로, API 버전 협상이 고쳐진 버전으로 올린다.
 extra["testcontainers.version"] = "1.21.4"
