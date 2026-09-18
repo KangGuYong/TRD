@@ -11,6 +11,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.csrf.CsrfToken;
+import org.springframework.security.web.csrf.CsrfTokenRepository;
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.web.bind.annotation.*;
 
@@ -24,12 +26,15 @@ public class AdminAuthController {
     private final AdminAccountService accountService;
     private final AuditLogService auditLogService;
     private final SecurityContextRepository securityContextRepository;
+    private final CsrfTokenRepository csrfTokenRepository;
 
     public AdminAuthController(AdminAccountService accountService, AuditLogService auditLogService,
-                                SecurityContextRepository securityContextRepository) {
+                                SecurityContextRepository securityContextRepository,
+                                CsrfTokenRepository csrfTokenRepository) {
         this.accountService = accountService;
         this.auditLogService = auditLogService;
         this.securityContextRepository = securityContextRepository;
+        this.csrfTokenRepository = csrfTokenRepository;
     }
 
     public record LoginRequest(String loginId, String password) {}
@@ -38,6 +43,14 @@ public class AdminAuthController {
     @PostMapping("/auth/login")
     public AdminSummary login(@RequestBody LoginRequest req, HttpServletRequest request, HttpServletResponse response) {
         AdminAccount account = accountService.authenticate(req.loginId(), req.password());
+
+        // 세션 고정 방어: 컨트롤러가 직접 로그인하므로 Spring 인증 필터의 세션 ID·CSRF 토큰 교체가
+        // 일어나지 않는다. 여기서 명시적으로 수행한다. 세션이 아직 없으면 saveContext가 새로 만든다.
+        if (request.getSession(false) != null) {
+            request.changeSessionId();
+        }
+        CsrfToken rotated = csrfTokenRepository.generateToken(request);
+        csrfTokenRepository.saveToken(rotated, request, response);
 
         AdminPrincipal principal = new AdminPrincipal(account.getId(), account.getLoginId(),
                 account.getDisplayName(), account.getRole());
@@ -67,5 +80,10 @@ public class AdminAuthController {
     @GetMapping("/me")
     public AdminPrincipal me() {
         return (AdminPrincipal) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+    }
+
+    /** SPA 부팅용 — 응답에 XSRF-TOKEN 쿠키를 싣는 것 외에 하는 일이 없다(CsrfCookieFilter가 발급). */
+    @GetMapping("/auth/csrf")
+    public void csrf() {
     }
 }
