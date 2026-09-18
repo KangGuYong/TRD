@@ -255,10 +255,10 @@ ParamStudioService.simulate (시뮬)            ─┼→ JudgeService.judge(ite
 
 ## 6. SP0 실행 체크리스트 (이 스펙의 구현)
 
-- [ ] CLAUDE.md: R4 개정, R5 대체, 점수 공식 절(d → AS), baseline 경고 대체, 배치 잡 표(`sla_watch`·미구현 표기·ADM-900), 상세 문서 경로 수정, "열려 있는 결정" 표에 O8~O10
-- [ ] `01-system-design.md`: §4 판정 알고리즘을 제보 신호 기반으로 재서술(현행 = 제보자 수, SP4 = 다축), §10 `metric_collector`·S1–S5·baseline 삭제, §3.3 쿼터를 "Phase 1 선행"으로, §6 등급에 L4 없음 명시
-- [ ] `03-merge-clustering.md`: baseline 재계산 절 → `order_rank`·시간 분포 재계산 + RESOLVED 병합 금지, 24h SLA 근거를 "판정 유예 연장"으로, 클레임·보류·멱등키 절 추가
-- [ ] `04-development-plan.md`: 197·274행 `metric_collector` 삭제, `sla_watch` 추가, Phase 1 선행 조건에 쿼터
-- [ ] `02-admin-console.md`·`05-screen-endpoint-map.md`: ADM-900 + `POST /admin/batch-jobs/**` 추가, ADM-410 자동 임시 비공개 확정 표기, ADM-100 클레임/보류/에스컬레이션, ADM-800 2인 승인·승인권 유예
-- [ ] `ReportAdminService.java:27-28` 주석 → "4h 자동 임시 비공개는 SP3 `sla_watch`에서 구현" 로 정정
-- [ ] PR: `docs/design-review` → `main`
+- [x] CLAUDE.md: R4 개정, R5 대체, 점수 공식 절(d → AS), baseline 경고 대체, 배치 잡 표(`sla_watch`·미구현 표기·ADM-900), 상세 문서 경로 수정, "열려 있는 결정" 표에 O8~O10
+- [x] `01-system-design.md`: §4 판정 알고리즘을 제보 신호 기반으로 재서술(현행 = 제보자 수, SP4 = 다축), §10 `metric_collector`·S1–S5·baseline 삭제, §3.3 쿼터를 "Phase 1 선행"으로, §6 등급에 L4 없음 명시
+- [x] `03-merge-clustering.md`: baseline 재계산 절 → `order_rank`·시간 분포 재계산 + RESOLVED 병합 금지, 24h SLA 근거를 "판정 유예 연장"으로, 클레임·보류·멱등키 절 추가
+- [x] `04-development-plan.md`: 197·274행 `metric_collector` 삭제, `sla_watch` 추가, Phase 1 선행 조건에 쿼터
+- [x] `02-admin-console.md`·`05-screen-endpoint-map.md`: ADM-900 + `POST /admin/batch-jobs/**` 추가, ADM-410 자동 임시 비공개 확정 표기, ADM-100 클레임/보류/에스컬레이션, ADM-800 2인 승인·승인권 유예
+- [x] `ReportAdminService.java:27-28` 주석 → "4h 자동 임시 비공개는 SP3 `sla_watch`에서 구현" 로 정정
+- [x] PR: `docs/design-review` → `main`
