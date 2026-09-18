@@ -2,16 +2,17 @@ import React from "react";
 import { C, ROLE_LABEL, type Role } from "../theme";
 import { useRole } from "../state/role";
 import { useAuth } from "../state/auth";
+import { useQueueSummary } from "../api/hooks";
 
 export type ScreenId = "ADM-010" | "ADM-100" | "ADM-110" | "ADM-111" | "ADM-200" | "ADM-410" | "ADM-500" | "ADM-600" | "ADM-620" | "ADM-311" | "ADM-700" | "ADM-800" | "ADM-900" | "stub";
 
-const NAV: { group: string; items: { id: ScreenId | "stub"; label: string; code: string; badge?: number }[] }[] = [
+const NAV: { group: string; items: { id: ScreenId | "stub"; label: string; code: string }[] }[] = [
   { group: "큐", items: [
     { id: "ADM-010", label: "오늘의 작업", code: "ADM-010" },
-    { id: "ADM-100", label: "병합 검수", code: "ADM-100", badge: 24 },
-    { id: "stub", label: "어뷰징", code: "ADM-300", badge: 6 },
-    { id: "stub", label: "이의 제기", code: "ADM-400", badge: 3 },
-    { id: "ADM-410", label: "신고 콘텐츠", code: "ADM-410", badge: 2 },
+    { id: "ADM-100", label: "병합 검수", code: "ADM-100" },
+    { id: "stub", label: "어뷰징", code: "ADM-300" },
+    { id: "stub", label: "이의 제기", code: "ADM-400" },
+    { id: "ADM-410", label: "신고 콘텐츠", code: "ADM-410" },
   ]},
   { group: "트렌드", items: [
     { id: "ADM-110", label: "항목 목록", code: "ADM-110" },
@@ -34,12 +35,30 @@ const NAV: { group: string; items: { id: ScreenId | "stub"; label: string; code:
 
 const ROLES: Role[] = ["REVIEWER", "OPERATOR", "ADMIN", "AUDITOR"];
 
+type Tile = { id: string; count: number; slaExceeded: boolean; available: boolean };
+
+/** 큐 요약 API의 실제 값만 보여준다. 로딩·실패 시 아무것도 그리지 않는다(가짜 숫자 금지). */
+function QueueBadge({ tile }: { tile?: Tile }) {
+  if (!tile) return null;
+  if (!tile.available) {
+    return <span style={{ font: "600 9.5px Pretendard", padding: "3px 5px", borderRadius: 5, background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.35)" }}>미구현</span>;
+  }
+  if (tile.count === 0) return null;
+  return (
+    <span style={{ font: "600 10px ui-monospace, monospace", padding: "3px 5px", borderRadius: 5,
+      background: tile.slaExceeded ? C.fading : "rgba(255,255,255,0.12)",
+      color: tile.slaExceeded ? "#fff" : "rgba(255,255,255,0.7)" }}>{tile.count}</span>
+  );
+}
+
 export function Layout({ screen, setScreen, title, children }: {
   screen: ScreenId; setScreen: (s: ScreenId) => void; title: string; children: React.ReactNode;
 }) {
   const { role, setRole, locked } = useRole();
   const { state: authState, logout } = useAuth();
   const principal = authState.status === "authenticated" ? authState.principal : null;
+  const summary = useQueueSummary();
+  const tiles = new Map((summary.data?.queues ?? []).map((t) => [t.id, t] as const));
   return (
     <div style={{ display: "flex", height: "100vh", fontFamily: "Pretendard, system-ui, sans-serif", color: C.ink }}>
       {/* 사이드바 */}
@@ -61,9 +80,7 @@ export function Layout({ screen, setScreen, title, children }: {
                       <span style={{ font: "500 12.5px Pretendard", color: n.id === "stub" ? "rgba(255,255,255,0.5)" : "#fff" }}>{n.label}</span>
                       <span style={{ font: "500 9px ui-monospace, monospace", color: "rgba(255,255,255,0.25)" }}>{n.code}</span>
                     </span>
-                    {n.badge != null && (
-                      <span style={{ font: "600 10px ui-monospace, monospace", padding: "3px 5px", borderRadius: 5, background: "rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.7)" }}>{n.badge}</span>
-                    )}
+                    <QueueBadge tile={tiles.get(n.code)} />
                   </button>
                 );
               })}

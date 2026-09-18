@@ -2,15 +2,15 @@
 import type { AdminAccountSummary, ApprovalRequestView, AdminUserDetail, AuditEntry, ClusterMergeResult, ImminentItem, JudgedItem, MergeCandidate, MergePreview, ParameterDraftView, QueueSummary, ReportQueueItem, ReportSubmissionCandidate, SeedAccuracyRow, SimulationSummary, TrendItemDetail, TrendItemSummary, VerdictListResponse } from "./api/types";
 
 export const fxQueueSummary: QueueSummary = {
-  slaBreaches: 3,
+  slaBreaches: 1,
   queues: [
-    { id: "ADM-100", name: "병합 검수", count: 24, oldest: "4h", slaExceeded: false },
-    { id: "ADM-300", name: "어뷰징", count: 6, oldest: "11h", slaExceeded: false },
-    { id: "ADM-400", name: "이의 제기", count: 3, oldest: "26h", slaExceeded: true },
-    { id: "ADM-410", name: "신고", count: 2, oldest: "3h", slaExceeded: false },
+    { id: "ADM-100", name: "병합 검수", count: 24, oldest: "4h", slaExceeded: false, available: true },
+    { id: "ADM-300", name: "어뷰징", count: 0, oldest: "-", slaExceeded: false, available: false },
+    { id: "ADM-400", name: "이의 제기", count: 0, oldest: "-", slaExceeded: false, available: false },
+    { id: "ADM-410", name: "신고 콘텐츠", count: 2, oldest: "5h", slaExceeded: true, available: true },
   ],
   alerts: [
-    { title: "이의 제기 큐 SLA 초과 3건", detail: "5영업일 기준 초과, 상위 역할 확인 필요" },
+    { title: "신고 콘텐츠 SLA 초과 1건", detail: "4시간 기준 초과 — 자동 임시 비공개는 미구현, 수동 처리 필요" },
   ],
   seedRatio: 0.41,
   judgedToday: 17,

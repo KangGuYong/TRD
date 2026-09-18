@@ -28,8 +28,17 @@ export default function TodayScreen({ goMerge }: { goMerge: () => void }) {
                     <span style={{ font: "600 12.5px Pretendard", color: C.sub }}>{qc.name}</span>
                     <span style={{ font: "500 9.5px ui-monospace, monospace", color: C.faint }}>{qc.id}</span>
                   </div>
-                  <div style={{ font: "700 34px Pretendard", letterSpacing: "-0.03em", marginTop: 14, color: qc.slaExceeded ? C.fading : C.ink }}>{qc.count}</div>
-                  <div style={{ font: "500 11.5px Pretendard", marginTop: 9, color: qc.slaExceeded ? C.fading : C.sub }}>최장 대기 {qc.oldest}{qc.slaExceeded ? " ⚠" : ""}</div>
+                  {qc.available ? (
+                    <>
+                      <div style={{ font: "700 34px Pretendard", letterSpacing: "-0.03em", marginTop: 14, color: qc.slaExceeded ? C.fading : C.ink }}>{qc.count}</div>
+                      <div style={{ font: "500 11.5px Pretendard", marginTop: 9, color: qc.slaExceeded ? C.fading : C.sub }}>최장 대기 {qc.oldest}{qc.slaExceeded ? " ⚠" : ""}</div>
+                    </>
+                  ) : (
+                    <>
+                      <div style={{ font: "700 20px Pretendard", marginTop: 20, color: C.faint }}>미구현</div>
+                      <div style={{ font: "500 11.5px Pretendard", marginTop: 9, color: C.faint }}>Phase 2 대상</div>
+                    </>
+                  )}
                 </button>
               ))}
             </div>
