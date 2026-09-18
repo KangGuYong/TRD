@@ -177,7 +177,7 @@ ParamStudioService.simulate (시뮬)            ─┼→ JudgeService.judge(ite
                                                 │     4. verdict + score_ledger 저장 (원값)
                                                 │     5. submissions.result, item.RESOLVED
 ```
-멱등성은 DB 제약: `verdicts(trend_item_id) WHERE supersedes IS NULL` 부분 UNIQUE, `score_ledger(verdict_id, submission_id)` UNIQUE.
+멱등성은 DB 제약: `verdicts(trend_item_id) WHERE supersedes IS NULL` 부분 UNIQUE는 **이미 있다**(`V4:26` `verdict_one_original_per_item` — SP0 최종 리뷰에서 정정). SP1이 신설할 것은 `score_ledger(verdict_id, submission_id)` UNIQUE뿐이다.
 `TrendSignal`은 SP4가 파이프라인을 다시 열지 않도록 지금부터 확장 형태(제보 시각 목록·플랫폼 enum·제보자 가입일/디바이스 해시)로 정의한다.
 
 **병합 (SP2)**
