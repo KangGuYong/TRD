@@ -45,7 +45,7 @@ public class AdminAccountService {
      */
     @Transactional(noRollbackFor = {InvalidCredentialsException.class, AccountLockedException.class})
     public AdminAccount authenticate(String loginId, String rawPassword) {
-        AdminAccount account = repository.findByLoginId(loginId)
+        AdminAccount account = repository.findByLoginIdForUpdate(loginId)
                 .orElseThrow(() -> new InvalidCredentialsException(INVALID_MESSAGE));
 
         if (account.getDisabledAt() != null) {

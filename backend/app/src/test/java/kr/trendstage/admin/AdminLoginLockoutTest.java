@@ -1,6 +1,7 @@
 package kr.trendstage.admin;
 
 import jakarta.servlet.http.Cookie;
+import kr.trendstage.apiadmin.auth.AdminAccountService;
 import kr.trendstage.persistence.entity.AdminAccount;
 import kr.trendstage.persistence.repo.AdminAccountRepository;
 import kr.trendstage.persistence.type.AdminRole;
@@ -13,7 +14,13 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.ResultActions;
 
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -27,6 +34,7 @@ class AdminLoginLockoutTest extends AbstractIntegrationTest {
 
     @Autowired AdminAccountRepository accounts;
     @Autowired PasswordEncoder passwordEncoder;
+    @Autowired AdminAccountService accountService;
 
     private String loginId;
     private UUID accountId;
@@ -110,5 +118,30 @@ class AdminLoginLockoutTest extends AbstractIntegrationTest {
         for (int i = 0; i < 4; i++) login("wrong").andExpect(status().isUnauthorized());
 
         assertThat(lockedUntilSet()).isFalse();
+    }
+
+    @Test
+    void concurrentFailuresAreNotLost() throws Exception {
+        // 행 잠금이 없으면 동시에 들어온 실패가 카운터를 서로 덮어써 5회를 채우지 못한다(lost update).
+        int n = 5;
+        ExecutorService pool = Executors.newFixedThreadPool(n);
+        CountDownLatch start = new CountDownLatch(1);
+        List<Future<?>> futures = new ArrayList<>();
+        for (int i = 0; i < n; i++) {
+            futures.add(pool.submit(() -> {
+                start.await();
+                try {
+                    accountService.authenticate(loginId, "wrong");
+                } catch (RuntimeException expected) {
+                    // InvalidCredentialsException — 실패가 기대 동작
+                }
+                return null;
+            }));
+        }
+        start.countDown();
+        for (Future<?> f : futures) f.get();
+        pool.shutdown();
+
+        assertThat(lockedUntilSet()).isTrue();
     }
 }
