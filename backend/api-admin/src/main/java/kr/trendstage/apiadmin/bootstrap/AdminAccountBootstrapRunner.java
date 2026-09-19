@@ -11,7 +11,6 @@ import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Map;
 
@@ -42,8 +41,12 @@ public class AdminAccountBootstrapRunner implements ApplicationRunner {
         this.auditLogService = auditLogService;
     }
 
+    /**
+     * 트랜잭션을 걸지 않는다. 감사 기록({@link AuditLogService#record})은 REQUIRES_NEW라 별도 트랜잭션에서
+     * actor_id → admin_accounts FK를 검사하는데, 계정 저장이 바깥 트랜잭션에 묶여 커밋 전이면 그 트랜잭션에서
+     * 계정 행이 보이지 않아 FK 위반으로 기동이 실패한다(빈 DB 첫 기동). 계정을 먼저 커밋한 뒤 기록한다.
+     */
     @Override
-    @Transactional
     public void run(ApplicationArguments args) {
         if (bootstrapLoginId.isBlank() || bootstrapPassword.isBlank()) {
             return;
@@ -52,9 +55,8 @@ public class AdminAccountBootstrapRunner implements ApplicationRunner {
             return;
         }
 
-        AdminAccount created = new AdminAccount(bootstrapLoginId, bootstrapLoginId, AdminRole.ADMIN,
-                passwordEncoder.encode(bootstrapPassword));
-        repository.save(created);
+        AdminAccount created = repository.save(new AdminAccount(bootstrapLoginId, bootstrapLoginId,
+                AdminRole.ADMIN, passwordEncoder.encode(bootstrapPassword)));
         auditLogService.record(created.getId(), AdminRole.ADMIN, "ADMIN_BOOTSTRAP", "ADMIN_ACCOUNT",
                 created.getId(), Map.of("loginId", bootstrapLoginId));
 

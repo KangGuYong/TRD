@@ -116,6 +116,29 @@ npm run dev            # http://localhost:5173 (/admin 요청은 :8080으로 프
 npm run gen:api        # openapi.yaml → src/api/schema.ts
 ```
 
+## Docker로 전체 실행
+
+DB·임베딩·백엔드·관리자 콘솔을 컨테이너로 한 번에 띄운다. JDK·Node 없이 Docker만 있으면 된다.
+
+```bash
+cd infra
+cp .env.example .env          # DB_PASSWORD, ADMIN_BOOTSTRAP_PASSWORD 를 채운다
+docker compose up -d --build
+```
+
+| 주소                    | 내용                                                                        |
+| ----------------------- | --------------------------------------------------------------------------- |
+| `http://localhost:8081` | 관리자 콘솔 — `.env`의 `ADMIN_BOOTSTRAP_LOGIN_ID` / `PASSWORD`로 로그인     |
+| `http://localhost:8080` | 백엔드 — 앱 API `/v1`, 헬스체크 `/actuator/health`                          |
+
+- 첫 관리자 계정은 `admin_accounts`가 비어 있을 때 한 번만 만들어진다.
+- 최초 기동 때 임베딩 모델(KURE-v1, 수 GB)을 내려받는다. 받는 동안은 `cluster_merge` 배치만 실패하고 나머지는 정상 동작한다.
+- Firebase 키(앱 로그인 검증)는 `infra/secrets/`에 두고 `.env`의 `FIREBASE_CREDENTIALS_PATH` 주석을 푼다. 없으면 인증이 필요한 `/v1` 요청만 401.
+- 코드 수정 후 다시 올리기: `docker compose up -d --build backend admin`
+- 중지: `docker compose down`(데이터 유지) · 완전 초기화: `docker compose down -v`(DB·모델 캐시 삭제)
+- 서버에 올릴 때: `.env`의 `DB_PUBLISH`·`EMBEDDINGS_PUBLISH`는 `127.0.0.1:`을 붙인 채로 둬 바깥에 열지 않고, HTTPS는 앞단 리버스 프록시에서 처리한다.
+- 컨테이너 JVM은 UTC다. 배치 시각은 `cluster_merge` 02:00, `verdict_runner` 03:00, `grade_recalc` 월 00:00(모두 KST).
+
 ## 현재 구현 상태
 
 | 영역                                                   | 상태                                                                                  |

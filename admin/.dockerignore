@@ -1,0 +1,7 @@
+node_modules/
+dist/
+*.tsbuildinfo
+
+# 로컬 .env(예: VITE_USE_FIXTURES=true)가 빌드에 섞이면 픽스처 모드로 굳어 버린다 — 이미지는 항상 실제 API.
+.env
+.env.*
