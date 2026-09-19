@@ -2,11 +2,14 @@ package kr.trendstage.apiadmin.queues;
 
 import kr.trendstage.domain.verdict.DeadlineWindow;
 import kr.trendstage.persistence.entity.MergeQueueEntry;
+import kr.trendstage.persistence.entity.Report;
 import kr.trendstage.persistence.entity.TrendItem;
 import kr.trendstage.persistence.repo.MergeQueueRepository;
+import kr.trendstage.persistence.repo.ReportRepository;
 import kr.trendstage.persistence.repo.SubmissionRepository;
 import kr.trendstage.persistence.repo.TrendItemRepository;
 import kr.trendstage.persistence.type.MergeQueueStatus;
+import kr.trendstage.persistence.type.ReportStatus;
 import kr.trendstage.persistence.type.TrendState;
 import org.springframework.stereotype.Service;
 
@@ -14,34 +17,39 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
 /**
- * ADM-010. 병합 검수 큐만 실제 백엔드가 있고(어뷰징/이의제기/신고는 서브시스템 자체가 미구현),
- * 그 셋은 0건 고정으로 응답한다 — 화면 구조는 유지하되 미구현임을 숨기지 않는다.
+ * ADM-010 오늘의 작업. 병합 검수(ADM-100)와 신고 콘텐츠(ADM-410)는 실데이터.
+ * 어뷰징(ADM-300)·이의 제기(ADM-400)는 큐 자체가 없어(Phase 2) available=false로 응답한다 —
+ * 0건으로 표시하면 "처리할 게 없다"로 읽히므로 미구현임을 숨기지 않는다.
  */
 @Service
 public class QueueSummaryService {
 
     private static final int MERGE_SLA_HOURS = 24;
+    private static final int REPORT_SLA_HOURS = 4;
     private static final int SEED_RATIO_WINDOW_DAYS = 7;
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
     private final MergeQueueRepository mergeQueue;
     private final TrendItemRepository trendItems;
     private final SubmissionRepository submissions;
+    private final ReportRepository reports;
     private final Clock clock;
 
     public QueueSummaryService(MergeQueueRepository mergeQueue, TrendItemRepository trendItems,
-                                SubmissionRepository submissions, Clock clock) {
+                                SubmissionRepository submissions, ReportRepository reports, Clock clock) {
         this.mergeQueue = mergeQueue;
         this.trendItems = trendItems;
         this.submissions = submissions;
+        this.reports = reports;
         this.clock = clock;
     }
 
-    public record QueueTile(String id, String name, int count, String oldest, boolean slaExceeded) {}
+    public record QueueTile(String id, String name, int count, String oldest, boolean slaExceeded, boolean available) {}
     public record Alert(String title, String detail) {}
     public record QueueSummaryResponse(int slaBreaches, List<QueueTile> queues, List<Alert> alerts,
                                         double seedRatio, int judgedToday, int imminent24h) {}
@@ -76,17 +84,31 @@ public class QueueSummaryService {
         long totalCount = submissions.countByCreatedAtAfter(seedWindowStart);
         double seedRatio = totalCount == 0 ? 0.0 : (double) seedCount / totalCount;
 
+        long reportPending = reports.countByStatusIn(List.of(ReportStatus.OPEN, ReportStatus.EXPLAINING));
+        List<Report> openReports = reports.findByStatusOrderByCreatedAtAsc(ReportStatus.OPEN);
+        long reportOverdue = openReports.stream()
+                .filter(r -> Duration.between(r.getCreatedAt(), now).toHours() >= REPORT_SLA_HOURS)
+                .count();
+        String reportOldest = openReports.isEmpty() ? "-" : formatAgo(openReports.get(0).getCreatedAt(), now);
+
         List<QueueTile> queues = List.of(
-                new QueueTile("ADM-100", "병합 검수", pending.size(), oldest, mergeOverdue > 0),
-                new QueueTile("ADM-300", "어뷰징", 0, "-", false),
-                new QueueTile("ADM-400", "이의 제기", 0, "-", false),
-                new QueueTile("ADM-410", "신고 콘텐츠", 0, "-", false)
-        );
-        List<Alert> alerts = mergeOverdue == 0 ? List.of() : List.of(
-                new Alert("병합 검수 큐 SLA 초과 " + mergeOverdue + "건", "24시간 기준 초과, 미처리 시 판정 유예 자동 연장")
+                new QueueTile("ADM-100", "병합 검수", pending.size(), oldest, mergeOverdue > 0, true),
+                new QueueTile("ADM-300", "어뷰징", 0, "-", false, false),
+                new QueueTile("ADM-400", "이의 제기", 0, "-", false, false),
+                new QueueTile("ADM-410", "신고 콘텐츠", (int) reportPending, reportOldest, reportOverdue > 0, true)
         );
 
-        return new QueueSummaryResponse((int) mergeOverdue, queues, alerts,
+        List<Alert> alerts = new ArrayList<>();
+        if (mergeOverdue > 0) {
+            alerts.add(new Alert("병합 검수 큐 SLA 초과 " + mergeOverdue + "건",
+                    "24시간 기준 초과 — 판정 유예 연장은 ADM-200에서 수동 처리"));
+        }
+        if (reportOverdue > 0) {
+            alerts.add(new Alert("신고 콘텐츠 SLA 초과 " + reportOverdue + "건",
+                    "4시간 기준 초과 — 자동 임시 비공개는 미구현, 수동 처리 필요"));
+        }
+
+        return new QueueSummaryResponse((int) (mergeOverdue + reportOverdue), queues, alerts,
                 seedRatio, (int) judgedToday, (int) imminent24h);
     }
 

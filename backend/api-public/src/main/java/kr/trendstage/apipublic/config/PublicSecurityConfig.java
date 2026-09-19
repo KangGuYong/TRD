@@ -29,6 +29,8 @@ public class PublicSecurityConfig {
                                          UserProvisioningService provisioning) throws Exception {
         http
             .securityMatcher("/v1/**")
+            // /v1/**는 STATELESS Bearer JWT — 브라우저가 자격증명을 자동 첨부하지 않으므로 CSRF 대상이 아니다.
+            // (쿠키 세션을 쓰는 /admin/**만 CSRF를 켠다 — AdminSecurityConfig)
             .csrf(csrf -> csrf.disable())
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .addFilterBefore(new FirebaseAuthenticationFilter(verifier, provisioning),

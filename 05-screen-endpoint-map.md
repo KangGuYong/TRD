@@ -71,7 +71,13 @@
 ### ADM-010 · 오늘의 작업
 | 상호작용 | API | 스펙 | 구현 | 권한 | 비고 |
 |---|---|:--:|:--:|:--:|---|
-| 큐 카운트·SLA초과·시스템알림·시딩비중 | `GET /admin/queues/summary` | ✅ | ✅ | R/O/A/Au | **미구현(SP0.5·SP3)** 부분: ADM-300/400/410 타일은 0 고정(`QueueSummaryService.java:81-83`, 실재하는 신고 큐(ADM-410) 포함), 사이드바 뱃지 하드코딩(`admin/src/components/Layout.tsx:11-14`) |
+| 큐 카운트·SLA초과·시스템알림·시딩비중 | `GET /admin/queues/summary` | ✅ | ✅ | R/O/A/Au | ADM-410은 실데이터(OPEN+EXPLAINING, OPEN 4h SLA), ADM-300/400은 `available=false`로 '미구현' 표시. 사이드바 뱃지도 같은 API |
+
+### 콘솔 인증
+| 상호작용 | API | 스펙 | 구현 | 권한 | 비고 |
+|---|---|:--:|:--:|:--:|---|
+| CSRF 쿠키 발급(SPA 부팅용) | `GET /admin/auth/csrf` | ✅ | ✅ | 전체 | 응답에 XSRF-TOKEN 쿠키 |
+| 로그인 | `POST /admin/auth/login` | ✅ | ✅ | 전체 | X-XSRF-TOKEN 헤더 필수, 5회 실패 15분 잠금(423) |
 
 ### ADM-100 · 병합 검수 큐 ★
 | 상호작용 | API | 스펙 | 구현 | 권한 |
@@ -193,7 +199,7 @@
 | `POST /admin/merge-queue/{id}/merge`·`separate`·`void`, `…/claim`·`release`·`hold` | 병합/분리/VOID/클레임/보류 | ADM-100 | merge·separate·void는 구현 있음(스펙은 구형 `POST …/action` 하나로만 정의, 치환 필요). claim·release·hold는 구현도 없음(SP2) |
 | `GET /admin/trend-items`, `GET /admin/trend-items/{id}` | 트렌드 목록/상세 | ADM-110/111 | 구현은 이미 있음 — 스펙 옛 경로 `/admin/trends`를 치환 |
 | `GET /admin/verdicts`, `POST …/{id}/void`·`rejudge`·`extend-grace` | 판정 관리 목록/예외처리 | ADM-200 | 구현은 이미 있음 — 스펙 옛 경로 `/admin/trends/{id}` + `/admin/trends/{id}/exceptions`(단일 엔드포인트, type 파라미터 분기)를 치환 |
-| `GET·PUT /admin/params/draft`, `POST …/draft/simulate`, `…/draft/request-approval` | 파라미터 드래프트(액터당 1개, ID 없음) | ADM-600 | 구현은 이미 있음 — 스펙 옛 모델 `/admin/parameter-drafts`(다건·ID기반)를 치환. 스펙 요약문의 "가중치 합계 1.0"(~`GET·POST /admin/parameter-drafts` summary/422)은 폐기된 외부지표 다축 가중치(S1~S5) 모델의 잔재 — 삭제 대상(스펙 정리는 SP0.5). 현재 구현은 `submitterTarget`+`hitThreshold` 2필드뿐이고 합계 제약 자체가 없다 |
+| `GET·PUT /admin/params/draft`, `POST …/draft/simulate`, `…/draft/request-approval` | 파라미터 드래프트(액터당 1개, ID 없음) | ADM-600 | 구현은 이미 있음 — 스펙 옛 모델 `/admin/parameter-drafts`(다건·ID기반)를 치환. 스펙 요약문의 "가중치 합계 1.0"(~`GET·POST /admin/parameter-drafts` summary/422)은 폐기된 외부지표 다축 가중치(S1~S5) 모델의 잔재 — 삭제 대상(스펙 정리는 **SP3**로 이관 — SP0.5 스펙 범위에서 빠짐). 현재 구현은 `submitterTarget`+`hitThreshold` 2필드뿐이고 합계 제약 자체가 없다 |
 | `POST /admin/seed/submissions`, `GET /admin/seed/accuracy` | 시딩 등록/적중률 | ADM-500 | 구현은 이미 있음 — 스펙 옛 경로 `/admin/seeding`, `/admin/seeding/stats`를 치환 |
 | `POST /admin/accounts/{id}/disable`, `…/enable` | 관리자 계정 비활성화/재활성화 | ADM-800 | 구현은 이미 있음 — 스펙엔 대신 미구현 상태인 `POST …/{id}/role`만 있음. role 변경 자체가 필요하면 이 스펙 항목은 구현부터 필요(SP3), disable/enable은 스펙 추가만 필요 |
 | `POST /admin/accounts/me/password` | 비밀번호 변경(부트스트랩 강제) | ADM-800 | 구현·스펙 둘 다 없음(SP3) |

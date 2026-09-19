@@ -2,7 +2,7 @@
 
 export interface QueueSummary {
   slaBreaches: number;
-  queues: { id: string; name: string; count: number; oldest: string; slaExceeded: boolean }[];
+  queues: { id: string; name: string; count: number; oldest: string; slaExceeded: boolean; available: boolean }[];
   alerts: { title: string; detail: string }[];
   seedRatio: number;
   judgedToday: number;
