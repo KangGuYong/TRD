@@ -80,24 +80,6 @@ public class MergeService {
         ));
     }
 
-    /** ADM-100 "VOID" — 신규 항목 자체를 무효 처리(허위·규정위반 등). 그 항목의 제보도 함께 VOID. */
-    @Transactional
-    public void voidTrendItem(UUID trendItemId, UUID actorId, AdminRole actorRole, String reason) {
-        TrendItem item = trendItems.findById(trendItemId)
-                .orElseThrow(() -> new IllegalStateException("항목이 없습니다: " + trendItemId));
-        if (item.getState() == TrendState.MERGED || item.getState() == TrendState.VOID) {
-            return;
-        }
-        for (Submission s : submissions.findByTrendItemIdAndResultNot(trendItemId, SubmissionResult.VOID)) {
-            s.voidOut(clock.instant());
-        }
-        item.transitionTo(TrendState.VOID);
-
-        auditLogService.record(actorId, actorRole, "MERGE_VOID", "TREND_ITEM", trendItemId, Map.of(
-                "reason", reason == null ? "" : reason
-        ));
-    }
-
     /**
      * ADM-100 병합 후 미리보기(dry-run). DB에 아무것도 쓰지 않는다 — merge()와 같은 순수 함수를
      * 재사용하므로 실제 병합 결과와 어긋날 수 없다(readOnly 트랜잭션으로 실수 저장도 방지).

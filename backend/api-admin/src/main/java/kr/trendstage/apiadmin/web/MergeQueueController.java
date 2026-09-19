@@ -2,6 +2,8 @@ package kr.trendstage.apiadmin.web;
 
 import kr.trendstage.apiadmin.auth.AdminPrincipal;
 import kr.trendstage.apiadmin.auth.AdminValidationException;
+import kr.trendstage.audit.AuditLogService;
+import kr.trendstage.judge.JudgeService;
 import kr.trendstage.merge.MergeService;
 import kr.trendstage.persistence.entity.*;
 import kr.trendstage.persistence.repo.*;
@@ -34,6 +36,8 @@ public class MergeQueueController {
     private final UserRepository users;
     private final UserGradeRepository userGrades;
     private final MergeService mergeService;
+    private final JudgeService judgeService;
+    private final AuditLogService auditLogService;
     private final Clock clock;
 
     private static final DateTimeFormatter DISPLAY_FORMAT =
@@ -42,7 +46,8 @@ public class MergeQueueController {
     public MergeQueueController(MergeQueueRepository mergeQueue, TrendItemRepository trendItems,
                                  SubmissionRepository submissions, SubmissionOrderRankRepository orderRanks,
                                  UserRepository users, UserGradeRepository userGrades,
-                                 MergeService mergeService, Clock clock) {
+                                 MergeService mergeService, JudgeService judgeService,
+                                 AuditLogService auditLogService, Clock clock) {
         this.mergeQueue = mergeQueue;
         this.trendItems = trendItems;
         this.submissions = submissions;
@@ -50,6 +55,8 @@ public class MergeQueueController {
         this.users = users;
         this.userGrades = userGrades;
         this.mergeService = mergeService;
+        this.judgeService = judgeService;
+        this.auditLogService = auditLogService;
         this.clock = clock;
     }
 
@@ -149,7 +156,10 @@ public class MergeQueueController {
                                @AuthenticationPrincipal AdminPrincipal actor) {
         MergeQueueEntry entry = requirePending(id);
         String reason = req == null ? null : req.reason();
-        mergeService.voidTrendItem(entry.getNewTrendItemId(), actor.id(), actor.role(), reason);
+        // 항목 VOID는 판정 사건이다(P5) — 판정된 항목이면 원장 상쇄까지 JudgeService가 한다
+        judgeService.voidItem(entry.getNewTrendItemId(), reason, clock.instant());
+        auditLogService.record(actor.id(), actor.role(), "MERGE_VOID", "TREND_ITEM", entry.getNewTrendItemId(),
+                Map.of("reason", reason == null ? "" : reason));
         entry.resolve(MergeQueueStatus.VOIDED, actor.id(), clock.instant());
     }
 

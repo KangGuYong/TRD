@@ -26,6 +26,7 @@ import kr.trendstage.persistence.repo.VerdictRepository;
 import kr.trendstage.persistence.type.LedgerKind;
 import kr.trendstage.persistence.type.SubmissionResult;
 import kr.trendstage.persistence.type.TrendState;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,8 +34,12 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -113,6 +118,121 @@ public class JudgeService {
         }
         item.transitionTo(plan.result() == VerdictResult.VOID ? TrendState.VOID : TrendState.RESOLVED);
         return true;
+    }
+
+    /**
+     * 재판정 — 원 판정 때 동결한 파라미터로 다시 계산해 supersede 판정을 쌓고, 원장은 제보 단위 차액만 ADJ로 남긴다(J2).
+     * 그사이 VOID된 제보가 빠지는 것이 재판정의 실질이다. 유효 제보가 0건이 되면 VOID 판정 → 항목 VOID.
+     */
+    @Transactional
+    public Verdict rejudge(UUID itemId, String reason, Instant now) {
+        TrendItem item = lock(itemId);
+        Verdict current = verdicts.findCurrentByTrendItemId(itemId)
+                .orElseThrow(() -> new JudgeRejectedException("판정 이력이 없는 항목입니다"));
+        if (current.getResult() == VerdictResult.VOID) {
+            throw new JudgeConflictException("이미 VOID 처리된 항목은 다시 판정할 수 없습니다");
+        }
+        Chain chain = chainOf(itemId);
+        Inputs in = collect(item, deadlineOf(item));
+        VerdictPlan plan = VerdictComputation.run(in.signal(), in.refs(), chain.params());
+
+        Verdict next = supersede(new Verdict(itemId, plan.result(), plan.reach(), scoreT(plan), now,
+                evidence(plan, in, chain.params(), current.getId(), reason), current.getId()));
+        settle(chain, next, plan.ledgerLines(), "재판정 · " + reason);
+        for (Submission s : in.submissions()) {
+            s.markResult(toSubmissionResult(plan.result()), now);
+        }
+        if (plan.result() == VerdictResult.VOID) {
+            item.transitionTo(TrendState.VOID);
+        }
+        return next;
+    }
+
+    /**
+     * 항목 VOID(P5 "항목이 VOID됨") — ADM-100 큐 VOID와 ADM-200 VOID의 공통 경로.
+     * 비VOID 제보 전부 VOID(voided_at = 제보권 반환 시점, J4). 판정이 있었으면 VOID 판정을 쌓고 원장을 제보 단위로 전액 상쇄한다.
+     *
+     * @return 새 VOID 판정(판정 전 항목이면 비어 있음)
+     */
+    @Transactional
+    public Optional<Verdict> voidItem(UUID itemId, String reason, Instant now) {
+        TrendItem item = lock(itemId);
+        if (item.getState() == TrendState.MERGED || item.getState() == TrendState.VOID) {
+            throw new JudgeConflictException("이미 병합됐거나 VOID된 항목입니다");
+        }
+        for (Submission s : submissions.findByTrendItemIdAndResultNot(itemId, SubmissionResult.VOID)) {
+            s.voidOut(now);
+        }
+        Optional<Verdict> current = verdicts.findCurrentByTrendItemId(itemId);
+        Optional<Verdict> voided = Optional.empty();
+        if (current.isPresent()) {
+            Chain chain = chainOf(itemId);
+            Verdict next = supersede(new Verdict(itemId, VerdictResult.VOID, null, null, now,
+                    write(new VerdictEvidence("VOID", null, null, null, null, null, 0, 0, Map.of(),
+                            current.get().getId(), reason)),
+                    current.get().getId()));
+            settle(chain, next, List.of(), "VOID · " + (reason == null ? "" : reason));
+            voided = Optional.of(next);
+        }
+        item.transitionTo(TrendState.VOID);
+        return voided;
+    }
+
+    /** 판정 체인 — 원본의 파라미터·판정 시각이 재판정·VOID 차액의 기준이다(J1·J2). */
+    record Chain(List<UUID> verdictIds, ParameterSet params, Instant anchor) {}
+
+    private Chain chainOf(UUID itemId) {
+        List<Verdict> all = verdicts.findByTrendItemIdOrderByCreatedAtAsc(itemId);
+        Verdict original = all.stream().filter(v -> v.getSupersedes() == null).findFirst()
+                .orElseThrow(() -> new IllegalStateException("원본 판정이 없습니다: " + itemId));
+        ParamsSnapshot frozen = read(original).params();
+        if (frozen == null) {
+            throw new IllegalStateException("원본 판정 근거에 파라미터가 없습니다: " + original.getId());
+        }
+        return new Chain(all.stream().map(Verdict::getId).toList(), frozen.toParameterSet(), original.getJudgedAt());
+    }
+
+    /** 체인 원장을 제보 단위로 합산해 새 라인과의 차액만 ADJ로 남긴다 — 원 판정과 같은 감쇠 기준(J1). */
+    private void settle(Chain chain, Verdict next, List<LedgerLine> lines, String reason) {
+        Map<UUID, BigDecimal> before = new HashMap<>();
+        Map<UUID, UUID> owner = new HashMap<>();
+        for (ScoreLedgerEntry e : ledger.findByVerdictIdIn(chain.verdictIds())) {
+            if (e.getSubmissionId() == null) continue;
+            before.merge(e.getSubmissionId(), e.getDelta(), BigDecimal::add);
+            owner.put(e.getSubmissionId(), e.getUserId());
+        }
+        Map<UUID, BigDecimal> after = new HashMap<>();
+        for (LedgerLine line : lines) {
+            after.put(line.submissionId(), amount(line.delta()));
+            owner.put(line.submissionId(), line.userId());
+        }
+        Set<UUID> touched = new HashSet<>(before.keySet());
+        touched.addAll(after.keySet());
+        for (UUID submissionId : touched) {
+            BigDecimal diff = after.getOrDefault(submissionId, BigDecimal.ZERO)
+                    .subtract(before.getOrDefault(submissionId, BigDecimal.ZERO));
+            if (diff.signum() != 0) {
+                ledger.save(ScoreLedgerEntry.verdictAdjustment(owner.get(submissionId), submissionId, next.getId(),
+                        diff, reason, chain.params().halflifeDays, chain.anchor()));
+            }
+        }
+    }
+
+    /** 체인 분기는 DB(verdict_superseded_once)가 막는다 — 행 잠금 덕에 거의 없지만 마지막 방어선을 409로 옮긴다. */
+    private Verdict supersede(Verdict next) {
+        try {
+            return verdicts.saveAndFlush(next);
+        } catch (DataIntegrityViolationException e) {
+            throw new JudgeConflictException("다른 요청이 먼저 이 판정을 대체했습니다 — 새로고침 후 다시 시도하세요");
+        }
+    }
+
+    VerdictEvidence read(Verdict v) {
+        try {
+            return objectMapper.readValue(v.getEvidenceJson(), VerdictEvidence.class);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("판정 근거 파싱 실패: " + v.getId(), e);
+        }
     }
 
     // ── 공용 ──────────────────────────────────────────────────────────────

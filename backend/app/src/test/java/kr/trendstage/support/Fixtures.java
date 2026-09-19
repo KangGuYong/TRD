@@ -66,6 +66,21 @@ public class Fixtures {
                 Integer.class, itemId);
     }
 
+    public UUID admin() {
+        return jdbc.queryForObject("INSERT INTO admin_accounts (login_id, display_name, role, password_hash) "
+                + "VALUES (?, '테스트 관리자', 'ADMIN', 'x') RETURNING id", UUID.class, "a_" + rand());
+    }
+
+    /** 적용된 파라미터 드래프트(가장 최근 APPLIED가 현재값). 테스트 끝에 반드시 {@link #deleteDraft}로 지운다 — 공유 DB. */
+    public UUID appliedDraft(String payloadJson) {
+        return jdbc.queryForObject("INSERT INTO parameter_drafts (author_id, status, payload, applied_at) "
+                + "VALUES (?, 'APPLIED', ?::jsonb, now()) RETURNING id", UUID.class, admin(), payloadJson);
+    }
+
+    public void deleteDraft(UUID draftId) {
+        jdbc.update("DELETE FROM parameter_drafts WHERE id = ?", draftId);
+    }
+
     private UUID insertSubmission(UUID userId, UUID itemId, int confidence, Instant createdAt, boolean seed) {
         String key = jdbc.queryForObject("SELECT normalized_key FROM trend_items WHERE id = ?", String.class, itemId);
         return jdbc.queryForObject(
