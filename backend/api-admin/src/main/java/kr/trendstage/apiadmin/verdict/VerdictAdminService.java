@@ -144,11 +144,11 @@ public class VerdictAdminService {
                 plan.result() == VerdictResult.VOID ? null : t,
                 now, evidence, current.getId()));
 
-        reconcileLedger(current, plan, "%s: %s".formatted(auditAction, reason));
+        reconcileLedger(current, plan, "%s: %s".formatted(auditAction, reason), p.halflifeDays, now);
 
         for (LedgerLine line : plan.lines()) {
             Submission sub = subById.get(line.submissionId());
-            if (sub != null) sub.markResult(toSubResult(line.kind()));
+            if (sub != null) sub.markResult(toSubResult(line.kind()), now);
         }
 
         item.transitionTo(plan.result() == VerdictResult.VOID ? TrendState.VOID : TrendState.RESOLVED);
@@ -165,7 +165,8 @@ public class VerdictAdminService {
      * 기존 판정분(verdictId 귀속 원장)과 새 플랜을 유저별로 비교해 차액만 ADJ로 남긴다. 0이면 아무것도 안 남김.
      * approved_by는 users(id) FK라 관리자(admin_accounts.id)를 넣을 수 없다 — 승인자는 감사 로그에만 남긴다.
      */
-    private void reconcileLedger(Verdict oldVerdict, VerdictPlan newPlan, String reason) {
+    private void reconcileLedger(Verdict oldVerdict, VerdictPlan newPlan, String reason,
+                                 int halflifeDays, Instant anchor) {
         Map<UUID, BigDecimal> oldByUser = new HashMap<>();
         for (ScoreLedgerEntry old : ledger.findByVerdictId(oldVerdict.getId())) {
             oldByUser.merge(old.getUserId(), old.getDelta(), BigDecimal::add);
@@ -182,7 +183,7 @@ public class VerdictAdminService {
             BigDecimal diff = newByUser.getOrDefault(userId, BigDecimal.ZERO)
                     .subtract(oldByUser.getOrDefault(userId, BigDecimal.ZERO));
             if (diff.signum() != 0) {
-                ledger.save(ScoreLedgerEntry.adjustment(userId, diff, reason, null, null));
+                ledger.save(ScoreLedgerEntry.adjustment(userId, diff, reason, null, null, halflifeDays, anchor));
             }
         }
     }

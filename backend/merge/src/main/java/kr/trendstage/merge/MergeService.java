@@ -11,6 +11,7 @@ import kr.trendstage.persistence.type.TrendState;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.util.*;
 
@@ -24,12 +25,14 @@ public class MergeService {
     private final TrendItemRepository trendItems;
     private final SubmissionRepository submissions;
     private final AuditLogService auditLogService;
+    private final Clock clock;
 
     public MergeService(TrendItemRepository trendItems, SubmissionRepository submissions,
-                         AuditLogService auditLogService) {
+                         AuditLogService auditLogService, Clock clock) {
         this.trendItems = trendItems;
         this.submissions = submissions;
         this.auditLogService = auditLogService;
+        this.clock = clock;
     }
 
     /**
@@ -86,7 +89,7 @@ public class MergeService {
             return;
         }
         for (Submission s : submissions.findByTrendItemIdAndResultNot(trendItemId, SubmissionResult.VOID)) {
-            s.voidOut();
+            s.voidOut(clock.instant());
         }
         item.transitionTo(TrendState.VOID);
 
@@ -147,7 +150,7 @@ public class MergeService {
         for (Submission s : b) byId.put(s.getId(), s);
 
         Set<UUID> voided = MergeComputation.computeDedup(toInputs(a), toInputs(b));
-        for (UUID id : voided) byId.get(id).voidOut();
+        for (UUID id : voided) byId.get(id).voidOut(clock.instant());
     }
 
     private void mergeAliases(TrendItem survivor, TrendItem loser) {

@@ -125,11 +125,12 @@ public class VerdictRunner {
         for (LedgerLine line : plan.lines()) {
             Submission sub = subById.get(line.submissionId());
             if (sub == null) continue;
-            sub.markResult(toSubResult(line.kind()));
+            sub.markResult(toSubResult(line.kind()), judgedAt);
             if (!sub.isSeed() && line.kind() != VerdictResult.VOID) {
                 ledger.save(ScoreLedgerEntry.ofVerdict(
                         line.userId(), line.submissionId(), verdict.getId(),
-                        toLedgerKind(line.kind()), BigDecimal.valueOf(line.delta()), line.reason()));
+                        toLedgerKind(line.kind()), BigDecimal.valueOf(line.delta()), line.reason(),
+                        p.halflifeDays, judgedAt));
             }
             // VOID면 제보권 반환은 QuotaService 도입 후 처리(TODO)
         }

@@ -41,9 +41,11 @@ public abstract class AbstractIntegrationTest {
     @Autowired protected MockMvc mvc;
     @Autowired protected JdbcTemplate jdbc;
     @Autowired protected MutableClock clock;
+    protected Fixtures fx;
 
     @BeforeEach
     void resetClock() {
         clock.reset();
+        fx = new Fixtures(jdbc);
     }
 }

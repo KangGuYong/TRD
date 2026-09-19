@@ -1,0 +1,81 @@
+package kr.trendstage.support;
+
+import org.springframework.jdbc.core.JdbcTemplate;
+
+import java.math.BigDecimal;
+import java.sql.Timestamp;
+import java.time.Instant;
+import java.util.UUID;
+
+/**
+ * 판정 파이프라인 통합 테스트 데이터. JDBC로 직접 넣어 created_at·first_seen_at을 과거로 정할 수 있다.
+ * 모든 테스트 클래스가 DB 하나를 공유하므로 이름·키는 항상 랜덤이다.
+ */
+public class Fixtures {
+
+    private final JdbcTemplate jdbc;
+
+    public Fixtures(JdbcTemplate jdbc) {
+        this.jdbc = jdbc;
+    }
+
+    public UUID user() {
+        return jdbc.queryForObject("INSERT INTO users (handle) VALUES (?) RETURNING id", UUID.class, "u_" + rand());
+    }
+
+    /** PENDING 항목. 관측 마감 = firstSeenAt + 14일. */
+    public UUID item(Instant firstSeenAt) {
+        String key = "k_" + rand();
+        return jdbc.queryForObject(
+                "INSERT INTO trend_items (canonical_name, normalized_key, category, state, first_seen_at) "
+                        + "VALUES (?, ?, 'MEME', 'PENDING', ?) RETURNING id",
+                UUID.class, key, key, Timestamp.from(firstSeenAt));
+    }
+
+    public UUID submission(UUID userId, UUID itemId, int confidence, Instant createdAt) {
+        return insertSubmission(userId, itemId, confidence, createdAt, false);
+    }
+
+    public UUID seedSubmission(UUID userId, UUID itemId, Instant createdAt) {
+        return insertSubmission(userId, itemId, 30, createdAt, true);
+    }
+
+    public void voidSubmission(UUID submissionId, Instant at) {
+        jdbc.update("UPDATE submissions SET result = 'VOID', voided_at = ? WHERE id = ?", Timestamp.from(at), submissionId);
+    }
+
+    public String submissionResult(UUID submissionId) {
+        return jdbc.queryForObject("SELECT result::text FROM submissions WHERE id = ?", String.class, submissionId);
+    }
+
+    public String itemState(UUID itemId) {
+        return jdbc.queryForObject("SELECT state::text FROM trend_items WHERE id = ?", String.class, itemId);
+    }
+
+    /** 이 항목의 판정 체인에 귀속된 원장의 유저별 합(ADJ 포함). */
+    public BigDecimal ledgerSum(UUID userId, UUID itemId) {
+        return jdbc.queryForObject(
+                "SELECT coalesce(sum(l.delta), 0) FROM score_ledger l JOIN verdicts v ON v.id = l.verdict_id "
+                        + "WHERE l.user_id = ? AND v.trend_item_id = ?",
+                BigDecimal.class, userId, itemId);
+    }
+
+    public int ledgerRows(UUID itemId) {
+        return jdbc.queryForObject(
+                "SELECT count(*) FROM score_ledger l JOIN verdicts v ON v.id = l.verdict_id WHERE v.trend_item_id = ?",
+                Integer.class, itemId);
+    }
+
+    private UUID insertSubmission(UUID userId, UUID itemId, int confidence, Instant createdAt, boolean seed) {
+        String key = jdbc.queryForObject("SELECT normalized_key FROM trend_items WHERE id = ?", String.class, itemId);
+        return jdbc.queryForObject(
+                "INSERT INTO submissions (user_id, trend_item_id, raw_input, normalized_key, confidence, "
+                        + "source_platform, evidence_url, one_line, created_at, is_seed) "
+                        + "VALUES (?, ?, ?, ?, ?, 'X', 'https://example.com', '설명', ?, ?) RETURNING id",
+                UUID.class, userId, itemId, key, key, confidence, Timestamp.from(createdAt), seed);
+    }
+
+    static String rand() {
+        return UUID.randomUUID().toString().substring(0, 8);
+    }
+}

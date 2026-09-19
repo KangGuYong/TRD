@@ -54,6 +54,14 @@ public class Submission {
     @Column(name = "is_seed", nullable = false)
     private boolean seed;
 
+    /** VOID된 시각 — 이 시각이 속한 주에 제보권이 반환된다(J4). result = VOID와 함께만 존재(DB CHECK). */
+    @Column(name = "voided_at")
+    private Instant voidedAt;
+
+    /** 처음 HIT/MISS로 판정된 시각 — TI 180일 창의 기준. 재판정해도 유지한다. */
+    @Column(name = "resolved_at")
+    private Instant resolvedAt;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt = Instant.now();
 
@@ -86,10 +94,27 @@ public class Submission {
     public boolean isSeed() { return seed; }
     public Instant getCreatedAt() { return createdAt; }
 
-    public void markResult(SubmissionResult r) { this.result = r; }
+    public Instant getVoidedAt() { return voidedAt; }
+    public Instant getResolvedAt() { return resolvedAt; }
 
-    /** 같은 유저 중복 병합 시 늦은 쪽 VOID + 제보권 반환(03 §4.4). */
-    public void voidOut() { this.result = SubmissionResult.VOID; }
+    /** 판정 결과 기록. VOID면 {@link #voidOut}. HIT/MISS는 처음 판정된 시각만 남긴다. */
+    public void markResult(SubmissionResult r, Instant at) {
+        if (r == SubmissionResult.VOID) {
+            voidOut(at);
+            return;
+        }
+        this.result = r;
+        if (this.resolvedAt == null && (r == SubmissionResult.HIT || r == SubmissionResult.MISS)) {
+            this.resolvedAt = at;
+        }
+    }
+
+    /** VOID 처리(항목 VOID·같은 유저 중복, 03 §4.4). voided_at이 제보권 반환 시점이다(J4). 이미 VOID면 그대로 둔다. */
+    public void voidOut(Instant at) {
+        if (this.result == SubmissionResult.VOID) return;
+        this.result = SubmissionResult.VOID;
+        this.voidedAt = at;
+    }
 
     /** 병합 시 패자 클러스터의 제보를 승자로 재배정(03 §3). VOID된 제보도 감사 추적 연속성을 위해 함께 옮긴다. */
     public void reassignTrendItem(UUID survivorTrendItemId) { this.trendItemId = survivorTrendItemId; }
