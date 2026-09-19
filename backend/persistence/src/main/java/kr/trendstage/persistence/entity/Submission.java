@@ -82,6 +82,15 @@ public class Submission {
         this.seed = seed;
     }
 
+    /** 생성 시각을 명시(Clock). created_at은 order_rank 기준이라 이후 바뀌지 않는다. */
+    public Submission(UUID userId, UUID trendItemId, String rawInput, String normalizedKey,
+                      short confidence, String sourcePlatform, String evidenceUrl, String oneLine,
+                      boolean disclosure, boolean seed, Instant createdAt) {
+        this(userId, trendItemId, rawInput, normalizedKey, confidence, sourcePlatform, evidenceUrl, oneLine,
+                disclosure, seed);
+        this.createdAt = createdAt;
+    }
+
     public UUID getId() { return id; }
     public UUID getUserId() { return userId; }
     public UUID getTrendItemId() { return trendItemId; }

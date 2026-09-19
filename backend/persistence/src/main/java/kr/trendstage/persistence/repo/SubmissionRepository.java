@@ -40,6 +40,9 @@ public interface SubmissionRepository extends JpaRepository<Submission, UUID> {
 
     long countByCreatedAtAfterAndSeedTrue(Instant since);
 
-    /** 나 탭 제보권 표시용 — 이번 주(월요일 0시 KST 이후) 유효 제보 수. */
-    long countByUserIdAndCreatedAtAfterAndResultNot(UUID userId, Instant since, SubmissionResult excluded);
+    /** 제보권: 이번 주에 낸 제보 수(시딩 제외, VOID 여부 무관 — J4). */
+    long countByUserIdAndSeedFalseAndCreatedAtGreaterThanEqual(UUID userId, Instant since);
+
+    /** 제보권: 이번 주에 VOID로 반환된 제보 수(시딩 제외, 지난주에 낸 것 포함 — J4). */
+    long countByUserIdAndSeedFalseAndVoidedAtGreaterThanEqual(UUID userId, Instant since);
 }

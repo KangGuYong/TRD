@@ -11,7 +11,6 @@ import kr.trendstage.apipublic.web.PreferencesResponse;
 import kr.trendstage.domain.grade.Grade;
 import kr.trendstage.domain.grade.GradePolicy;
 import kr.trendstage.domain.grade.GradeStatus;
-import kr.trendstage.domain.grade.SubmissionQuota;
 import kr.trendstage.domain.params.ParameterSet;
 import kr.trendstage.domain.score.ActiveScore;
 import kr.trendstage.domain.score.TrustIndex;
@@ -34,10 +33,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
-import java.time.DayOfWeek;
 import java.time.Duration;
-import java.time.ZoneId;
-import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -51,7 +47,6 @@ import java.util.UUID;
 @Service
 public class MeService {
 
-    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
     private static final Map<Grade, String> GRADE_NAMES = Map.of(
             Grade.L0, "관찰자", Grade.L1, "제보자", Grade.L2, "탐지자", Grade.L3, "분석가", Grade.L4, "선구자"
     );
@@ -62,12 +57,15 @@ public class MeService {
     private final VoteRepository votes;
     private final VerdictRepository verdicts;
     private final UserPreferenceRepository preferences;
+    private final QuotaService quotaService;
     private final Clock clock;
 
     public MeService(SubmissionRepository submissions, ScoreLedgerRepository ledger, TrendItemRepository trends,
-                     VoteRepository votes, VerdictRepository verdicts, UserPreferenceRepository preferences, Clock clock) {
+                     VoteRepository votes, VerdictRepository verdicts, UserPreferenceRepository preferences,
+                     QuotaService quotaService, Clock clock) {
         this.submissions = submissions; this.ledger = ledger; this.trends = trends;
-        this.votes = votes; this.verdicts = verdicts; this.preferences = preferences; this.clock = clock;
+        this.votes = votes; this.verdicts = verdicts; this.preferences = preferences;
+        this.quotaService = quotaService; this.clock = clock;
     }
 
     @Transactional(readOnly = true)
@@ -90,14 +88,7 @@ public class MeService {
 
     @Transactional(readOnly = true)
     public MeSummaryResponse summary(UUID userId) {
-        GradeStatus status = computeGradeStatus(userId);
-        int quotaMax = SubmissionQuota.weeklyLimit(status.current());
-
-        var now = clock.instant();
-        var weekStart = now.atZone(KST).toLocalDate()
-                .with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
-                .atStartOfDay(KST).toInstant();
-        int quotaUsed = (int) submissions.countByUserIdAndCreatedAtAfterAndResultNot(userId, weekStart, SubmissionResult.VOID);
+        QuotaService.Quota quota = quotaService.of(userId, clock.instant());
 
         List<VoteAccuracy.VoteOutcome> outcomes = new ArrayList<>();
         for (Vote v : votes.findByUserId(userId)) {
@@ -109,7 +100,7 @@ public class MeService {
         VoteAccuracy.Result acc = VoteAccuracy.compute(outcomes);
 
         // streakDays/totalRead: reads 테이블이 없어 계산 불가 — 항상 0. 프론트는 이 두 값을 표시에 쓰지 않는다.
-        return new MeSummaryResponse(0, quotaUsed, quotaMax, acc.hitRate(), acc.total(), acc.correct(), 0);
+        return new MeSummaryResponse(0, quota.used(), quota.max(), acc.hitRate(), acc.total(), acc.correct(), 0);
     }
 
     @Transactional(readOnly = true)

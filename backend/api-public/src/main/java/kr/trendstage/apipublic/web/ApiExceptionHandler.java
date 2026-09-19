@@ -59,7 +59,22 @@ public class ApiExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(problem(409, e.getMessage()));
     }
 
+    @ExceptionHandler(QuotaExhaustedException.class)
+    public ResponseEntity<Map<String, Object>> handle(QuotaExhaustedException e) {
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(problem("quota-exhausted", 422, e.getMessage()));
+    }
+
+    @ExceptionHandler(ItemClosedException.class)
+    public ResponseEntity<Map<String, Object>> handle(ItemClosedException e) {
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(problem("item-closed", 422, e.getMessage()));
+    }
+
     private Map<String, Object> problem(int status, String detail) {
-        return Map.of("type", "about:blank", "status", status, "detail", detail == null ? "" : detail);
+        return problem("about:blank", status, detail);
+    }
+
+    /** RFC 9457. type으로 앱이 오류 종류를 구분한다(quota-exhausted·item-closed). */
+    private Map<String, Object> problem(String type, int status, String detail) {
+        return Map.of("type", type, "status", status, "detail", detail == null ? "" : detail);
     }
 }
