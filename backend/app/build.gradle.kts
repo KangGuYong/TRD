@@ -9,6 +9,7 @@ dependencies {
     implementation(project(":scheduler"))
     implementation(project(":audit"))
     implementation(project(":merge"))
+    implementation(project(":judge"))
     implementation(project(":persistence"))
     implementation(project(":domain-core"))
     implementation("org.springframework.boot:spring-boot-starter-actuator")

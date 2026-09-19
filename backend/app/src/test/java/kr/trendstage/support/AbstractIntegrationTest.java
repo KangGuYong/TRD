@@ -48,4 +48,13 @@ public abstract class AbstractIntegrationTest {
         clock.reset();
         fx = new Fixtures(jdbc);
     }
+
+    /**
+     * 배치의 ShedLock(lockAtLeastFor = PT1M)을 만료시켜 곧바로 다시 실행할 수 있게 한다. 배치를 부르기 전에 항상 호출한다.
+     * 행을 DELETE하면 안 된다 — JdbcTemplateLockProvider는 한 번 만든 행을 기억해 이후 UPDATE만 시도하므로,
+     * 행이 없으면 락을 못 잡고 배치가 조용히 건너뛰어진다.
+     */
+    protected void releaseBatchLock(String name) {
+        jdbc.update("UPDATE shedlock SET lock_until = TIMESTAMP '1970-01-01' WHERE name = ?", name);
+    }
 }

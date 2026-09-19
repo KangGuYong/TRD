@@ -32,7 +32,7 @@
     끝나면 `docker volume rm trd-gradle-test-cache`로 캐시를 지워도 된다(다음 실행이 느려질 뿐).
 - **DB 초기화.** 이 브랜치로 앱을 로컬 DB에 띄우기 전에 기존 판정 데이터를 비운다(V28이 남은 판정을 발견하면 기동을 멈춘다 — J7). Docker: `docker compose -f infra/docker-compose.yml down` 후 `docker volume rm infra_trd-db`.
 - **공유 테스트 DB.** 모든 통합 테스트 클래스가 컨테이너 하나를 공유한다(`AbstractIntegrationTest`). 이름·키는 항상 랜덤으로 만들고, 단언은 자기가 만든 데이터로만 한다. 배치(`VerdictRunner.run()`, `GradeRecalcJob.run()`)는 DB 전체를 처리하므로 개수 단언을 하지 않는다.
-- **ShedLock.** 배치의 `@SchedulerLock(lockAtLeastFor = "PT1M")` 때문에 1분 안에 두 번 부르면 두 번째는 조용히 건너뛴다. 테스트에서 배치를 부를 때는 반드시 먼저 `DELETE FROM shedlock WHERE name = ?`를 실행한다(각 테스트의 `runBatch()`·`runGradeRecalc()` 헬퍼).
+- **ShedLock.** 배치의 `@SchedulerLock(lockAtLeastFor = "PT1M")` 때문에 1분 안에 두 번 부르면 두 번째는 조용히 건너뛴다. 테스트에서 배치를 부를 때는 반드시 먼저 `AbstractIntegrationTest.releaseBatchLock(name)`(lock_until을 과거로)을 부른다. **행을 DELETE하면 안 된다** — `JdbcTemplateLockProvider`가 행이 있다고 기억해 UPDATE만 시도하므로 락을 못 잡고 조용히 건너뛴다(Task 4 구현 중 확인). 헬퍼는 Task 4에서 추가한다.
 - 순서: Task 1~8 백엔드 → Task 9 API 계약 → Task 10 프론트 → Task 11 문서 → Task 12 최종 검증·PR. **각 태스크가 끝나면 전체 컴파일(`compileJava compileTestJava`)과 해당 테스트가 통과해야 한다.**
 
 ## 파일 구조
@@ -1265,7 +1265,7 @@ class JudgePipelineTest extends AbstractIntegrationTest {
     }
 
     private void runBatch() {
-        jdbc.update("DELETE FROM shedlock WHERE name = 'verdict_runner'");
+        releaseBatchLock("verdict_runner");
         runner.run();
     }
 
@@ -1323,7 +1323,7 @@ class VerdictRunnerRetryTest extends AbstractIntegrationTest {
     }
 
     private void runBatch() {
-        jdbc.update("DELETE FROM shedlock WHERE name = 'verdict_runner'");
+        releaseBatchLock("verdict_runner");
         runner.run();
     }
 }
@@ -2847,7 +2847,7 @@ class GradeRecalcTest extends AbstractIntegrationTest {
     }
 
     private void runGradeRecalc() {
-        jdbc.update("DELETE FROM shedlock WHERE name = 'grade_recalc'");
+        releaseBatchLock("grade_recalc");
         job.run();
     }
 
