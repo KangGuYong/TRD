@@ -64,9 +64,6 @@ services:
       ADMIN_BOOTSTRAP_PASSWORD: ${ADMIN_BOOTSTRAP_PASSWORD:-}
       # Firebase 서비스 계정 키(컨테이너 안 경로). 비어 있으면 앱은 뜨고, 인증이 필요한 /v1 요청만 401.
       FIREBASE_CREDENTIALS_PATH: ${FIREBASE_CREDENTIALS_PATH:-}
-      # 컨테이너 JVM은 UTC다. 일 배치 기본값(17:00·18:00 UTC = 02:00·03:00 KST)은 그대로 맞지만
-      # 주간 grade_recalc 기본값(월 00:00)은 UTC 기준이 돼 버리므로 월 00:00 KST(= 일 15:00 UTC)로 맞춘다.
-      JOBS_GRADE_RECALC_CRON: "${JOBS_GRADE_RECALC_CRON:-0 0 15 * * SUN}"
     volumes:
       # Firebase 키 같은 시크릿 파일은 infra/secrets/ 에 둔다(gitignore 대상 — secrets/README.md).
       - ./secrets:/run/secrets/trd:ro

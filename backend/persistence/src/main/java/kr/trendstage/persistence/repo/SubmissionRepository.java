@@ -45,4 +45,10 @@ public interface SubmissionRepository extends JpaRepository<Submission, UUID> {
 
     /** 제보권: 이번 주에 VOID로 반환된 제보 수(시딩 제외, 지난주에 낸 것 포함 — J4). */
     long countByUserIdAndSeedFalseAndVoidedAtGreaterThanEqual(UUID userId, Instant since);
+
+    /** TI 창(최근 180일) — 처음 판정 시각 기준, 시딩 제외. */
+    long countByUserIdAndResultAndSeedFalseAndResolvedAtGreaterThanEqual(UUID userId, SubmissionResult result, Instant since);
+
+    /** 판정완료 건수(전 기간), 시딩 제외. */
+    long countByUserIdAndResultAndSeedFalse(UUID userId, SubmissionResult result);
 }

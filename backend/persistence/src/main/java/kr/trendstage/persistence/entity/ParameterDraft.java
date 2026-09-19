@@ -84,7 +84,7 @@ public class ParameterDraft {
         this.approvalId = approvalId;
     }
 
-    /** 2인 승인 2/2 실행(ApprovalExecutor) 시 호출 — 이후 ParameterSetProvider가 이 값을 읽는다. */
+    /** 2인 승인 2/2 실행(ApprovalExecutor) 시 호출 — 이후 CurrentParameterSetResolver가 이 값을 읽는다. */
     public void markApplied(Instant appliedAt) {
         this.status = ParamStatus.APPLIED;
         this.appliedAt = appliedAt;

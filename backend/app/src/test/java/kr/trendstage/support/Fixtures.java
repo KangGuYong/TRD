@@ -81,6 +81,27 @@ public class Fixtures {
         jdbc.update("DELETE FROM parameter_drafts WHERE id = ?", draftId);
     }
 
+    /** 이미 판정된 제보(항목 포함, 항목은 RESOLVED — 다른 테스트의 배치가 다시 판정하지 않게). TI·판정완료 건수 테스트용. */
+    public UUID judgedSubmission(UUID userId, String result, Instant resolvedAt) {
+        UUID item = item(resolvedAt.minus(java.time.Duration.ofDays(15)));
+        UUID s = submission(userId, item, 30, resolvedAt.minus(java.time.Duration.ofDays(14)));
+        jdbc.update("UPDATE submissions SET result = ?::submission_result, resolved_at = ? WHERE id = ?",
+                result, Timestamp.from(resolvedAt), s);
+        jdbc.update("UPDATE trend_items SET state = 'RESOLVED' WHERE id = ?", item);
+        return s;
+    }
+
+    /** 판정과 무관한 원장 한 행(AS 테스트용). */
+    public void ledgerRow(UUID userId, double delta, int halflifeDays, Instant anchor) {
+        jdbc.update("INSERT INTO score_ledger (user_id, kind, delta, reason, halflife_days, decay_anchor_at) "
+                + "VALUES (?, 'ADJ', ?, '테스트', ?, ?)", userId, delta, halflifeDays, Timestamp.from(anchor));
+    }
+
+    public void gradeSnapshot(UUID userId, String grade, Instant computedAt) {
+        jdbc.update("INSERT INTO user_grades (user_id, grade, trust_index, active_score, judged_count, computed_at) "
+                + "VALUES (?, ?::grade_level, 0.5, 40, 6, ?)", userId, grade, Timestamp.from(computedAt));
+    }
+
     private UUID insertSubmission(UUID userId, UUID itemId, int confidence, Instant createdAt, boolean seed) {
         String key = jdbc.queryForObject("SELECT normalized_key FROM trend_items WHERE id = ?", String.class, itemId);
         return jdbc.queryForObject(
