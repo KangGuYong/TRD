@@ -6,7 +6,10 @@ import kr.trendstage.domain.score.*;
 import kr.trendstage.domain.verdict.*;
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
+import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -59,13 +62,13 @@ class EngineGoldenTest {
 
     @Test void verdict_밴드는_distinctSubmitters_비율로_정해진다() {
         // submitterTarget=20(기본). distinctSubmitters=12 → T=0.6 → HIT L3
-        VerdictOutcome o = VerdictEngine.evaluate(new SubmissionSignal(12, 3), p);
+        VerdictOutcome o = VerdictEngine.evaluate(signalOf(12), p);
         assertEquals(VerdictResult.HIT, o.result());
         assertEquals(ReachLevel.L3, o.reach());
         // distinctSubmitters=20 → T=1.0 → HIT L4
-        assertEquals(ReachLevel.L4, VerdictEngine.evaluate(new SubmissionSignal(20, 1), p).reach());
+        assertEquals(ReachLevel.L4, VerdictEngine.evaluate(signalOf(20), p).reach());
         // distinctSubmitters=2 → T=0.1 < hitThreshold → MISS
-        assertEquals(VerdictResult.MISS, VerdictEngine.evaluate(new SubmissionSignal(2, 1), p).result());
+        assertEquals(VerdictResult.MISS, VerdictEngine.evaluate(signalOf(2), p).result());
     }
 
     @Test void grade_는_AS와_TI를_모두_요구() {
@@ -82,5 +85,11 @@ class EngineGoldenTest {
         assertEquals(GradeRequirementKind.JUDGED_COUNT, gs.requirements().get(0).kind());
         assertEquals(GradeRequirementKind.TRUST_INDEX, gs.requirements().get(1).kind());
         assertEquals(GradeRequirementKind.ACTIVE_SCORE, gs.requirements().get(2).kind());
+    }
+
+    private static TrendSignal signalOf(int distinctSubmitters) {
+        Instant t = Instant.parse("2026-09-01T00:00:00Z");
+        return new TrendSignal(t, IntStream.range(0, distinctSubmitters)
+                .mapToObj(i -> new TrendSignal.Entry(UUID.randomUUID(), UUID.randomUUID(), false, t, "X", t)).toList());
     }
 }

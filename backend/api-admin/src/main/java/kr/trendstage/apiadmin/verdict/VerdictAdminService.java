@@ -146,10 +146,7 @@ public class VerdictAdminService {
 
         reconcileLedger(current, plan, "%s: %s".formatted(auditAction, reason), p.halflifeDays, now);
 
-        for (LedgerLine line : plan.lines()) {
-            Submission sub = subById.get(line.submissionId());
-            if (sub != null) sub.markResult(toSubResult(line.kind()), now);
-        }
+        for (Submission s : subEntities) s.markResult(toSubResult(plan.result()), now);
 
         item.transitionTo(plan.result() == VerdictResult.VOID ? TrendState.VOID : TrendState.RESOLVED);
 
@@ -172,7 +169,7 @@ public class VerdictAdminService {
             oldByUser.merge(old.getUserId(), old.getDelta(), BigDecimal::add);
         }
         Map<UUID, BigDecimal> newByUser = new HashMap<>();
-        for (LedgerLine line : newPlan.lines()) {
+        for (LedgerLine line : newPlan.ledgerLines()) {
             if (line.kind() == VerdictResult.VOID) continue; // VOID 라인은 항상 delta 0
             newByUser.merge(line.userId(), BigDecimal.valueOf(line.delta()), BigDecimal::add);
         }

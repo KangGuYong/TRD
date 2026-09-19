@@ -121,18 +121,14 @@ public class VerdictRunner {
                 plan.result() == VerdictResult.VOID ? null : t,
                 judgedAt, evidence, null));
 
-        // 5) score_ledger + 제보 결과 반영 (시딩분은 원장 제외)
-        for (LedgerLine line : plan.lines()) {
-            Submission sub = subById.get(line.submissionId());
-            if (sub == null) continue;
-            sub.markResult(toSubResult(line.kind()), judgedAt);
-            if (!sub.isSeed() && line.kind() != VerdictResult.VOID) {
-                ledger.save(ScoreLedgerEntry.ofVerdict(
-                        line.userId(), line.submissionId(), verdict.getId(),
-                        toLedgerKind(line.kind()), BigDecimal.valueOf(line.delta()), line.reason(),
-                        p.halflifeDays, judgedAt));
-            }
-            // VOID면 제보권 반환은 QuotaService 도입 후 처리(TODO)
+        // 5) score_ledger(시딩 제외는 plan이 보장) + 제보 결과(시딩 포함 전부)
+        for (LedgerLine line : plan.ledgerLines()) {
+            ledger.save(ScoreLedgerEntry.ofVerdict(
+                    line.userId(), line.submissionId(), verdict.getId(),
+                    toLedgerKind(line.kind()), BigDecimal.valueOf(line.delta()), line.reason(), p.halflifeDays, judgedAt));
+        }
+        for (Submission s : subEntities) {
+            s.markResult(toSubResult(plan.result()), judgedAt);
         }
 
         // 6) 항목 상태 전이
