@@ -42,8 +42,8 @@
 | 상호작용 | API | 스펙 | 구현 | 비고 |
 |---|---|:--:|:--:|---|
 | 항목명 입력 시 중복 감지 | `GET /v1/trends?q=…`(디바운스) | ✅ | 🔶 | **미구현**(A-4 참조) — 확정 방어는 `POST` 409(구현됨)로 이뤄지므로, 현재 클라이언트 쪽 사전 중복 감지는 사실상 없고 서버 409 응답에만 의존한다 |
-| 제보권 잔량(도트) | `GET /v1/me/summary` | ✅ | ✅ | 표시만(`quotaUsed`/`quotaMax`는 매 요청마다 그 주 제보 수를 세어 계산) — 차감·리필은 `QuotaService` 자체가 없어 **미구현(SP1)** |
-| 제보하기(카테고리·플랫폼·URL·확신도·고지) | `POST /v1/submissions` | ✅ | ✅ | 201 / 409(중복) / 422(권한·누락) |
+| 제보권 잔량(도트) | `GET /v1/me/summary` | ✅ | ✅ | `quotaUsed` = 이번 주(월 00:00 KST~) 낸 제보 − 이번 주 VOID 반환, `quotaMax` = 주간 스냅샷 등급의 한도. 집행과 같은 `QuotaService`. 제보 탭에 남은 장수 표시, 소진 시 제출 버튼 비활성 |
+| 제보하기(카테고리·플랫폼·URL·확신도·고지) | `POST /v1/submissions` | ✅ | ✅ | 201 / 409(중복) / 422 — `type`: `quota-exhausted`(제보권 소진) · `item-closed`(관측 마감·판정 중/완료·VOID·병합된 항목, 제보권 미차감) · `about:blank`(필드 오류) |
 | "동의로 올리기" | `POST /v1/trends/{id}/endorse` | ✅ | ✅ | 제보권 미차감 |
 | 내 제보 탭 (판정 상태·Δ) | `GET /v1/submissions/me` | ✅ | ✅ | PENDING/HIT/MISS/VOID |
 
@@ -55,7 +55,7 @@
 ### A-7. 나 · 등급 · 원장
 | 상호작용 | API | 스펙 | 구현 | 비고 |
 |---|---|:--:|:--:|---|
-| 등급·다음 승급 부족분 | `GET /v1/me/grade` | ✅ | ✅ | `requirements[].basis` 산정근거 동봉(R3) |
+| 등급·다음 승급 부족분 | `GET /v1/me/grade` | ✅ | ✅ | `grade`는 주간 스냅샷(월 00:00 KST). `requirements[].basis`는 다음 등급까지를 지금 값(TI 180일·AS 행별 감쇠)으로 계산한 산정근거(R3). 요건을 다 채우면 `note`로 반영 시점 안내 |
 | 점수 원장 전건 | `GET /v1/me/ledger` | ✅ | ✅ | append-only |
 | 통계(적중률·읽은 트렌드) | `GET /v1/me/summary` | ✅ | ✅ | |
 | 명예의 전당(상위 10, 동의자 한정 노출) | `GET /v1/leaderboard` | ✅ | 🔶 | **미구현** — 컨트롤러 없음(전 소스 검색 결과 `leaderboard` 관련 구현체 없음). 스펙만 정의돼 있고 화면·백엔드 모두 미착수 |
@@ -85,7 +85,7 @@
 | 큐 로드(유사도·양쪽 비교·선점 미리보기) | `GET /admin/merge-queue` | ✅ | ✅ | R/O/A/Au(조회) |
 | 병합 결정 미리보기(dry-run) | `GET /admin/merge-queue/{id}/preview` | 🔶 | ✅ | R/O/A/Au · 실제 병합과 같은 계산(`MergeService.preview`)을 공유하므로 결과가 실제 병합과 일치한다 |
 | 병합 / 분리 | `POST /admin/merge-queue/{id}/merge` · `…/separate` | 🔶 | ✅ | R/O/A · `openapi.yaml`은 구식 단일 `POST …/action`(action enum)만 정의 — 실제 경로 3종 미반영, 스펙 갱신(치환) 필요. `Idempotency-Key` 헤더·사유 필수 검증은 컨트롤러에 없음 — **미구현(SP2)** |
-| VOID(허위/규정위반) | `POST /admin/merge-queue/{id}/void` | 🔶 | ✅ | **O/A**(R은 403) · 위와 동일한 스펙 불일치. 사유 필수 검증은 서버에 없음(`@RequestBody(required=false)`) — **미구현(SP2)** |
+| VOID(허위/규정위반) | `POST /admin/merge-queue/{id}/void` | 🔶 | ✅ | **O/A**(R은 403) · 위와 동일한 스펙 불일치. `JudgeService.voidItem` 경유(ADM-200 VOID와 같은 경로 — 판정된 항목이면 원장 상쇄까지, VOID·병합된 항목은 409). 사유 필수 검증은 서버에 없음(`@RequestBody(required=false)`) — **미구현(SP2)** |
 | 클레임 / 해제 | `POST /admin/merge-queue/{id}/claim` · `…/release` | 🔶 | 🔶 | **미구현(SP2)** — R/O/A · 15분 만료 설계값, 컨트롤러 없음 |
 | 보류(HOLD) | `POST /admin/merge-queue/{id}/hold` | 🔶 | 🔶 | **미구현(SP2)** — R/O/A · 3회 → ESCALATED 설계값, 컨트롤러 없음 |
 
@@ -99,7 +99,7 @@
 | 상호작용 | API | 스펙 | 구현 | 비고 |
 |---|---|:--:|:--:|---|
 | 큐 로드(판정 완료 목록 + D+14 임박 30건) | `GET /admin/verdicts` | 🔶 | ✅ | R 불가 · O/A/Au · 스펙엔 이 목록 조회 자체가 없음(추가 필요) |
-| VOID / 재판정 | `POST /admin/verdicts/{id}/void` · `…/rejudge` | 🔶 | ✅ | **O/A** · 사유 **서버 필수**(`VerdictAdminService.requireReason`, 없으면 예외) · 재판정 ADJ 합계 >100 → `ApprovalGate` **미구현(SP3)** · 스펙은 여전히 구경로 `POST /admin/trends/{id}/exceptions`(type 파라미터로 VOID/EXTEND/REJUDGE 분기) 하나만 정의 — 치환 필요 |
+| VOID / 재판정 | `POST /admin/verdicts/{id}/void` · `…/rejudge` | 🔶 | ✅ | **O/A** · 사유 **서버 필수**(`VerdictAdminService.requireReason`, 없으면 예외) · `JudgeService` 경유 — 재판정은 원 판정 파라미터·제보 단위 ADJ, VOID는 항목 VOID(원장 전액 상쇄). 이미 VOID된 항목은 409 · 재판정 ADJ 합계 >100 → `ApprovalGate` **미구현(SP3)** · 스펙은 여전히 구경로 `POST /admin/trends/{id}/exceptions`(type 파라미터로 VOID/EXTEND/REJUDGE 분기) 하나만 정의 — 치환 필요 |
 | 유예연장 | `POST /admin/verdicts/{id}/extend-grace` | 🔶 | ✅ | **O/A** · 사유는 **서버가 요구하지 않는다** — `VerdictAdminService.extendGrace`는 `requireReason`을 호출하지 않고, `reason`이 null이면 빈 문자열로 감사 로그에만 남긴다. 1~90일(`MAX_GRACE_DAYS`) 범위·최대 유예 도달 여부만 검증. 위와 동일한 스펙 불일치 |
 | ~~HIT/MISS 변경·T 수동입력·verdict 삭제~~ | **엔드포인트 없음** | — | — | 금지기능(R1) |
 

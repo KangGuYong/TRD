@@ -31,7 +31,7 @@
                                     [제보권 리필 · 배지 갱신]
 ```
 
-> 이 다이어그램은 목표 구조다. `JudgeService`는 SP1에서 신설(현행은 `VerdictRunner`/`VerdictAdminService`가 판정 로직을 각각 보유). `verdict_runner`는 매일 실행되어 `verdicts`·`score_ledger`는 정상 기록하지만, self-invocation으로 트랜잭션이 걸리지 않아(4.3 참조) 제보 result·항목 상태는 배치 경로로는 갱신되지 않으며, TI도 사실상 0.4에 머문다(관리자 재판정 경로만 예외). **제보권 리필** 단계는 현행 미구현(3.3 참조, SP1). 시딩 제보가 T 집계에 섞이는 문제도 미해결(4.1 참조).
+> 판정은 `JudgeService`(`judge` 모듈) 하나가 배치·재판정·항목 VOID·미리보기를 모두 수행한다. `verdict_runner`는 목록을 순회만 하고 항목마다 `JudgeService`의 트랜잭션으로 판정·원장·제보 result·항목 상태를 함께 기록한다(4.3). **제보권 리필**은 배치가 아니라 주 경계(월 00:00 KST) 자체다(3.3). 시딩은 판정 신호에서 빠진다(4.1).
 
 핵심 분리 원칙 세 가지.
 
@@ -49,12 +49,12 @@
 |---|---|---|
 | `users` | 회원 | id, joined_at, verified_at, status |
 | `trend_items` | 병합된 트렌드 항목(클러스터) | id, canonical_name, aliases[], category, first_seen_at, state |
-| `submissions` | 개별 제보 | id, user_id, trend_item_id, raw_input, confidence, disclosure, is_seed, created_at |
-| `submission_order_rank` | 선점 순위 **파생 뷰**(저장 컬럼 아님). `created_at` 기준 `RANK()`, VOID 제외. 판정 시 `verdicts.evidence_json`으로 동결 | id, trend_item_id, order_rank |
+| `submissions` | 개별 제보 | id, user_id, trend_item_id, raw_input, confidence, disclosure, is_seed, result, voided_at, resolved_at, created_at |
+| `submission_order_rank` | 선점 순위 **파생 뷰**(저장 컬럼 아님). `created_at` 기준 `RANK()`, VOID·시딩 제외. 판정 시 `verdicts.evidence_json`으로 동결 | id, trend_item_id, order_rank |
 | `endorsements` | 중복 제보의 동의 처리분(현행: 저장만, 점수·판정 미반영) | submission_id, user_id, created_at |
 | `merge_queue` | 회색지대 병합 후보 큐 | new_trend_item_id, target_trend_item_id, status, assigned_to, decision_key |
 | `verdicts` | 판정 결과(append-only, `supersedes`로 재판정) | trend_item_id, result, reach_level, score_T, judged_at, evidence_json |
-| `score_ledger` | 점수 원장(append-only) | id, user_id, submission_id, delta, reason, created_at |
+| `score_ledger` | 점수 원장(append-only, 감쇠 없는 원값) | id, user_id, submission_id, verdict_id, delta, reason, halflife_days, decay_anchor_at, created_at |
 | `user_grades` | 등급 스냅샷 | user_id, grade, trust_index, active_score, computed_at |
 | `abuse_flags` | 어뷰징 탐지 기록 | user_id, rule_code, severity, detected_at |
 | `appeals` | 이의 제기 | id, user_id, target_type, target_id, status, resolved_at |
@@ -67,7 +67,7 @@ DRAFT → PENDING(관측 중) → JUDGING(D+14 도달) → RESOLVED(HIT|MISS)
                                               → VOID(판정불가·중복·규정위반)
 ```
 
-> 현행 `JUDGING`은 조회 필터에만 쓰이고 실제로 설정되지 않는다(4.3 참조, SP1).
+> `JUDGING`은 관측 마감(기본 D+14, 유예 연장 반영)이 지나 판정을 기다리는 상태다. `verdict_runner`가 설정하며, 이때부터 새 제보를 받지 않는다(3.3). 판정 중 오류가 나면 JUDGING으로 남아 다음 실행에서 재시도된다. 유예 연장으로 마감이 다시 미래가 되면 PENDING으로 돌아간다.
 
 **Submission.result**: `PENDING / HIT / MISS / VOID`
 
@@ -110,9 +110,13 @@ DRAFT → PENDING(관측 중) → JUDGING(D+14 도달) → RESOLVED(HIT|MISS)
 | L3 분석가 | 8 | |
 | L4 선구자 | 12 | 정원제 |
 
-매주 월요일 00:00 리필. **이월 없음**(비축 후 일괄 투척 방지).
+매주 월요일 00:00(KST) 리필. **이월 없음**(비축 후 일괄 투척 방지).
 
-> **Phase 1 선행 조건(P3).** 쿼터가 없으면 "MISS 페널티 = HIT의 절반"이라는 의도된 비대칭이 역효과를 낸다 — 적중률 ~30%만 넘으면 난사가 이득. 현행: 한도 표(`SubmissionQuota`)와 주간 사용량 표시(`/v1/me/summary`의 `quotaUsed`/`quotaMax`)는 있으나 **강제(차감)·리필·VOID 반환은 모두 미구현**이다 — 한도를 넘겨도 제보가 막히지 않는다. SP1에서 판정과 같은 트랜잭션 경계로 구현하며, 표시용 계산과 집행을 같은 소스로 통일한다.
+> **Phase 1 선행 조건(P3).** 쿼터가 없으면 "MISS 페널티 = HIT의 절반"이라는 의도된 비대칭이 역효과를 낸다 — 적중률 ~30%만 넘으면 난사가 이득.
+>
+> **집행 방식(J4).** 저장 카운터 없이 제보 행에서 파생한다: 이번 주 사용 = 이번 주에 낸 제보 − 이번 주에 VOID로 반환된 제보(`voided_at` 기준, 지난주에 낸 것 포함). 시딩은 세지 않는다. 리필은 주 경계 자체라 배치가 없다. 한도의 등급은 주간 스냅샷 등급(6장)이고, 같은 유저의 동시 제보는 유저 행 잠금으로 직렬화한다. 소진 시 `POST /v1/submissions`는 422(`type: quota-exhausted`). 집행(`SubmissionService`)과 표시(`/v1/me/summary`)가 같은 `QuotaService`를 쓴다.
+>
+> **관측 마감 후 제보 불가(J6).** 관측 마감이 지났거나 PENDING이 아닌 항목(판정 중·판정 완료·VOID·병합됨)에는 제보를 받지 않는다 — 422(`type: item-closed`), 제보권은 쓰지 않는다.
 
 ---
 
@@ -122,17 +126,16 @@ DRAFT → PENDING(관측 중) → JUDGING(D+14 도달) → RESOLVED(HIT|MISS)
 
 ### 4.1 판정 신호 (TrendSignal)
 
-D+14 도달 시 항목의 제보를 집계한다. 집계 대상에서 **VOID 제보는 제외**하고, **시딩(`is_seed=true`)도 제외해야 한다(P2)**.
-> **미구현(SP1).** 현행 `VerdictRunner`는 VOID만 거른다 — 시딩 제보가 `distinctSubmitters`에 그대로 들어가 T를 끌어올린다. 시딩 계정 수만큼 HIT가 공짜로 만들어지므로 R1 위반이며, Phase 1 시딩 시작 전에 고쳐야 한다. `is_seed`는 현재 원장 기록 제외에만 쓰인다.
+관측 마감(기본 D+14) 전에 들어온 항목의 제보를 집계한다. 집계 대상에서 **VOID 제보와 시딩(`is_seed=true`) 제보는 제외한다(P2)** — 시딩 계정 수만큼 HIT가 공짜로 만들어지면 R1 위반이다. 시딩은 선점 순위에서도 빠지고(J3), 판정 결과는 받지만 원장에는 기록되지 않는다.
 
 | 축 | 정의 | 상태 |
 |---|---|---|
-| 서로 다른 제보자 수 `n` | 유효 제보의 distinct user 수 | 제보자 수 집계는 구현 · 시딩 제외는 미구현(SP1) |
+| 서로 다른 제보자 수 `n` | 유효 제보(시딩 제외)의 distinct user 수 | 구현 |
 | 시간 분포 | 2주 중 후속 제보가 들어온 날 수, 첫 48h 쏠림 비율 — 이미 뜬 것을 몰아서 적는 행동을 감점 | SP4 |
 | 플랫폼 다양성 | 유효 제보의 distinct 플랫폼 수(플랫폼은 enum) | 집계만 구현, 미사용 → SP4 |
 | 제보자 독립성 | 가입일·디바이스·IP 군집이 같은 제보자를 1명으로 압축 | SP4 |
 
-`TrendSignal`은 SP1에서 확장 가능한 형태(제보 시각 목록·플랫폼·제보자 메타 포함)로 정의해 SP4가 파이프라인을 다시 열지 않게 한다.
+`TrendSignal`은 제보마다 제보 시각·플랫폼·시딩 여부·제보자 가입일을 담고 판정 근거(`evidence_json`)에 그대로 동결된다 — SP4가 파이프라인을 다시 열지 않고 축을 더할 수 있고, 파라미터 시뮬레이션(ADM-600)도 이 동결 신호로 돈다.
 
 ### 4.2 종합 점수 T
 
@@ -158,19 +161,21 @@ submitterTarget = max( 하한 , 최근 N일 활성 제보자 수 × 비율 )
 | 0.55 ≤ T < 0.75 | HIT | L3 크로스플랫폼 | 1.0 |
 | T ≥ 0.75 | HIT | L4 매스 | 1.5 |
 
-판정은 `JudgeService` 하나가 수행하며 배치(`verdict_runner`)·관리자 재판정·파라미터 시뮬레이션이 같은 서비스와 같은 파라미터 소스(`ParameterSetProvider`)를 쓴다(P6) — **`JudgeService`는 SP1에서 신설한다. 현행은 `VerdictRunner`와 `VerdictAdminService`가 판정 로직을 각각 들고 있고, 재판정은 승인된 파라미터 대신 `ParameterSet.defaults()`를 쓴다.** 항목은 `PENDING → JUDGING → RESOLVED`로 전이하고, 판정·원장 기록·제보 result·항목 상태 변경이 한 트랜잭션이어야 한다 — **SP1의 목표 상태다.** 현행 `VerdictRunner`는 `run()`이 같은 빈의 `@Transactional protected judgeOne()`을 직접 호출해(self-invocation) 프록시를 타지 못하므로 **트랜잭션이 걸리지 않는다.** `verdicts`·`score_ledger`는 명시 save라 저장되지만 `submissions.result`와 `trend_items.state`는 dirty-check에 의존해 flush되지 않는다 — 제보는 계속 PENDING이고, TI는 배치 경로로는 갱신되지 않아 사실상 0.4에 머문다(관리자 재판정 경로만 예외). `JUDGING` 상태도 현재는 설정되지 않는다.
+판정은 `JudgeService` 하나가 수행하며 배치(`verdict_runner`)·관리자 재판정·항목 VOID·ADM-111 미리보기가 같은 서비스를 쓴다(P6). 파라미터는 적용된 최신 파라미터(`CurrentParameterSetResolver`)를 쓰고, 판정 근거에 그 값을 동결한다. 항목은 `PENDING → JUDGING → RESOLVED|VOID`로 전이하고, 판정·원장 기록·제보 result·항목 상태 변경이 항목 하나당 한 트랜잭션이다(항목 행 잠금). `verdict_runner`는 목록을 순회만 하는 별도 빈이라 트랜잭션이 프록시를 탄다 — 같은 빈의 `@Transactional` 메서드를 직접 부르면(self-invocation) 트랜잭션이 걸리지 않아 제보 result·항목 상태가 flush되지 않는다(SP1 이전의 실제 결함).
+
+**재판정은 원 판정 때 동결한 파라미터로 다시 계산한다(J2).** 새 파라미터를 과거 판정에 소급하지 않는다 — 재판정의 실질은 그사이 VOID된 제보(카르텔 적발 등)를 빼고 다시 세는 것이다. 새 판정은 `supersedes`로 쌓이고, 원장은 제보 단위 차액만 ADJ로 남긴다(원 판정과 같은 감쇠 기준, 5.3). 같은 입력으로 다시 재판정하면 차액이 0이라 아무것도 남지 않는다.
 
 ### 4.4 VOID — 판정 공식의 출력이 아니라 사건의 결과
 
-VOID는 `verdict_runner`가 계산하는 값이 아니다(P5). 아래 사건이 발생하면 **그 시점에** 제보가 VOID 처리되고, 원칙적으로 제보권이 반환되어야 한다. 판정 배치는 VOID 제보를 집계에서 제외할 뿐이다.
+VOID는 `verdict_runner`가 계산하는 값이 아니다(P5). 아래 사건이 발생하면 **그 시점에** 제보가 VOID 처리되고(`voided_at`), 그 시각이 속한 주에 제보권이 반환된다(3.3). 판정 배치는 VOID 제보를 집계에서 제외할 뿐이다.
 
-> 제보권 반환은 3.3의 쿼터 시스템 자체가 **미구현**이라 지금은 일어나지 않는다(코드 주석: "VOID면 제보권 반환은 QuotaService 도입 후 처리"). SP1에서 쿼터 시스템과 함께 구현.
+항목 VOID는 `JudgeService.voidItem` 하나로 처리한다(ADM-100 큐 VOID·ADM-200 VOID 공통). 판정 전 항목이면 제보만 VOID하고, 이미 판정된 항목이면 VOID 판정을 `supersedes`로 쌓고 그 항목의 원장을 제보 단위로 전액 상쇄한다(ADJ).
 
 - 항목이 VOID됨(관리자 VOID 처리, 병합 시 흡수) → 해당 항목의 모든 제보
 - 병합 후 같은 유저의 제보가 중복됨 → 늦은 쪽 (03 §4.4)
 - 규정 위반(허위 URL, 미고지 이해관계)으로 관리자가 개별 제보를 VOID
 
-판정 시점에 유효 제보가 0건이면 항목 자체가 VOID여야 한다(P5). **미구현(SP1)** — 현행은 `voidByRule`이 항상 false라 T=0 → MISS로 판정되고 항목이 RESOLVED가 된다.
+판정 시점에 유효 제보(시딩 포함)가 0건이면 VOID 판정이 되고 항목도 VOID가 된다(P5) — 판정 시점의 VOID는 이것뿐이다. 시딩만 있는 항목은 제보자 수 0 → MISS다.
 
 ---
 
@@ -190,13 +195,13 @@ VOID:  Δ = 0
 | `w_order` | 선점 가중치 | 1위 1.0 / 2위 0.6 / 3위 0.4 / 4위 이하 0.2 |
 | `m` | 확산배수 | 4.3 표 참조 |
 
-> **원장에는 감쇠 없는 원값을 기록한다.** 시간감쇠는 5.3 AS 계산에서만 적용. 원장에 감쇠를 미리 곱해 두면 "그때 얼마를 받았나"가 불변이 아니게 되고(R2) 반감기를 바꾸려면 과거 원장을 UPDATE해야 한다. 양쪽에 걸면 이중 적용(현행 코드 상태 — SP1에서 전환). 조회 시점 감쇠에 쓸 반감기 버전은 O11(미결).
+> **원장에는 감쇠 없는 원값을 기록한다.** 시간감쇠는 5.3 AS 계산에서만 적용. 원장에 감쇠를 미리 곱해 두면 "그때 얼마를 받았나"가 불변이 아니게 되고(R2) 반감기를 바꾸려면 과거 원장을 UPDATE해야 한다. 양쪽에 걸면 이중 적용이다. 조회 시점 감쇠에 쓸 반감기는 원장 행마다 기록한 값이다(O11 = (b), 5.3).
 
 > **실패 페널티를 이득의 절반으로 둔 이유**: 대칭 페널티는 유저를 극단적으로 보수화시켜 "이미 뜬 것만 제보"하게 만든다. 조기경보라는 시스템 목적과 정면으로 충돌한다.
 
 ### 5.2 신뢰도 지수 (Trust Index)
 
-최근 180일 판정 완료분에 대한 베이지안 평활 적중률. (현행은 전체 기간 — 180일 창 제한은 SP1.)
+최근 180일 판정 완료분에 대한 베이지안 평활 적중률. 창의 기준은 제보가 처음 HIT/MISS로 판정된 시각(`resolved_at`, 재판정해도 유지)이고 시딩 제보는 세지 않는다. 승급 조건의 "판정완료" 건수는 전 기간이다.
 
 ```
 TI = (HIT수 + α) / (HIT수 + MISS수 + α + β),   α = 2, β = 3
@@ -207,8 +212,10 @@ TI = (HIT수 + α) / (HIT수 + MISS수 + α + β),   α = 2, β = 3
 ### 5.3 활동 점수 (Active Score)
 
 ```
-AS = Σ Δ_i × d_i ,    d_i = 0.5 ^ (원장 기록일로부터 경과일 / 90)     # 반감기 90일, 조회 시점 계산
+AS = Σ Δ_i × d_i ,    d_i = 0.5 ^ (decay_anchor_at_i 로부터 경과일 / halflife_days_i)     # 조회 시점 계산
 ```
+
+반감기(기본 90일)와 감쇠 기준 시각은 원장 행마다 기록한다(O11 = (b)) — 파라미터 스튜디오에서 반감기를 바꿔도 과거 행의 감쇠는 그대로다(비소급). 판정 행의 기준은 판정 시각, 재판정·VOID 차액(ADJ)의 기준은 원 판정 시각이라 원 행과 정확히 상쇄된다.
 
 **AS 와 TI 는 서로 다른 축이며, 승급은 두 값을 모두 요구한다.** (전제 A2)
 
@@ -224,7 +231,9 @@ AS = Σ Δ_i × d_i ,    d_i = 0.5 ^ (원장 기록일로부터 경과일 / 90) 
 | L3 | 분석가 | 판정완료 ≥ 40, TI ≥ 0.55, AS ≥ 500 | 8 | 제보 시계열 상세 열람, 우선 노출 |
 | L4 | 선구자 | L3 + 상위 1% (정원제) | 12 | 리워드, 운영 자문단 참여 |
 
-> 현행: L4는 `GradePolicy`에 없다(Phase 3). 6.1 강등 규칙은 미구현(Phase 2) — 구현 전까지 강등은 발생하지 않는다. 승급도 현재는 발생하지 않는다 — 판정완료 건수가 배치 경로에서는 사실상 0에 머물기 때문(관리자 재판정 경로만 예외, 10장 참조).
+> **공식 등급은 주간 스냅샷이다(J5).** `grade_recalc`(월 00:00 KST)가 매긴 등급이 앱 표시와 제보권 한도에 함께 쓰인다 — 주중에 등급이 오르내리지 않는다. `/v1/me/grade`는 다음 등급까지의 진행 상황만 지금 값으로 보여주고, 요건을 다 채웠으면 "월요일 재계산 때 반영"을 알린다.
+>
+> 현행: L4는 `GradePolicy`에 없다(Phase 3). 6.1 강등 규칙은 미구현(Phase 2) — 그 전까지 `grade_recalc`는 등급을 직전 스냅샷 아래로 내리지 않는다(J8). TI가 한 번 떨어진 것만으로 다음 주에 강등되는 것을 막기 위한 임시 규칙이다.
 
 ### 6.1 강등 규칙
 
@@ -262,7 +271,7 @@ AS = Σ Δ_i × d_i ,    d_i = 0.5 ^ (원장 기록일로부터 경과일 / 90) 
 | 단계 | 기간 | 내용 | 성공 기준 |
 |---|---|---|---|
 | Phase 0 | ~4주 | 판정 엔진 가동. 과거 사례 30건을 제보 데이터로 재생해 백테스트. 유저 노출 없음 | submitterTarget·임계값 보정(O1) |
-| Phase 1 | 4~12주 | 운영진 시딩 (주 20건 이상, T 집계 제외). 초대 기반 클로즈드 베타 50~100명. **선행 조건: 제보권 쿼터(SP1)** | 주간 활성 제보자 30명 |
+| Phase 1 | 4~12주 | 운영진 시딩 (주 20건 이상, T 집계 제외). 초대 기반 클로즈드 베타 50~100명. **선행 조건: 제보권 쿼터(SP1에서 구현)** | 주간 활성 제보자 30명 |
 | Phase 2 | 12~24주 | 공개 전환. 등급 시스템 활성화 | 유저 제보 비중 > 70%, TI 중앙값 > 0.4 |
 | Phase 3 | 24주~ | 리워드·L4 정원제 도입 | 4주 리텐션 > 25% |
 
@@ -273,7 +282,7 @@ AS = Σ Δ_i × d_i ,    d_i = 0.5 ^ (원장 기록일로부터 경과일 / 90) 
 ## 9. API 설계 (초안)
 
 ```
-POST   /v1/submissions              제보 등록 (제보권 차감 — 현행 미구현, 3.3 참조)
+POST   /v1/submissions              제보 등록 (제보권 집행·관측 마감 후 거부 — 3.3)
 GET    /v1/submissions/me           내 제보 목록 + 판정 상태
 POST   /v1/trends/{id}/endorse      동의(중복 제보 전환)
 GET    /v1/trends                   관측 중/판정 완료 목록, 필터·정렬
@@ -293,9 +302,9 @@ GET    /v1/leaderboard              상위 10 (동의자 한정)
 | 주기 | 잡 | 내용 |
 |---|---|---|
 | 일 1회 | `cluster_merge` | 신규 제보 임베딩 병합, 운영자 큐 적재. ADM-900 수동 실행 가능 |
-| 일 1회 | `verdict_runner` | D+14 도달 항목 판정(현행 자체 로직, `JudgeService` 통합은 SP1에서 신설) → `verdicts` + `score_ledger` 기록. **제보 result·항목 RESOLVED 전이는 self-invocation으로 현재 반영되지 않음(4.3 참조, SP1에서 수정)** |
+| 일 1회 | `verdict_runner` | 관측 마감 지난 PENDING → JUDGING, 이어서 JUDGING 항목마다 `JudgeService`가 판정 → `verdicts` + `score_ledger` + 제보 result + 항목 RESOLVED/VOID를 한 트랜잭션으로. 실패한 항목은 JUDGING으로 남아 다음 실행에서 재시도 |
 | 1시간 | `sla_watch` | **미구현(SP3)**. 신고 4h → 자동 임시 비공개 / 병합 24h → 판정 유예 연장 / 90일 미접속 관리자 비활성화 |
-| 주 1회(월 00:00) | `grade_recalc` | AS 재계산(`score_ledger` 기반 — 다만 `ScoreEngine`이 이미 곱한 감쇠에 `ActiveScore`가 다시 곱하는 **이중 적용** 상태, 5.1 참조, SP1에서 전환). **TI·판정완료 건수는 배치 경로에서 `submissions.result`가 갱신되지 않아 사실상 0.4·0에 머물며(관리자 재판정 경로만 예외, 4.3 참조), `GradePolicy` L1 조건(판정완료 ≥ 5)이 영원히 막혀 실질적으로 승급이 일어나지 않는다(SP1에서 수정).** 제보권 리필은 미구현(SP1에서 신설) |
+| 주 1회(월 00:00 KST) | `grade_recalc` | 공식 등급 스냅샷(6장) — AS(원장 행별 감쇠)·TI(최근 180일)·판정완료 건수로 `GradePolicy` 평가, 강등 규칙 전까지 직전 등급 아래로 내리지 않음(J8). 타임존은 코드에 명시. 제보권 리필은 주 경계 자체라 이 잡이 하지 않는다 |
 | 일 1회 | `abuse_scan` | **미구현(Phase 2)**. 어뷰징 룰 실행 → `abuse_flags` |
 | 월 1회 | `l4_quota` | **미구현(Phase 3)**. L4 정원 재산정 |
 
@@ -327,7 +336,7 @@ GET    /v1/leaderboard              상위 10 (동의자 한정)
 | O8 | 시간 분포·플랫폼 다양성·제보자 독립성 축의 가중치 | SP4 |
 | O9 | 판정 후 병합(ADJ 상쇄 경로) 도입 시점 | Phase 2. 그 전까지 RESOLVED 병합은 409 |
 | O10 | SLA 통보 채널 | Phase 2 메신저 웹훅. Phase 1은 로그 |
-| O11 | AS 조회 감쇠에 쓸 반감기 버전(전역 현재값 vs 원장 기록 시점 파라미터) | SP1. ADM-600 "비소급"과의 충돌 해소 |
+| O11 | AS 조회 감쇠에 쓸 반감기 버전(전역 현재값 vs 원장 기록 시점 파라미터) | **결정됨(b)** — 원장 행별 반감기(2026-09-20) |
 
 > O3(디시 데이터 수집 방식)은 2026-08-13 판정 모델 피벗으로 폐기.
 

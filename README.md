@@ -144,11 +144,12 @@ docker compose up -d --build
 | 영역                                                   | 상태                                                                                  |
 | ------------------------------------------------------ | -------------------------------------------------------------------------------------- |
 | 백엔드 전체 빌드                                       | ✅ `./gradlew build` 전 모듈 컴파일 + 테스트 성공                                      |
-| DB 스키마 V1~V25                                       | ✅ append-only 트리거·2인승인 CHECK·컬럼 코멘트까지 반영                              |
+| DB 스키마 V1~V28                                       | ✅ append-only 트리거·2인승인 CHECK·컬럼 코멘트까지 반영. V28(SP1)은 기존 판정·원장이 있으면 기동을 멈춘다 — 개발 DB 초기화 필요 |
 | 도메인 엔진(점수·판정·등급·정규화·시딩·병합계산)    | ✅ 골든 테스트 9종 통과 (순수 함수, ADM-600 시뮬레이션과 동일 코드 재사용)              |
-| 배치 — verdict_runner · grade_recalc · cluster_merge    | ✅ 구현 (멱등·order_rank 동결·시딩 제외, cluster_merge는 KURE-v1 임베딩 유사도 연동) |
+| 배치 — verdict_runner · grade_recalc · cluster_merge    | ✅ 구현 — 판정은 `JudgeService`(항목별 트랜잭션)가 결과·상태·원장을 실제로 기록, 시딩은 신호·선점 순위에서 제외, 멱등은 DB 제약. grade_recalc는 공식 등급 스냅샷(TI 180일, 강등 규칙 전까지 등급 유지). cluster_merge는 KURE-v1 임베딩 유사도 연동 |
 | 배치 — abuse_scan · l4_quota                            | 🔴 미착수 (엔티티·서비스 없음)                                                      |
 | api-public `/v1` — 트렌드·제보·투표·나(등급/원장/워치) | ✅ 대부분 구현 (trends, submissions, vote, endorse, me/\*, reads)                     |
+| 제보권(주간 한도·VOID 반환·월요일 리필)                | ✅ 집행 — 제보 행에서 파생, 소진·관측 마감 시 422(`quota-exhausted`·`item-closed`), 앱 제보 탭에 남은 장수 표시 |
 | api-public `/v1/appeals` · `/v1/leaderboard`            | 🔶 OpenAPI 계약만 (엔티티부터 없음)                                                  |
 | **푸시 알림 발송**                                | 🔴 미구현 (`expo-notifications` 의존성만 설치, 발송 코드 0줄 — 워치해도 알림 안 감) |
 | api-admin — 큐 요약·병합검수·판정관리·시딩·계정·감사로그·파라미터스튜디오 | ✅ 구현 + 콘솔 연동                                                    |
