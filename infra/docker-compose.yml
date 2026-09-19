@@ -1,14 +1,24 @@
+# Trend Radar — Docker 구성
+#
+#   개발용 DB만:  docker compose up -d db          백엔드는 호스트에서 ./gradlew :app:bootRun
+#   전체 스택:    docker compose up -d --build     db · embeddings · backend(:8080) · admin 콘솔(:8081)
+#
+# 설정은 같은 폴더의 .env 에서 읽는다(.env.example 을 복사해 채운다). .env 가 없으면 아래 기본값(개발용)으로 뜬다.
+
 services:
   db:
     image: pgvector/pgvector:pg16
     container_name: trd-db
+    restart: unless-stopped
     environment:
       POSTGRES_DB: trd
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: pw
+      # 볼륨을 처음 만들 때만 적용된다 — 이미 초기화된 볼륨은 비밀번호가 바뀌지 않는다(README "접속 오류 대처").
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-pw}
     ports:
       # 호스트 5433 → 컨테이너 5432. (로컬 설치 PostgreSQL이 5432를 점유하는 충돌 회피)
-      - "5433:5432"
+      # "127.0.0.1:5433"처럼 IP를 붙이면 이 PC 안에서만 접속된다.
+      - "${DB_PUBLISH:-5433}:5432"
     volumes:
       - trd-db:/var/lib/postgresql/data
     healthcheck:
@@ -21,9 +31,10 @@ services:
     # 한국어 특화 임베딩(KURE-v1, 1024-dim — trend_items.embedding vector(1024)과 일치). 온프레미스, 외부 전송 없음(M2).
     image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.6
     container_name: trd-embeddings
+    restart: unless-stopped
     command: ["--model-id", "nlpai-lab/KURE-v1"]
     ports:
-      - "6000:80"
+      - "${EMBEDDINGS_PUBLISH:-6000}:80"
     volumes:
       - trd-embeddings-cache:/data
     healthcheck:
@@ -33,19 +44,52 @@ services:
       retries: 30
       start_period: 120s   # 최초 기동 시 모델 다운로드(수 GB) 시간 확보
 
+  backend:
+    # 앱 API(/v1) + 콘솔 API(/admin) + 배치. 기동 시 Flyway가 마이그레이션을 적용한다.
+    build: ../backend
+    image: trd-backend
+    container_name: trd-backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      # embeddings는 cluster_merge 배치에서만 호출한다 — 최초 모델 다운로드(수 분)를 기동 조건으로 걸지 않는다.
+    environment:
+      DB_URL: jdbc:postgresql://db:5432/trd
+      DB_USER: postgres
+      DB_PASSWORD: ${DB_PASSWORD:-pw}
+      EMBEDDING_SERVICE_URL: http://embeddings:80
+      # 최초 관리자 계정 — admin_accounts가 비어 있을 때 한 번만 만든다. 둘 중 하나라도 비어 있으면 건너뛴다.
+      ADMIN_BOOTSTRAP_LOGIN_ID: ${ADMIN_BOOTSTRAP_LOGIN_ID:-}
+      ADMIN_BOOTSTRAP_PASSWORD: ${ADMIN_BOOTSTRAP_PASSWORD:-}
+      # Firebase 서비스 계정 키(컨테이너 안 경로). 비어 있으면 앱은 뜨고, 인증이 필요한 /v1 요청만 401.
+      FIREBASE_CREDENTIALS_PATH: ${FIREBASE_CREDENTIALS_PATH:-}
+      # 컨테이너 JVM은 UTC다. 일 배치 기본값(17:00·18:00 UTC = 02:00·03:00 KST)은 그대로 맞지만
+      # 주간 grade_recalc 기본값(월 00:00)은 UTC 기준이 돼 버리므로 월 00:00 KST(= 일 15:00 UTC)로 맞춘다.
+      JOBS_GRADE_RECALC_CRON: "${JOBS_GRADE_RECALC_CRON:-0 0 15 * * SUN}"
+    volumes:
+      # Firebase 키 같은 시크릿 파일은 infra/secrets/ 에 둔다(gitignore 대상 — secrets/README.md).
+      - ./secrets:/run/secrets/trd:ro
+    ports:
+      - "${BACKEND_PUBLISH:-8080}:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+
+  admin:
+    # 관리자 콘솔(nginx). /admin/** 는 backend로 프록시한다(admin/nginx.conf).
+    build: ../admin
+    image: trd-admin
+    container_name: trd-admin
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${ADMIN_PUBLISH:-8081}:80"
+
 volumes:
   trd-db:
   trd-embeddings-cache:
-
-
- # 백엔드는 최초 1회 `gradle wrapper` 후 `./gradlew :app:bootRun` 으로 기동하거나
-  # 아래 서비스를 활성화해 컨테이너로 실행. Flyway가 기동 시 V1~V9를 적용한다.
-  # backend:
-  #   build: ../backend
-  #   depends_on:
-  #     db: { condition: service_healthy }
-  #   environment:
-  #     DB_URL: jdbc:postgresql://db:5432/trd
-  #     DB_USER: postgres
-  #     DB_PASSWORD: pw
-  #   ports: ["8080:8080"]

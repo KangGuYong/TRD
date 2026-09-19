@@ -17,6 +17,9 @@ admin/dist/
 .env.*
 !.env.example
 backend/app/src/main/resources/application-local.yml
+# docker compose 시크릿 파일 — infra/secrets/README.md 만 커밋한다.
+infra/secrets/*
+!infra/secrets/README.md
 
 # Firebase — 앱 설정 파일과 백엔드 서비스 계정 키(절대 커밋 금지)
 app/google-services.json
