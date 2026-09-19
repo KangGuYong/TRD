@@ -156,7 +156,7 @@ export interface TrendItemSummary {
   firstSeenAt: string; submitterCount: number; currentResult: string | null;
 }
 export interface SubmissionRow {
-  submissionId: string; userHandle: string; orderRank: number;
+  submissionId: string; userHandle: string; orderRank: number | null;
   confidence: number; submitterTi: number | null; createdAt: string;
   platform: string; oneLine: string; evidenceUrl: string;
 }

@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import { useMySubmissions, useSubmit } from "../api/hooks";
+import { useMeSummary, useMySubmissions, useSubmit } from "../api/hooks";
 import type { Category } from "../api/types";
 import { Card, H1, Muted, Screen, StateView } from "../components/ui";
 import { C, STAGE_COLOR } from "../theme";
@@ -42,7 +42,11 @@ function NewSubmission() {
   const [disc, setDisc] = useState(false);
   const [oneLine, setOneLine] = useState("");
 
-  const ready = name.trim() && cat && plat && url.trim().length > 3 && oneLine.trim();
+  const summary = useMeSummary();
+  const remaining = summary.data ? Math.max(0, summary.data.quotaMax - summary.data.quotaUsed) : null;
+  const exhausted = remaining === 0;
+
+  const ready = name.trim() && cat && plat && url.trim().length > 3 && oneLine.trim() && !exhausted;
 
   const onSubmit = () => {
     if (!ready) return;
@@ -92,12 +96,17 @@ function NewSubmission() {
         </View>
       </Pressable>
 
+      {remaining !== null && (
+        <Muted style={exhausted ? { color: C.fading } : undefined}>
+          {exhausted ? "이번 주 제보권을 모두 썼어요 · 월요일 00:00에 다시 채워져요" : `이번 주 제보권 ${remaining}장 남음`}
+        </Muted>
+      )}
       {submit.isError && <Muted style={{ color: C.fading }}>{(submit.error as Error).message}</Muted>}
       {submit.isSuccess && <Muted style={{ color: C.rising }}>접수됐습니다. 14일 뒤 자동 판정됩니다.</Muted>}
 
       <Pressable onPress={onSubmit} disabled={!ready || submit.isPending} style={[s.submit, { backgroundColor: ready ? C.ink : "rgba(20,19,15,0.1)" }]}>
         <Text style={{ color: ready ? "#fff" : "rgba(20,19,15,0.35)", fontWeight: "600", fontSize: 15.5 }}>
-          {submit.isPending ? "제보 중…" : ready ? `제보하기 · 확신도 ${conf} 걸기` : "항목명 · 카테고리 · 플랫폼 · URL 필요"}
+          {submit.isPending ? "제보 중…" : exhausted ? "이번 주 제보권 소진" : ready ? `제보하기 · 확신도 ${conf} 걸기` : "항목명 · 카테고리 · 플랫폼 · URL 필요"}
         </Text>
       </Pressable>
     </View>
