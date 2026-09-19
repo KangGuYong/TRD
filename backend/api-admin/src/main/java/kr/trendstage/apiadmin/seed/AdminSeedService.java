@@ -12,6 +12,7 @@ import kr.trendstage.persistence.entity.AdminAccount;
 import kr.trendstage.persistence.entity.Submission;
 import kr.trendstage.persistence.entity.TrendItem;
 import kr.trendstage.persistence.entity.UserAccount;
+import kr.trendstage.persistence.params.CurrentParameterSetResolver;
 import kr.trendstage.persistence.repo.AdminAccountRepository;
 import kr.trendstage.persistence.repo.SubmissionRepository;
 import kr.trendstage.persistence.repo.TrendItemRepository;
@@ -44,15 +45,17 @@ public class AdminSeedService {
     private final TrendItemRepository trendItems;
     private final SubmissionRepository submissions;
     private final AuditLogService auditLogService;
+    private final CurrentParameterSetResolver currentParams;
 
     public AdminSeedService(AdminAccountRepository adminAccounts, UserRepository users,
                             TrendItemRepository trendItems, SubmissionRepository submissions,
-                            AuditLogService auditLogService) {
+                            AuditLogService auditLogService, CurrentParameterSetResolver currentParams) {
         this.adminAccounts = adminAccounts;
         this.users = users;
         this.trendItems = trendItems;
         this.submissions = submissions;
         this.auditLogService = auditLogService;
+        this.currentParams = currentParams;
     }
 
     public record SeedSubmissionRequest(
@@ -112,7 +115,7 @@ public class AdminSeedService {
 
     @Transactional(readOnly = true)
     public List<SeedAccuracyRow> listAccuracy() {
-        ParameterSet p = ParameterSet.defaults();
+        ParameterSet p = currentParams.resolve();
         return adminAccounts.findAll().stream()
                 .filter(a -> a.getSeedUserId() != null)
                 .map(a -> {

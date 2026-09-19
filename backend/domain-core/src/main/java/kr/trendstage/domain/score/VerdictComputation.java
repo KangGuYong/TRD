@@ -1,7 +1,6 @@
 package kr.trendstage.domain.score;
 
 import kr.trendstage.domain.params.ParameterSet;
-import kr.trendstage.domain.verdict.SubmissionSignal;
 import kr.trendstage.domain.verdict.TrendSignal;
 import kr.trendstage.domain.verdict.VerdictEngine;
 import kr.trendstage.domain.verdict.VerdictOutcome;
@@ -26,17 +25,6 @@ public final class VerdictComputation {
     public static VerdictPlan run(TrendSignal signal, List<SubmissionRef> subs, ParameterSet p) {
         if (signal.validCount() == 0) {
             return new VerdictPlan(VerdictResult.VOID, null, 0.0, List.of());
-        }
-        VerdictOutcome o = VerdictEngine.evaluate(signal, p);
-        return new VerdictPlan(o.result(), o.reach(), o.t(), ledgerLines(o, subs, p));
-    }
-
-    /** @deprecated Task 6에서 삭제 — {@link #run(TrendSignal, List, ParameterSet)}를 쓴다. */
-    @Deprecated(forRemoval = true)
-    public static VerdictPlan run(SubmissionSignal signal, boolean voidByRule, List<SubmissionRef> subs, ParameterSet p) {
-        double t = VerdictEngine.computeT(signal, p);
-        if (voidByRule) {
-            return new VerdictPlan(VerdictResult.VOID, null, t, List.of());
         }
         VerdictOutcome o = VerdictEngine.evaluate(signal, p);
         return new VerdictPlan(o.result(), o.reach(), o.t(), ledgerLines(o, subs, p));

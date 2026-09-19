@@ -235,6 +235,17 @@ public class JudgeService {
         }
     }
 
+    /** ADM-111 예상 판정 — 현재 파라미터와 지금까지의 신호로 계산만 한다(저장 없음). */
+    @Transactional(readOnly = true)
+    public Preview preview(UUID itemId) {
+        TrendItem item = trendItems.findById(itemId)
+                .orElseThrow(() -> new JudgeRejectedException("존재하지 않는 항목입니다"));
+        Inputs in = collect(item, deadlineOf(item));
+        return new Preview(in.signal(), VerdictComputation.run(in.signal(), in.refs(), params.resolve()));
+    }
+
+    public record Preview(TrendSignal signal, VerdictPlan plan) {}
+
     // ── 공용 ──────────────────────────────────────────────────────────────
 
     TrendItem lock(UUID itemId) {

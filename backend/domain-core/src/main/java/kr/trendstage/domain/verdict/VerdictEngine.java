@@ -33,18 +33,6 @@ public final class VerdictEngine {
         return classify(computeT(sig, p), p);
     }
 
-    /** @deprecated Task 6에서 삭제 — {@link #computeT(TrendSignal, ParameterSet)}를 쓴다. */
-    @Deprecated(forRemoval = true)
-    public static double computeT(SubmissionSignal sig, ParameterSet p) {
-        return ratio(sig.distinctSubmitters(), p);
-    }
-
-    /** @deprecated Task 6에서 삭제 — {@link #evaluate(TrendSignal, ParameterSet)}를 쓴다. */
-    @Deprecated(forRemoval = true)
-    public static VerdictOutcome evaluate(SubmissionSignal sig, ParameterSet p) {
-        return classify(ratio(sig.distinctSubmitters(), p), p);
-    }
-
     private static double ratio(int distinctSubmitters, ParameterSet p) {
         double r = distinctSubmitters / (double) Math.max(p.submitterTarget, 1);
         return Math.max(0.0, Math.min(1.0, r));

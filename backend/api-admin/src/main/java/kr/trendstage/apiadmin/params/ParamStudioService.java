@@ -9,8 +9,8 @@ import kr.trendstage.domain.params.ParamSimulation;
 import kr.trendstage.domain.params.ParameterSet;
 import kr.trendstage.domain.params.SimulationSummary;
 import kr.trendstage.domain.params.VerdictSnapshot;
-import kr.trendstage.domain.verdict.ReachLevel;
 import kr.trendstage.domain.verdict.VerdictResult;
+import kr.trendstage.judge.VerdictEvidence;
 import kr.trendstage.persistence.entity.ApprovalRequest;
 import kr.trendstage.persistence.entity.ParameterDraft;
 import kr.trendstage.persistence.entity.Verdict;
@@ -135,11 +135,8 @@ public class ParamStudioService {
 
     private VerdictSnapshot toSnapshot(Verdict v) {
         try {
-            var node = objectMapper.readTree(v.getEvidenceJson());
-            int distinctSubmitters = node.get("distinctSubmitters").asInt();
-            int distinctPlatforms = node.get("distinctPlatforms").asInt();
-            ReachLevel reach = v.getReachLevel();
-            return new VerdictSnapshot(v.getResult(), reach, distinctSubmitters, distinctPlatforms);
+            VerdictEvidence ev = objectMapper.readValue(v.getEvidenceJson(), VerdictEvidence.class);
+            return new VerdictSnapshot(v.getResult(), v.getReachLevel(), ev.signal());
         } catch (Exception e) {
             throw new IllegalStateException("evidence_json 파싱 실패: verdict=" + v.getId(), e);
         }
