@@ -167,10 +167,10 @@ public class MeService {
         List<ActiveScore.Aged> aged = new ArrayList<>();
         var now = clock.instant();
         for (ScoreLedgerEntry e : ledger.findByUserIdOrderByCreatedAtDesc(userId)) {
-            long ageDays = Duration.between(e.getCreatedAt(), now).toDays();
-            aged.add(new ActiveScore.Aged(e.getDelta().doubleValue(), Math.max(0, ageDays)));
+            long ageDays = Math.max(0, Duration.between(e.getDecayAnchorAt(), now).toDays());
+            aged.add(new ActiveScore.Aged(e.getDelta().doubleValue(), ageDays, e.getHalflifeDays()));
         }
-        return ActiveScore.compute(aged, ParameterSet.defaults());
+        return ActiveScore.compute(aged);
     }
 
     private String wordFor(ScoreLedgerEntry e) {

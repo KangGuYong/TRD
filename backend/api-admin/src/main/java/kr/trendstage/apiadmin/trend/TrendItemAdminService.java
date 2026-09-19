@@ -115,7 +115,7 @@ public class TrendItemAdminService {
         List<SubmissionRef> refs = subs.stream().map(s -> new SubmissionRef(
                 s.getId(), s.getUserId(), s.getConfidence(),
                 rankById.getOrDefault(s.getId(), Integer.MAX_VALUE),
-                Duration.between(s.getCreatedAt(), now).toDays())).toList();
+                s.isSeed())).toList();
         long distinctSubmitters = subs.stream().map(Submission::getUserId).distinct().count();
         long distinctPlatforms = subs.stream().map(Submission::getSourcePlatform)
                 .filter(Objects::nonNull).distinct().count();

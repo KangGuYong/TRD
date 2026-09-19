@@ -37,7 +37,7 @@ public final class VerdictComputation {
         List<LedgerLine> lines = new ArrayList<>();
         for (SubmissionRef s : subs) {
             ScoreResult r = ScoreEngine.compute(
-                    new ScoreInput(o.result(), s.confidence(), s.orderRank(), o.reach(), s.elapsedDays()), p);
+                    new ScoreInput(o.result(), s.confidence(), s.orderRank(), o.reach()), p);
             lines.add(new LedgerLine(s.userId(), s.submissionId(), o.result(), r.delta(), r.breakdown()));
         }
         return new VerdictPlan(o.result(), o.reach(), o.t(), lines);

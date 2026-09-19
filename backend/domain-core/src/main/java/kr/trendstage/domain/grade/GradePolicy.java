@@ -1,6 +1,5 @@
 package kr.trendstage.domain.grade;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
@@ -38,19 +37,29 @@ public final class GradePolicy {
                 break; // 사다리는 순차 — 한 칸 막히면 위도 막힘
             }
         }
-        Grade next = switch (current) {
+        Grade next = nextOf(current);
+        return new GradeStatus(current, next, progressToward(next, judgedCount, trustIndex, activeScore));
+    }
+
+    /** 다음 등급. L3·L4 다음은 L4(L4는 정원제 — 사다리 밖). */
+    public static Grade nextOf(Grade g) {
+        return switch (g) {
             case L0 -> Grade.L1; case L1 -> Grade.L2; case L2 -> Grade.L3;
             case L3, L4 -> Grade.L4;
         };
-        Req nextReq = LADDER.stream().filter(r -> r.grade == next).findFirst().orElse(null);
+    }
 
-        List<GradeRequirement> reqs = new ArrayList<>();
-        if (nextReq != null) {
-            reqs.add(req(GradeRequirementKind.JUDGED_COUNT, "판정 완료", judgedCount, nextReq.minJudged, 0));
-            reqs.add(req(GradeRequirementKind.TRUST_INDEX, "신뢰도 지수 TI", trustIndex, nextReq.minTi, 2));
-            reqs.add(req(GradeRequirementKind.ACTIVE_SCORE, "활동 점수 AS", activeScore, nextReq.minAs, 0));
-        }
-        return new GradeStatus(current, next, reqs);
+    /**
+     * 목표 등급의 요구 항목과 충족 여부. 공식 등급은 주간 스냅샷이고 진행 상황만 실시간으로 보여줄 때 쓴다(J5).
+     * 사다리에 없는 등급(L4)이면 빈 목록.
+     */
+    public static List<GradeRequirement> progressToward(Grade target, int judgedCount, double trustIndex, double activeScore) {
+        Req r = LADDER.stream().filter(x -> x.grade == target).findFirst().orElse(null);
+        if (r == null) return List.of();
+        return List.of(
+                req(GradeRequirementKind.JUDGED_COUNT, "판정 완료", judgedCount, r.minJudged, 0),
+                req(GradeRequirementKind.TRUST_INDEX, "신뢰도 지수 TI", trustIndex, r.minTi, 2),
+                req(GradeRequirementKind.ACTIVE_SCORE, "활동 점수 AS", activeScore, r.minAs, 0));
     }
 
     private static GradeRequirement req(GradeRequirementKind kind, String label, double cur, double required, int decimals) {

@@ -101,7 +101,7 @@ public class VerdictRunner {
             refs.add(new SubmissionRef(
                     s.getId(), s.getUserId(), s.getConfidence(),
                     rankById.getOrDefault(s.getId(), Integer.MAX_VALUE),
-                    Duration.between(s.getCreatedAt(), judgedAt).toDays()));
+                    s.isSeed()));
         }
 
         // 2) 제보 신호 집계 — 외부 지표 없이 제보 자체가 판정 근거(R1 개정)

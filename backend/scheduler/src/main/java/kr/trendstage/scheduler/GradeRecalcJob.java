@@ -78,10 +78,10 @@ public class GradeRecalcJob {
 
         List<ActiveScore.Aged> aged = new ArrayList<>();
         for (ScoreLedgerEntry e : ledger.findByUserIdOrderByCreatedAtDesc(u.getId())) {
-            long ageDays = Duration.between(e.getCreatedAt(), now).toDays();
-            aged.add(new ActiveScore.Aged(e.getDelta().doubleValue(), Math.max(0, ageDays)));
+            long ageDays = Math.max(0, Duration.between(e.getDecayAnchorAt(), now).toDays());
+            aged.add(new ActiveScore.Aged(e.getDelta().doubleValue(), ageDays, e.getHalflifeDays()));
         }
-        double as = ActiveScore.compute(aged, p);
+        double as = ActiveScore.compute(aged);
 
         GradeStatus status = GradePolicy.evaluate(judged, ti, as);
 

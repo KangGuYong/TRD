@@ -6,6 +6,8 @@ import kr.trendstage.domain.score.*;
 import kr.trendstage.domain.verdict.*;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -17,29 +19,40 @@ class EngineGoldenTest {
 
     @Test void hit_L3_c30_order1_은_60점() {
         assertEquals(60.0, ScoreEngine.compute(
-                new ScoreInput(VerdictResult.HIT, 30, 1, ReachLevel.L3, 0), p).delta(), 1e-9);
+                new ScoreInput(VerdictResult.HIT, 30, 1, ReachLevel.L3), p).delta(), 1e-9);
     }
 
     @Test void hit_L2_c10_order2_는_9점() {
         assertEquals(9.0, ScoreEngine.compute(
-                new ScoreInput(VerdictResult.HIT, 10, 2, ReachLevel.L2, 0), p).delta(), 1e-9);
+                new ScoreInput(VerdictResult.HIT, 10, 2, ReachLevel.L2), p).delta(), 1e-9);
     }
 
     @Test void miss_c30_은_마이너스15점_이득의_절반() {
         assertEquals(-15.0, ScoreEngine.compute(
-                new ScoreInput(VerdictResult.MISS, 30, 2, null, 0), p).delta(), 1e-9);
+                new ScoreInput(VerdictResult.MISS, 30, 2, null), p).delta(), 1e-9);
     }
 
     @Test void void_는_점수변동_없음() {
         assertEquals(0.0, ScoreEngine.compute(
-                new ScoreInput(VerdictResult.VOID, 50, 4, null, 0), p).delta(), 1e-9);
+                new ScoreInput(VerdictResult.VOID, 50, 4, null), p).delta(), 1e-9);
     }
 
-    @Test void 반감기_90일이면_절반() {
-        assertEquals(30.0, ScoreEngine.compute(
-                new ScoreInput(VerdictResult.HIT, 30, 1, ReachLevel.L3, 90), p).delta(), 1e-9);
+    @Test void 원장_Δ에는_감쇠가_없고_근거에도_감쇠항이_없다() {
+        ScoreResult r = ScoreEngine.compute(new ScoreInput(VerdictResult.HIT, 30, 1, ReachLevel.L3), p);
+        assertEquals(60.0, r.delta(), 1e-9);
+        assertEquals("HIT L3 · 확신도 30 × 선점 1위(1.0) × 확산 ×2.0 = +60.0", r.breakdown());
+        assertEquals("MISS · 확신도 30 × 0.5 = -15.0",
+                ScoreEngine.compute(new ScoreInput(VerdictResult.MISS, 30, 2, null), p).breakdown());
     }
 
+    @Test void 스냅샷_등급_기준으로_다음_등급_진행상황을_낸다() {
+        assertEquals(Grade.L1, GradePolicy.nextOf(Grade.L0));
+        assertEquals(Grade.L4, GradePolicy.nextOf(Grade.L4));
+        List<GradeRequirement> reqs = GradePolicy.progressToward(Grade.L1, 6, 0.40, 35);
+        assertEquals(3, reqs.size());
+        assertTrue(reqs.stream().allMatch(GradeRequirement::met));
+        assertTrue(GradePolicy.progressToward(Grade.L4, 100, 0.9, 999).isEmpty()); // L4는 정원제 — 사다리 밖
+    }
     @Test void trustIndex_초기값은_0_4() {
         assertEquals(0.4, TrustIndex.compute(0, 0, p), 1e-9);
     }

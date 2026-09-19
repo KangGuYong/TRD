@@ -124,7 +124,7 @@ public class VerdictAdminService {
             refs.add(new SubmissionRef(
                     s.getId(), s.getUserId(), s.getConfidence(),
                     rankById.getOrDefault(s.getId(), Integer.MAX_VALUE),
-                    Duration.between(s.getCreatedAt(), now).toDays()));
+                    s.isSeed()));
         }
 
         long distinctSubmitters = subEntities.stream().map(Submission::getUserId).distinct().count();
