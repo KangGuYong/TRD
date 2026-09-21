@@ -12,6 +12,7 @@ import kr.trendstage.persistence.repo.TrendItemRepository;
 import kr.trendstage.persistence.type.AdminRole;
 import kr.trendstage.persistence.type.MergeQueueStatus;
 import kr.trendstage.persistence.type.TrendState;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -110,6 +111,13 @@ public class MergeDecisionService {
                         Map.of("reason", reason == null ? "" : reason));
                 entry.resolve(MergeQueueStatus.VOIDED, actorId, now, key);
             }
+        }
+        // 위의 findByDecisionKey 확인과 이 기록 사이에 다른 후보가 같은 키를 먼저 커밋하면 UNIQUE가 막는다.
+        // 여기서 flush해 그 위반을 커밋 시점의 500 대신 422로 돌려준다(트랜잭션은 예외와 함께 롤백된다).
+        try {
+            mergeQueue.flush();
+        } catch (DataIntegrityViolationException e) {
+            throw new IdempotencyKeyMismatchException("이 멱등키는 다른 후보에 이미 쓰였습니다");
         }
         return new Outcome(responseOf(entry, false), false);
     }
