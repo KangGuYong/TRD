@@ -196,7 +196,7 @@ export default function MergeQueueScreen() {
                   <div style={{ font: "500 12.5px Pretendard" }}>{previewData.deadlineBefore} → {previewData.deadlineAfter}</div>
                   {previewData.deadlineGuarded && (
                     <div style={{ marginTop: 8, padding: "9px 12px", borderRadius: 8, background: "rgba(216,150,60,0.1)", color: C.sub, font: "600 11.5px Pretendard" }}>
-                      병합으로 관측 기간이 줄어 병합 시점부터 최소 3일을 보장합니다 (상한: 최초 제보 + 21일)
+                      남은 관측 기간이 3일보다 짧아 병합 시점부터 최소 3일을 보장합니다 (상한: 최초 제보 + 21일)
                     </div>
                   )}
                 </div>

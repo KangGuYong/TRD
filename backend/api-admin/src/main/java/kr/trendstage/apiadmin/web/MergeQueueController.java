@@ -235,18 +235,25 @@ public class MergeQueueController {
     }
 
     /** 목록 카드의 병합 후 순위 칩 — 미리보기와 같은 규칙(시딩 제외, 동순위). */
+    /** 병합 후 순위 요약 — 미리보기(MergeService.preview)와 같이 같은 유저의 늦은 제보(VOID될 것)는 뺀다. */
     private List<String> buildOrderPreview(UUID newTrendItemId, UUID oldTrendItemId) {
-        List<Submission> combined = new ArrayList<>();
-        combined.addAll(submissions.findByTrendItemIdAndResultNot(newTrendItemId, SubmissionResult.VOID));
-        combined.addAll(submissions.findByTrendItemIdAndResultNot(oldTrendItemId, SubmissionResult.VOID));
-        List<MergeComputation.SubmissionInput> inputs = combined.stream()
-                .map(s -> new MergeComputation.SubmissionInput(
-                        s.getId(), s.getUserId(), s.getRawInput(), s.getCreatedAt(), s.isSeed()))
-                .toList();
+        List<MergeComputation.SubmissionInput> newInputs = inputsOf(newTrendItemId);
+        List<MergeComputation.SubmissionInput> oldInputs = inputsOf(oldTrendItemId);
+        Set<UUID> voided = MergeComputation.computeDedup(newInputs, oldInputs);
+        List<MergeComputation.SubmissionInput> inputs = new ArrayList<>(newInputs);
+        inputs.addAll(oldInputs);
+        inputs.removeIf(i -> voided.contains(i.submissionId()));
         return MergeComputation.computeCombinedOrder(inputs).stream()
                 .map(o -> o.seed()
                         ? "시딩 " + handleOf(o.userId())
                         : "order%d %s".formatted(o.rank(), handleOf(o.userId())))
+                .toList();
+    }
+
+    private List<MergeComputation.SubmissionInput> inputsOf(UUID trendItemId) {
+        return submissions.findByTrendItemIdAndResultNot(trendItemId, SubmissionResult.VOID).stream()
+                .map(s -> new MergeComputation.SubmissionInput(
+                        s.getId(), s.getUserId(), s.getRawInput(), s.getCreatedAt(), s.isSeed()))
                 .toList();
     }
 
