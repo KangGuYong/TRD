@@ -17,10 +17,11 @@ import kr.trendstage.persistence.repo.AdminAccountRepository;
 import kr.trendstage.persistence.repo.SubmissionRepository;
 import kr.trendstage.persistence.repo.TrendItemRepository;
 import kr.trendstage.persistence.repo.UserRepository;
+import kr.trendstage.persistence.trend.TrendItemCreator;
+import kr.trendstage.persistence.trend.TrendItemLookup;
 import kr.trendstage.persistence.type.AdminRole;
 import kr.trendstage.persistence.type.SubmissionResult;
 import kr.trendstage.persistence.type.TrendCategory;
-import kr.trendstage.persistence.type.TrendState;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -47,18 +48,22 @@ public class AdminSeedService {
     private final SubmissionRepository submissions;
     private final AuditLogService auditLogService;
     private final CurrentParameterSetResolver currentParams;
+    private final TrendItemLookup lookup;
+    private final TrendItemCreator creator;
     private final Clock clock;
 
     public AdminSeedService(AdminAccountRepository adminAccounts, UserRepository users,
                             TrendItemRepository trendItems, SubmissionRepository submissions,
                             AuditLogService auditLogService, CurrentParameterSetResolver currentParams,
-                            Clock clock) {
+                            TrendItemLookup lookup, TrendItemCreator creator, Clock clock) {
         this.adminAccounts = adminAccounts;
         this.users = users;
         this.trendItems = trendItems;
         this.submissions = submissions;
         this.auditLogService = auditLogService;
         this.currentParams = currentParams;
+        this.lookup = lookup;
+        this.creator = creator;
         this.clock = clock;
     }
 
@@ -96,15 +101,12 @@ public class AdminSeedService {
         String normalized = NameNormalizer.normalize(req.name());
         Instant now = clock.instant();
 
-        TrendItem item = trendItems.findByNormalizedKey(normalized).orElse(null);
-        if (item != null) {
-            boolean dup = submissions.existsByTrendItemIdAndUserIdAndResultNot(
-                    item.getId(), seedUserId, SubmissionResult.VOID);
-            if (dup) throw new AdminValidationException("이미 이 계정으로 시딩한 항목입니다");
-        } else {
-            item = trendItems.save(new TrendItem(req.name(), normalized, category, now));
-            item.transitionTo(TrendState.PENDING);
-        }
+        // 병합된 항목 이름이면 승자로(SP2 K6), 새 이름이면 생성 — 동시 생성은 먼저 생긴 항목에 합류
+        TrendItem item = lookup.findLiveByNormalizedKey(normalized)
+                .orElseGet(() -> creator.createOrJoin(req.name(), normalized, category, now).item());
+        boolean dup = submissions.existsByTrendItemIdAndUserIdAndResultNot(
+                item.getId(), seedUserId, SubmissionResult.VOID);
+        if (dup) throw new AdminValidationException("이미 이 계정으로 시딩한 항목입니다");
 
         Submission sub = submissions.save(new Submission(
                 seedUserId, item.getId(), req.name(), normalized,

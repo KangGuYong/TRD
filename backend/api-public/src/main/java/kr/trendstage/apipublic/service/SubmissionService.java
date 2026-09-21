@@ -14,6 +14,8 @@ import kr.trendstage.persistence.repo.SubmissionOrderRankRepository;
 import kr.trendstage.persistence.repo.SubmissionRepository;
 import kr.trendstage.persistence.repo.TrendItemRepository;
 import kr.trendstage.persistence.repo.UserRepository;
+import kr.trendstage.persistence.trend.TrendItemCreator;
+import kr.trendstage.persistence.trend.TrendItemLookup;
 import kr.trendstage.persistence.type.SubmissionResult;
 import kr.trendstage.persistence.type.TrendState;
 import org.springframework.stereotype.Service;
@@ -41,13 +43,16 @@ public class SubmissionService {
     private final SubmissionOrderRankRepository orderRanks;
     private final UserRepository users;
     private final QuotaService quotaService;
+    private final TrendItemLookup lookup;
+    private final TrendItemCreator creator;
     private final Clock clock;
 
     public SubmissionService(TrendItemRepository trends, SubmissionRepository submissions,
                              SubmissionOrderRankRepository orderRanks, UserRepository users,
-                             QuotaService quotaService, Clock clock) {
+                             QuotaService quotaService, TrendItemLookup lookup, TrendItemCreator creator, Clock clock) {
         this.trends = trends; this.submissions = submissions; this.orderRanks = orderRanks;
-        this.users = users; this.quotaService = quotaService; this.clock = clock;
+        this.users = users; this.quotaService = quotaService; this.lookup = lookup; this.creator = creator;
+        this.clock = clock;
     }
 
     @Transactional
@@ -60,16 +65,10 @@ public class SubmissionService {
 
         users.findByIdForUpdate(userId).orElseThrow(() -> new IllegalStateException("유저가 없습니다: " + userId));
 
-        TrendItem item = trends.findByNormalizedKey(normalized).orElse(null);
+        // 병합된 항목 이름이면 승자로 합류한다(SP2 K6). 제보의 normalized_key에는 유저가 입력한 키가 그대로 남는다.
+        TrendItem item = lookup.findLiveByNormalizedKey(normalized).orElse(null);
         if (item != null) {
-            requireOpen(item, now);
-            boolean dup = submissions.existsByTrendItemIdAndUserIdAndResultNot(
-                    item.getId(), userId, SubmissionResult.VOID);
-            if (dup) {
-                long rank = submissions.countByTrendItemIdAndResultNot(item.getId(), SubmissionResult.VOID);
-                throw new DuplicateSubmissionException((item.getId()), (int) rank,
-                        "이미 제보한 항목입니다 — 동의로 전환할 수 있습니다");
-            }
+            requireOpenAndNotDuplicate(item, userId, now);
         }
 
         QuotaService.Quota quota = quotaService.of(userId, now);
@@ -79,8 +78,11 @@ public class SubmissionService {
         }
 
         if (item == null) {
-            item = trends.save(new TrendItem(req.name(), normalized, req.category(), now));
-            item.transitionTo(TrendState.PENDING);
+            TrendItemCreator.Result created = creator.createOrJoin(req.name(), normalized, req.category(), now);
+            item = created.item();
+            if (!created.created()) {
+                requireOpenAndNotDuplicate(item, userId, now);   // 동시 첫 제보 — 먼저 생긴 항목에 합류
+            }
         }
         Submission sub = submissions.save(new Submission(
                 userId, item.getId(), req.name(), normalized,
@@ -89,12 +91,18 @@ public class SubmissionService {
         return toResponse(sub, item);
     }
 
+    private void requireOpenAndNotDuplicate(TrendItem item, UUID userId, Instant now) {
+        requireOpen(item, now);
+        boolean dup = submissions.existsByTrendItemIdAndUserIdAndResultNot(item.getId(), userId, SubmissionResult.VOID);
+        if (dup) {
+            long rank = submissions.countByTrendItemIdAndResultNot(item.getId(), SubmissionResult.VOID);
+            throw new DuplicateSubmissionException(item.getId(), (int) rank,
+                    "이미 제보한 항목입니다 — 동의로 전환할 수 있습니다");
+        }
+    }
+
     /** 관측 창(기본 D+14, 유예 연장 반영)이 열려 있는 PENDING 항목만 제보를 받는다(J6). 거부해도 제보권은 쓰지 않는다. */
     private static void requireOpen(TrendItem item, Instant now) {
-        if (item.getState() == TrendState.MERGED) {
-            // SP2가 병합 승자로 합류시키기 전까지는 막는다 — 죽은 클러스터에 붙어 영원히 PENDING이 되는 것보다 낫다
-            throw new ItemClosedException("다른 항목으로 병합된 트렌드입니다 — 검색에서 대표 항목을 찾아 동의해 주세요");
-        }
         Instant deadline = DeadlineWindow.effectiveDeadline(item.getFirstSeenAt(), item.getJudgmentDeadlineOverride());
         if (item.getState() != TrendState.PENDING || !now.isBefore(deadline)) {
             throw new ItemClosedException("관측이 끝난 트렌드입니다 — 판정이 끝났거나 진행 중이라 새 제보를 받지 않습니다");
