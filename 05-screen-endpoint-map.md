@@ -83,11 +83,11 @@
 | 상호작용 | API | 스펙 | 구현 | 권한 |
 |---|---|:--:|:--:|---|
 | 큐 로드(유사도·양쪽 비교·선점 미리보기) | `GET /admin/merge-queue` | ✅ | ✅ | R/O/A/Au(조회) |
-| 병합 결정 미리보기(dry-run) | `GET /admin/merge-queue/{id}/preview` | 🔶 | ✅ | R/O/A/Au · 실제 병합과 같은 계산(`MergeService.preview`)을 공유하므로 결과가 실제 병합과 일치한다 |
-| 병합 / 분리 | `POST /admin/merge-queue/{id}/merge` · `…/separate` | 🔶 | ✅ | R/O/A · `openapi.yaml`은 구식 단일 `POST …/action`(action enum)만 정의 — 실제 경로 3종 미반영, 스펙 갱신(치환) 필요. `Idempotency-Key` 헤더·사유 필수 검증은 컨트롤러에 없음 — **미구현(SP2)** |
-| VOID(허위/규정위반) | `POST /admin/merge-queue/{id}/void` | 🔶 | ✅ | **O/A**(R은 403) · 위와 동일한 스펙 불일치. `JudgeService.voidItem` 경유(ADM-200 VOID와 같은 경로 — 판정된 항목이면 원장 상쇄까지, VOID·병합된 항목은 409). 사유 필수 검증은 서버에 없음(`@RequestBody(required=false)`) — **미구현(SP2)** |
-| 클레임 / 해제 | `POST /admin/merge-queue/{id}/claim` · `…/release` | 🔶 | 🔶 | **미구현(SP2)** — R/O/A · 15분 만료 설계값, 컨트롤러 없음 |
-| 보류(HOLD) | `POST /admin/merge-queue/{id}/hold` | 🔶 | 🔶 | **미구현(SP2)** — R/O/A · 3회 → ESCALATED 설계값, 컨트롤러 없음 |
+| 병합 결정 미리보기(dry-run) | `GET /admin/merge-queue/{id}/preview` | ✅ | ✅ | R/O/A/Au · 실제 병합과 같은 계산(`MergeService.preview`)을 공유하므로 결과가 실제 병합과 일치한다. 시딩 제외 순위(`OrderComputed.rank=null`)·제보권 반환 대상(dedup VOID 중 시딩 제외)·관측 마감 조정(전/후, 상한 도달 여부)까지 반환 |
+| 병합 / 분리 | `POST /admin/merge-queue/{id}/merge` · `…/separate` | ✅ | ✅ | R/O/A · `openapi.yaml`이 실제 경로 3종(merge·separate·void)으로 갱신됨 — 구식 단일 `POST …/action` 불일치는 해소. `Idempotency-Key` 헤더 필수(없으면 400) · 409 type(`merge-judging`·`merge-resolved`·`merge-target-merged`·`merge-queue-decided`) · 다른 결정으로 키 재사용은 422(`idempotency-key-mismatch`) — 구현됨 |
+| VOID(허위/규정위반) | `POST /admin/merge-queue/{id}/void` | ✅ | ✅ | **O/A**(R은 403) · 위와 같은 경로로 스펙 반영됨. `JudgeService.voidItem` 경유(ADM-200 VOID와 같은 경로 — 판정된 항목이면 원장 상쇄까지, VOID·병합된 항목은 409). `Idempotency-Key` 필수 · 409 type · 422(`idempotency-key-mismatch`)는 병합/분리와 동일하게 구현됨. 사유 필수 검증만 서버에 없음(`@RequestBody(required=false)`) |
+| 클레임 / 해제 | `POST /admin/merge-queue/{id}/claim` · `…/release` | 🔶 | 🔶 | **미구현(SP2b)** — R/O/A · 15분 만료 설계값, 컨트롤러 없음 |
+| 보류(HOLD) | `POST /admin/merge-queue/{id}/hold` | 🔶 | 🔶 | **미구현(SP2b)** — R/O/A · 3회 → ESCALATED 설계값, 컨트롤러 없음 |
 
 ### ADM-110 / 111 · 트렌드 목록 / 상세
 | 상호작용 | API | 스펙 | 구현 | 비고 |
@@ -195,8 +195,9 @@
 | 제안 경로 | 용도 | 화면 | 비고 |
 |---|---|---|---|
 | `POST /admin/users/{id}/unmask` | PII 마스킹 해제(사유 기록) | ADM-311 | 스펙은 `GET …?unmask=true`+사유 헤더로 모델링 — 별도 POST 경로 자체가 스펙에도 없고 컨트롤러도 없음(SP3) |
-| `GET /admin/merge-queue/{id}/preview` | 병합 미리보기(dry-run) | ADM-100 | 구현은 이미 있음 — 스펙에만 없음 |
-| `POST /admin/merge-queue/{id}/merge`·`separate`·`void`, `…/claim`·`release`·`hold` | 병합/분리/VOID/클레임/보류 | ADM-100 | merge·separate·void는 구현 있음(스펙은 구형 `POST …/action` 하나로만 정의, 치환 필요). claim·release·hold는 구현도 없음(SP2) |
+| ~~`GET /admin/merge-queue/{id}/preview`~~ | 병합 미리보기(dry-run) | ADM-100 | 해소됨 — `openapi.yaml`에 반영 완료(SP2) |
+| ~~`POST /admin/merge-queue/{id}/merge`·`separate`·`void`~~ | 병합/분리/VOID | ADM-100 | 해소됨 — `openapi.yaml`이 실제 경로 3종으로 갱신됨(SP2), 구식 단일 `POST …/action` 정의는 제거 |
+| `POST /admin/merge-queue/{id}/claim`·`release`·`hold` | 클레임/해제/보류 | ADM-100 | 구현·스펙 둘 다 없음(SP2b) |
 | `GET /admin/trend-items`, `GET /admin/trend-items/{id}` | 트렌드 목록/상세 | ADM-110/111 | 구현은 이미 있음 — 스펙 옛 경로 `/admin/trends`를 치환 |
 | `GET /admin/verdicts`, `POST …/{id}/void`·`rejudge`·`extend-grace` | 판정 관리 목록/예외처리 | ADM-200 | 구현은 이미 있음 — 스펙 옛 경로 `/admin/trends/{id}` + `/admin/trends/{id}/exceptions`(단일 엔드포인트, type 파라미터 분기)를 치환 |
 | `GET·PUT /admin/params/draft`, `POST …/draft/simulate`, `…/draft/request-approval` | 파라미터 드래프트(액터당 1개, ID 없음) | ADM-600 | 구현은 이미 있음 — 스펙 옛 모델 `/admin/parameter-drafts`(다건·ID기반)를 치환. 스펙 요약문의 "가중치 합계 1.0"(~`GET·POST /admin/parameter-drafts` summary/422)은 폐기된 외부지표 다축 가중치(S1~S5) 모델의 잔재 — 삭제 대상(스펙 정리는 **SP3**로 이관 — SP0.5 스펙 범위에서 빠짐). 현재 구현은 `submitterTarget`+`hitThreshold` 2필드뿐이고 합계 제약 자체가 없다 |
