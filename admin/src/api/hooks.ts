@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, USE_FIXTURES } from "./client";
+import { api, ApiError, USE_FIXTURES } from "./client";
 import * as fx from "../fixtures";
-import type { AdminAccountSummary, ApprovalRequestView, AdminUserDetail, AuditEntry, ClusterMergeResult, MergeCandidate, MergePreview, ParameterDraftView, QueueSummary, ReportQueueItem, ReportSubmissionCandidate, SeedAccuracyRow, SeedSubmissionRequest, SeedSubmissionResult, TrendItemSummary, TrendItemDetail, VerdictListResponse } from "./types";
+import type { AdminAccountSummary, ApprovalRequestView, AdminUserDetail, AuditEntry, ClusterMergeResult, MergeCandidate, MergeDecisionResponse, MergePreview, ParameterDraftView, QueueSummary, ReportQueueItem, ReportSubmissionCandidate, SeedAccuracyRow, SeedSubmissionRequest, SeedSubmissionResult, TrendItemSummary, TrendItemDetail, VerdictListResponse } from "./types";
 
 /** 픽스처 on이면 즉시 픽스처, off면 실 API. 동일 훅으로 백엔드 전환. */
 function useData<T>(key: unknown[], path: string, fixture: T) {
@@ -33,8 +33,25 @@ export const createAdminAccount = (req: { loginId: string; displayName: string; 
 export const setAdminAccountDisabled = (id: string, disabled: boolean) =>
   api.post<AdminAccountSummary>(`/admin/accounts/${id}/${disabled ? "disable" : "enable"}`);
 
-export const decideMergeCandidate = (id: string, action: "merge" | "separate" | "void", reason: string) =>
-  api.post<void>(`/admin/merge-queue/${id}/${action}`, { reason });
+/**
+ * 병합 큐 결정. 결정마다 멱등키를 하나 만들고, 네트워크 오류·5xx일 때만 같은 키로 한 번 재시도한다 —
+ * 서버가 이미 처리했으면 같은 결과를 돌려준다(SP2 K5). 4xx는 서버가 판단을 끝낸 것이라 재시도하지 않는다.
+ */
+export async function decideMergeCandidate(
+  id: string,
+  action: "merge" | "separate" | "void",
+  reason: string,
+): Promise<MergeDecisionResponse> {
+  const key = crypto.randomUUID();
+  const send = () =>
+    api.post<MergeDecisionResponse>(`/admin/merge-queue/${id}/${action}`, { reason }, { "Idempotency-Key": key });
+  try {
+    return await send();
+  } catch (e) {
+    if (e instanceof ApiError && e.status < 500) throw e;
+    return await send();
+  }
+}
 
 export const fetchMergePreview = (id: string) =>
   api.get<MergePreview>(`/admin/merge-queue/${id}/preview`);

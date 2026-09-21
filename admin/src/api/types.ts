@@ -33,15 +33,34 @@ export interface MergeCandidate {
 export interface OrderEntry {
   handle: string;
   rankBefore: number | null;
-  rankAfter: number;
+  /** 시딩이면 null */
+  rankAfter: number | null;
+  seed: boolean;
 }
+
 export interface MergePreview {
   newCanonicalName: string;
   orderRank: OrderEntry[];
   firstSeenAtBefore: string;
   firstSeenAtAfter: string;
-  baselineShifted: boolean;
+  deadlineBefore: string;
+  deadlineAfter: string;
+  /** 병합으로 관측 기간이 줄어 최소 3일 보장이 적용됨 */
+  deadlineGuarded: boolean;
   dedupVoidedHandles: string[];
+  /** 중복 VOID로 제보권이 돌아가는 제보자(시딩 제외) */
+  quotaRefundHandles: string[];
+}
+
+export interface MergeDecisionResponse {
+  queueId: string;
+  decision: "MERGE" | "SEPARATE" | "VOID";
+  status: "MERGED" | "SKIPPED" | "VOIDED";
+  survivorId: string | null;
+  loserId: string | null;
+  decidedBy: string | null;
+  decidedAt: string | null;
+  replayed: boolean;
 }
 
 export interface SimulationSummary {
@@ -148,6 +167,10 @@ export interface ClusterMergeResult {
   autoMerged: number;
   queued: number;
   separated: number;
+  /** 판정된 항목과 닮아 병합하지 않고 기록만 함 */
+  skippedJudged: number;
+  /** 판정·다른 병합과 경합해 다음 실행에서 다시 봄 */
+  deferred: number;
   failed: number;
 }
 

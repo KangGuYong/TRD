@@ -58,7 +58,7 @@ export default function BatchJobsScreen() {
 
         {result && (
           <div style={{ marginTop: 16, padding: 12, borderRadius: 8, background: "#f7f7f8", font: "600 12px ui-monospace, monospace" }}>
-            후보 {result.candidates}건 · 자동병합 {result.autoMerged} · 큐적재 {result.queued} · 별개확정 {result.separated}
+            후보 {result.candidates}건 · 자동병합 {result.autoMerged} · 큐적재 {result.queued} · 별개확정 {result.separated} · 판정된 항목과 유사 {result.skippedJudged} · 보류 {result.deferred}
             {" · "}
             <span style={{ color: result.failed > 0 ? C.fading : C.ink }}>실패 {result.failed}</span>
           </div>
