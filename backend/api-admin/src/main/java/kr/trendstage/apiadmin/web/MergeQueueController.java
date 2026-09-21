@@ -73,7 +73,8 @@ public class MergeQueueController {
     public record OrderEntry(String handle, Integer rankBefore, Integer rankAfter, boolean seed) {}
     public record MergePreviewResponse(String newCanonicalName, List<OrderEntry> orderRank,
                                         String firstSeenAtBefore, String firstSeenAtAfter,
-                                        boolean baselineShifted, List<String> dedupVoidedHandles) {}
+                                        String deadlineBefore, String deadlineAfter, boolean deadlineGuarded,
+                                        List<String> dedupVoidedHandles, List<String> quotaRefundHandles) {}
 
     @GetMapping
     @PreAuthorize("hasAnyRole('REVIEWER', 'OPERATOR', 'ADMIN', 'AUDITOR')")
@@ -104,22 +105,14 @@ public class MergeQueueController {
                 .map(o -> new OrderEntry(handleOf(o.userId()), beforeRank.get(o.submissionId()), o.rank(), o.seed()))
                 .toList();
 
-        List<String> dedupVoidedHandles = new ArrayList<>();
-        if (!result.dedupVoidedSubmissionIds().isEmpty()) {
-            List<Submission> combined = new ArrayList<>();
-            combined.addAll(submissions.findByTrendItemIdAndResultNot(survivor.getId(), SubmissionResult.VOID));
-            combined.addAll(submissions.findByTrendItemIdAndResultNot(loser.getId(), SubmissionResult.VOID));
-            for (Submission s : combined) {
-                if (result.dedupVoidedSubmissionIds().contains(s.getId())) {
-                    dedupVoidedHandles.add(handleOf(s.getUserId()));
-                }
-            }
-        }
+        List<String> dedupVoidedHandles = handlesOf(result.dedupVoidedSubmissionIds(), survivor.getId(), loser.getId());
+        List<String> quotaRefundHandles = handlesOf(result.quotaRefundSubmissionIds(), survivor.getId(), loser.getId());
 
         return new MergePreviewResponse(
                 result.newCanonicalName(), orderRank,
                 DISPLAY_FORMAT.format(result.firstSeenAtBefore()), DISPLAY_FORMAT.format(result.firstSeenAtAfter()),
-                result.baselineShifted(), dedupVoidedHandles);
+                DISPLAY_FORMAT.format(result.deadlineBefore()), DISPLAY_FORMAT.format(result.deadlineAfter()),
+                result.deadlineGuarded(), dedupVoidedHandles, quotaRefundHandles);
     }
 
     @PostMapping("/{id}/merge")
@@ -220,6 +213,17 @@ public class MergeQueueController {
 
     private String handleOf(UUID userId) {
         return users.findById(userId).map(UserAccount::getHandle).orElse("(탈퇴)");
+    }
+
+    private List<String> handlesOf(Set<UUID> submissionIds, UUID itemA, UUID itemB) {
+        if (submissionIds.isEmpty()) return List.of();
+        List<Submission> combined = new ArrayList<>();
+        combined.addAll(submissions.findByTrendItemIdAndResultNot(itemA, SubmissionResult.VOID));
+        combined.addAll(submissions.findByTrendItemIdAndResultNot(itemB, SubmissionResult.VOID));
+        return combined.stream()
+                .filter(s -> submissionIds.contains(s.getId()))
+                .map(s -> handleOf(s.getUserId()))
+                .toList();
     }
 
     /** 목록 카드의 병합 후 순위 칩 — 미리보기와 같은 규칙(시딩 제외, 동순위). */
