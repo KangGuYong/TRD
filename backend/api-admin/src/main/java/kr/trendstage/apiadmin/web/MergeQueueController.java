@@ -4,6 +4,7 @@ import kr.trendstage.apiadmin.auth.AdminPrincipal;
 import kr.trendstage.apiadmin.auth.AdminValidationException;
 import kr.trendstage.audit.AuditLogService;
 import kr.trendstage.judge.JudgeService;
+import kr.trendstage.merge.MergeComputation;
 import kr.trendstage.merge.MergeService;
 import kr.trendstage.persistence.entity.*;
 import kr.trendstage.persistence.repo.*;
@@ -69,7 +70,7 @@ public class MergeQueueController {
                                           List<SubmissionDetail> oldSubmissions) {}
     public record DecisionRequest(String reason) {}
 
-    public record OrderEntry(String handle, Integer rankBefore, int rankAfter) {}
+    public record OrderEntry(String handle, Integer rankBefore, Integer rankAfter, boolean seed) {}
     public record MergePreviewResponse(String newCanonicalName, List<OrderEntry> orderRank,
                                         String firstSeenAtBefore, String firstSeenAtAfter,
                                         boolean baselineShifted, List<String> dedupVoidedHandles) {}
@@ -100,7 +101,7 @@ public class MergeQueueController {
         for (SubmissionOrderRank r : orderRanks.findByTrendItemId(loser.getId())) beforeRank.put(r.getSubmissionId(), r.getOrderRank());
 
         List<OrderEntry> orderRank = result.orderAfter().stream()
-                .map(o -> new OrderEntry(handleOf(o.userId()), beforeRank.get(o.submissionId()), o.rank()))
+                .map(o -> new OrderEntry(handleOf(o.userId()), beforeRank.get(o.submissionId()), o.rank(), o.seed()))
                 .toList();
 
         List<String> dedupVoidedHandles = new ArrayList<>();
@@ -221,18 +222,20 @@ public class MergeQueueController {
         return users.findById(userId).map(UserAccount::getHandle).orElse("(탈퇴)");
     }
 
+    /** 목록 카드의 병합 후 순위 칩 — 미리보기와 같은 규칙(시딩 제외, 동순위). */
     private List<String> buildOrderPreview(UUID newTrendItemId, UUID oldTrendItemId) {
         List<Submission> combined = new ArrayList<>();
         combined.addAll(submissions.findByTrendItemIdAndResultNot(newTrendItemId, SubmissionResult.VOID));
         combined.addAll(submissions.findByTrendItemIdAndResultNot(oldTrendItemId, SubmissionResult.VOID));
-        combined.sort(Comparator.comparing(Submission::getCreatedAt));
-
-        List<String> preview = new ArrayList<>();
-        int rank = 1;
-        for (Submission s : combined) {
-            preview.add("order%d %s".formatted(rank++, handleOf(s.getUserId())));
-        }
-        return preview;
+        List<MergeComputation.SubmissionInput> inputs = combined.stream()
+                .map(s -> new MergeComputation.SubmissionInput(
+                        s.getId(), s.getUserId(), s.getRawInput(), s.getCreatedAt(), s.isSeed()))
+                .toList();
+        return MergeComputation.computeCombinedOrder(inputs).stream()
+                .map(o -> o.seed()
+                        ? "시딩 " + handleOf(o.userId())
+                        : "order%d %s".formatted(o.rank(), handleOf(o.userId())))
+                .toList();
     }
 
     private static String formatAgo(Instant createdAt) {

@@ -149,7 +149,8 @@ public class MergeService {
 
     private static List<MergeComputation.SubmissionInput> toInputs(List<Submission> subs) {
         return subs.stream()
-                .map(s -> new MergeComputation.SubmissionInput(s.getId(), s.getUserId(), s.getRawInput(), s.getCreatedAt()))
+                .map(s -> new MergeComputation.SubmissionInput(
+                        s.getId(), s.getUserId(), s.getRawInput(), s.getCreatedAt(), s.isSeed()))
                 .toList();
     }
 }

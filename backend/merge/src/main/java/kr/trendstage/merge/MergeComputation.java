@@ -13,8 +13,10 @@ public final class MergeComputation {
 
     private MergeComputation() {}
 
-    public record SubmissionInput(UUID submissionId, UUID userId, String rawInput, Instant createdAt) {}
-    public record OrderComputed(UUID submissionId, UUID userId, int rank) {}
+    public record SubmissionInput(UUID submissionId, UUID userId, String rawInput, Instant createdAt, boolean seed) {}
+
+    /** rank는 시딩이면 null. */
+    public record OrderComputed(UUID submissionId, UUID userId, Integer rank, boolean seed) {}
 
     /** 같은 유저가 두 클러스터 모두에 유효 제보를 낸 경우, 늦은 쪽 submissionId를 반환(03 §4.4 — 헤지 방지). */
     public static Set<UUID> computeDedup(List<SubmissionInput> a, List<SubmissionInput> b) {
@@ -51,16 +53,30 @@ public final class MergeComputation {
         return Optional.of(best);
     }
 
-    /** created_at 오름차순 = 선점 순위. 1위부터 시작. */
+    /**
+     * 선점 순위 — submission_order_rank 뷰(V28)와 같은 규칙: 시딩 제외, created_at 오름차순,
+     * 동시각은 같은 순위(RANK, 1·1·3). 시딩은 순위 없이 뒤에 붙인다(미리보기 표시용).
+     */
     public static List<OrderComputed> computeCombinedOrder(List<SubmissionInput> active) {
-        List<SubmissionInput> sorted = active.stream()
+        List<SubmissionInput> ranked = active.stream()
+                .filter(s -> !s.seed())
                 .sorted(Comparator.comparing(SubmissionInput::createdAt))
                 .toList();
         List<OrderComputed> result = new ArrayList<>();
-        int rank = 1;
-        for (SubmissionInput s : sorted) {
-            result.add(new OrderComputed(s.submissionId(), s.userId(), rank++));
+        int rank = 0;
+        Instant previous = null;
+        for (int i = 0; i < ranked.size(); i++) {
+            SubmissionInput s = ranked.get(i);
+            if (previous == null || !s.createdAt().equals(previous)) {
+                rank = i + 1;
+                previous = s.createdAt();
+            }
+            result.add(new OrderComputed(s.submissionId(), s.userId(), rank, false));
         }
+        active.stream()
+                .filter(SubmissionInput::seed)
+                .sorted(Comparator.comparing(SubmissionInput::createdAt))
+                .forEach(s -> result.add(new OrderComputed(s.submissionId(), s.userId(), null, true)));
         return result;
     }
 }
