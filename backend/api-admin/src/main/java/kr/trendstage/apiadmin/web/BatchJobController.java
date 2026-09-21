@@ -37,7 +37,8 @@ public class BatchJobController {
         ClusterMergeResult r = result.get();
         auditLogService.record(actor.id(), actor.role(), "CLUSTER_MERGE_MANUAL_TRIGGER", "BATCH_JOB", null,
                 Map.of("candidates", r.candidates(), "autoMerged", r.autoMerged(),
-                        "queued", r.queued(), "separated", r.separated(), "failed", r.failed()));
+                        "queued", r.queued(), "separated", r.separated(),
+                        "skippedJudged", r.skippedJudged(), "deferred", r.deferred(), "failed", r.failed()));
         return r;
     }
 }
