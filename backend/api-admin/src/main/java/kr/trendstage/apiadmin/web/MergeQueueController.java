@@ -2,17 +2,20 @@ package kr.trendstage.apiadmin.web;
 
 import kr.trendstage.apiadmin.auth.AdminPrincipal;
 import kr.trendstage.apiadmin.auth.AdminValidationException;
-import kr.trendstage.audit.AuditLogService;
-import kr.trendstage.judge.JudgeService;
+import kr.trendstage.apiadmin.merge.IdempotencyKeyRequiredException;
+import kr.trendstage.apiadmin.merge.MergeDecisionService;
+import kr.trendstage.apiadmin.merge.MergeDecisionService.Decision;
+import kr.trendstage.apiadmin.merge.MergeDecisionService.Outcome;
 import kr.trendstage.merge.MergeComputation;
 import kr.trendstage.merge.MergeService;
 import kr.trendstage.persistence.entity.*;
 import kr.trendstage.persistence.repo.*;
 import kr.trendstage.persistence.type.MergeQueueStatus;
 import kr.trendstage.persistence.type.SubmissionResult;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Clock;
@@ -25,10 +28,13 @@ import java.util.*;
 /**
  * ADM-100 병합 검수 큐. 권한(02 §1.1): 병합/분리는 REVIEWER 이상, VOID는 OPERATOR 이상.
  * Type1(신규 제보 ↔ 기존 클러스터)만 다룬다 — 관리자가 임의로 두 클러스터를 고르는 수동 병합(Type2)은 아직 없음.
+ * 결정 요청은 Idempotency-Key 필수(SP2 K5) — 같은 키 재요청은 이전 결과를 돌려준다.
  */
 @RestController
 @RequestMapping("/admin/merge-queue")
 public class MergeQueueController {
+
+    static final int MAX_IDEMPOTENCY_KEY_LENGTH = 80;
 
     private final MergeQueueRepository mergeQueue;
     private final TrendItemRepository trendItems;
@@ -37,8 +43,7 @@ public class MergeQueueController {
     private final UserRepository users;
     private final UserGradeRepository userGrades;
     private final MergeService mergeService;
-    private final JudgeService judgeService;
-    private final AuditLogService auditLogService;
+    private final MergeDecisionService decisions;
     private final Clock clock;
 
     private static final DateTimeFormatter DISPLAY_FORMAT =
@@ -47,8 +52,7 @@ public class MergeQueueController {
     public MergeQueueController(MergeQueueRepository mergeQueue, TrendItemRepository trendItems,
                                  SubmissionRepository submissions, SubmissionOrderRankRepository orderRanks,
                                  UserRepository users, UserGradeRepository userGrades,
-                                 MergeService mergeService, JudgeService judgeService,
-                                 AuditLogService auditLogService, Clock clock) {
+                                 MergeService mergeService, MergeDecisionService decisions, Clock clock) {
         this.mergeQueue = mergeQueue;
         this.trendItems = trendItems;
         this.submissions = submissions;
@@ -56,8 +60,7 @@ public class MergeQueueController {
         this.users = users;
         this.userGrades = userGrades;
         this.mergeService = mergeService;
-        this.judgeService = judgeService;
-        this.auditLogService = auditLogService;
+        this.decisions = decisions;
         this.clock = clock;
     }
 
@@ -117,44 +120,49 @@ public class MergeQueueController {
 
     @PostMapping("/{id}/merge")
     @PreAuthorize("hasAnyRole('REVIEWER', 'OPERATOR', 'ADMIN')")
-    @Transactional
-    public void merge(@PathVariable UUID id, @RequestBody(required = false) DecisionRequest req,
-                       @AuthenticationPrincipal AdminPrincipal actor) {
-        MergeQueueEntry entry = requirePending(id);
-        TrendItem newItem = trendItems.findById(entry.getNewTrendItemId()).orElseThrow();
-        TrendItem oldItem = trendItems.findById(entry.getOldTrendItemId()).orElseThrow();
-
-        TrendItem survivor = newItem.getFirstSeenAt().isBefore(oldItem.getFirstSeenAt()) ? newItem : oldItem;
-        TrendItem loser = survivor == newItem ? oldItem : newItem;
-        String reason = req == null ? null : req.reason();
-
-        mergeService.merge(survivor.getId(), loser.getId(), actor.id(), actor.role(), reason);
-        entry.resolve(MergeQueueStatus.MERGED, actor.id(), clock.instant());
+    public ResponseEntity<?> merge(@PathVariable UUID id,
+                                   @RequestHeader(value = "Idempotency-Key", required = false) String key,
+                                   @RequestBody(required = false) DecisionRequest req,
+                                   @AuthenticationPrincipal AdminPrincipal actor) {
+        return respond(decisions.decide(id, Decision.MERGE, requireKey(key), actor.id(), actor.role(), reasonOf(req)));
     }
 
     @PostMapping("/{id}/separate")
     @PreAuthorize("hasAnyRole('REVIEWER', 'OPERATOR', 'ADMIN')")
-    @Transactional
-    public void separate(@PathVariable UUID id, @RequestBody(required = false) DecisionRequest req,
-                          @AuthenticationPrincipal AdminPrincipal actor) {
-        MergeQueueEntry entry = requirePending(id);
-        String reason = req == null ? null : req.reason();
-        mergeService.recordSeparateDecision(actor.id(), actor.role(), entry.getNewTrendItemId(), entry.getOldTrendItemId(), reason);
-        entry.resolve(MergeQueueStatus.SKIPPED, actor.id(), clock.instant());
+    public ResponseEntity<?> separate(@PathVariable UUID id,
+                                      @RequestHeader(value = "Idempotency-Key", required = false) String key,
+                                      @RequestBody(required = false) DecisionRequest req,
+                                      @AuthenticationPrincipal AdminPrincipal actor) {
+        return respond(decisions.decide(id, Decision.SEPARATE, requireKey(key), actor.id(), actor.role(), reasonOf(req)));
     }
 
     @PostMapping("/{id}/void")
     @PreAuthorize("hasAnyRole('OPERATOR', 'ADMIN')")
-    @Transactional
-    public void voidCandidate(@PathVariable UUID id, @RequestBody(required = false) DecisionRequest req,
-                               @AuthenticationPrincipal AdminPrincipal actor) {
-        MergeQueueEntry entry = requirePending(id);
-        String reason = req == null ? null : req.reason();
-        // 항목 VOID는 판정 사건이다(P5) — 판정된 항목이면 원장 상쇄까지 JudgeService가 한다
-        judgeService.voidItem(entry.getNewTrendItemId(), reason, clock.instant());
-        auditLogService.record(actor.id(), actor.role(), "MERGE_VOID", "TREND_ITEM", entry.getNewTrendItemId(),
-                Map.of("reason", reason == null ? "" : reason));
-        entry.resolve(MergeQueueStatus.VOIDED, actor.id(), clock.instant());
+    public ResponseEntity<?> voidCandidate(@PathVariable UUID id,
+                                           @RequestHeader(value = "Idempotency-Key", required = false) String key,
+                                           @RequestBody(required = false) DecisionRequest req,
+                                           @AuthenticationPrincipal AdminPrincipal actor) {
+        return respond(decisions.decide(id, Decision.VOID, requireKey(key), actor.id(), actor.role(), reasonOf(req)));
+    }
+
+    private static String requireKey(String key) {
+        if (key == null || key.isBlank() || key.length() > MAX_IDEMPOTENCY_KEY_LENGTH) {
+            throw new IdempotencyKeyRequiredException("Idempotency-Key 헤더(1~80자)가 필요합니다");
+        }
+        return key;
+    }
+
+    private static String reasonOf(DecisionRequest req) {
+        return req == null ? null : req.reason();
+    }
+
+    /** 사라진 후보는 서비스가 정리를 커밋한 뒤 409로 알린다 — 예외로 던지면 정리가 롤백된다. */
+    private static ResponseEntity<?> respond(Outcome outcome) {
+        if (outcome.stale()) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Problems.of(409, "merge-target-merged",
+                    "대상 항목이 이미 다른 항목으로 병합돼 후보를 정리했습니다"));
+        }
+        return ResponseEntity.ok(outcome.body());
     }
 
     private MergeQueueEntry requirePending(UUID id) {

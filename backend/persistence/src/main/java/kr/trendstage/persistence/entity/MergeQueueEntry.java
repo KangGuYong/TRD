@@ -58,10 +58,6 @@ public class MergeQueueEntry {
         this.decisionKey = key;
     }
 
-    public void resolve(MergeQueueStatus status, UUID resolvedBy, Instant at) {
-        resolve(status, resolvedBy, at, null);
-    }
-
     public UUID getId() { return id; }
     public UUID getNewTrendItemId() { return newTrendItemId; }
     public UUID getOldTrendItemId() { return oldTrendItemId; }

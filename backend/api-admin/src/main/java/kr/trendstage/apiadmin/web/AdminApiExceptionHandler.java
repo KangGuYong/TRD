@@ -8,8 +8,11 @@ import kr.trendstage.apiadmin.auth.DraftLockedException;
 import kr.trendstage.apiadmin.auth.DuplicateLoginIdException;
 import kr.trendstage.apiadmin.auth.InvalidCredentialsException;
 import kr.trendstage.apiadmin.auth.SelfModificationException;
+import kr.trendstage.apiadmin.merge.IdempotencyKeyMismatchException;
+import kr.trendstage.apiadmin.merge.IdempotencyKeyRequiredException;
 import kr.trendstage.judge.JudgeConflictException;
 import kr.trendstage.judge.JudgeRejectedException;
+import kr.trendstage.merge.MergeConflictException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
@@ -53,6 +56,22 @@ public class AdminApiExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(problem(409, e.getMessage()));
     }
 
+    /** 병합 거부 — type으로 판정 중(재시도)·판정 완료(영구)·이미 병합·이미 처리를 구분한다(SP2 K2). */
+    @ExceptionHandler(MergeConflictException.class)
+    public ResponseEntity<Map<String, Object>> handle(MergeConflictException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(Problems.of(409, e.type(), e.getMessage()));
+    }
+
+    @ExceptionHandler(IdempotencyKeyRequiredException.class)
+    public ResponseEntity<Map<String, Object>> handle(IdempotencyKeyRequiredException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Problems.of(400, "idempotency-key-required", e.getMessage()));
+    }
+
+    @ExceptionHandler(IdempotencyKeyMismatchException.class)
+    public ResponseEntity<Map<String, Object>> handle(IdempotencyKeyMismatchException e) {
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(Problems.of(422, "idempotency-key-mismatch", e.getMessage()));
+    }
+
     @ExceptionHandler(DuplicateLoginIdException.class)
     public ResponseEntity<Map<String, Object>> handle(DuplicateLoginIdException e) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(problem(409, e.getMessage()));
@@ -89,6 +108,6 @@ public class AdminApiExceptionHandler {
     }
 
     private Map<String, Object> problem(int status, String detail) {
-        return Map.of("type", "about:blank", "status", status, "detail", detail == null ? "" : detail);
+        return Problems.of(status, "about:blank", detail);
     }
 }
