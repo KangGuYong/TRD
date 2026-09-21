@@ -36,6 +36,11 @@ public interface SubmissionRepository extends JpaRepository<Submission, UUID> {
     /** 409 응답의 dupeRank(클러스터 내 현재 제보 수) 계산용. */
     long countByTrendItemIdAndResultNot(UUID trendItemId, SubmissionResult excluded);
 
+    /** ADM-110 목록의 '제보자수' — 판정 신호와 같은 기준(서로 다른 제보자, 시딩·VOID 제외). */
+    @Query("select count(distinct s.userId) from Submission s "
+            + "where s.trendItemId = :id and s.seed = false and s.result <> :excluded")
+    long countDistinctSubmitters(@Param("id") UUID trendItemId, @Param("excluded") SubmissionResult excluded);
+
     long countByCreatedAtAfter(Instant since);
 
     long countByCreatedAtAfterAndSeedTrue(Instant since);

@@ -88,7 +88,8 @@ public class TrendItemAdminService {
         return trendItems.findAll().stream()
                 .sorted(Comparator.comparing(TrendItem::getFirstSeenAt).reversed())
                 .map(item -> {
-                    long submitterCount = submissions.countByTrendItemIdAndResultNot(item.getId(), SubmissionResult.VOID);
+                    // 상세(ADM-111)·판정과 같은 기준: 서로 다른 제보자, 시딩 제외
+                    long submitterCount = submissions.countDistinctSubmitters(item.getId(), SubmissionResult.VOID);
                     Verdict current = verdicts.findCurrentByTrendItemId(item.getId()).orElse(null);
                     return new TrendItemSummary(
                             item.getId().toString(), item.getCanonicalName(), item.getCategory().name(), item.getState().name(),
