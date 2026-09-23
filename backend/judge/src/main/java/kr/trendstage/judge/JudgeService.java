@@ -213,7 +213,7 @@ public class JudgeService {
                     .subtract(before.getOrDefault(submissionId, BigDecimal.ZERO));
             if (diff.signum() != 0) {
                 ledger.save(ScoreLedgerEntry.verdictAdjustment(owner.get(submissionId), submissionId, next.getId(),
-                        diff, reason, chain.params().halflifeDays, chain.anchor()));
+                        diff, reason, chain.params().halflifeDays, chain.anchor(), null, null));
             }
         }
     }

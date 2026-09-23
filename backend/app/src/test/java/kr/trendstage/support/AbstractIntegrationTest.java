@@ -1,5 +1,8 @@
 package kr.trendstage.support;
 
+import jakarta.servlet.http.Cookie;
+import kr.trendstage.apiadmin.auth.AdminPrincipal;
+import kr.trendstage.persistence.type.AdminRole;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -7,9 +10,18 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
+
+import java.util.List;
+import java.util.UUID;
+
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
 /**
  * 통합 테스트 공통 기반. 실제 PostgreSQL(pgvector, infra/docker-compose와 같은 이미지)을 한 번 띄워
@@ -56,5 +68,22 @@ public abstract class AbstractIntegrationTest {
      */
     protected void releaseBatchLock(String name) {
         jdbc.update("UPDATE shedlock SET lock_until = TIMESTAMP '1970-01-01' WHERE name = ?", name);
+    }
+
+    /**
+     * 관리자 세션 + CSRF(쿠키-헤더 이중 제출). role은 계정의 DB 역할과 같아야 한다 —
+     * 세션 재검증(SP3 K7)이 다르면 401을 낸다.
+     */
+    protected RequestPostProcessor asAdmin(UUID accountId, AdminRole role) throws Exception {
+        Cookie csrf = mvc.perform(get("/admin/auth/csrf")).andReturn().getResponse().getCookie("XSRF-TOKEN");
+        AdminPrincipal principal = new AdminPrincipal(accountId, "t_" + accountId, "테스터", role);
+        RequestPostProcessor auth = authentication(new UsernamePasswordAuthenticationToken(
+                principal, null, List.of(new SimpleGrantedAuthority("ROLE_" + role.name()))));
+        return request -> {
+            auth.postProcessRequest(request);
+            request.setCookies(csrf);
+            request.addHeader("X-XSRF-TOKEN", csrf.getValue());
+            return request;
+        };
     }
 }
