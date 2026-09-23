@@ -34,12 +34,12 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -122,10 +122,10 @@ public class JudgeService {
 
     /**
      * 재판정 — 원 판정 때 동결한 파라미터로 다시 계산해 supersede 판정을 쌓고, 원장은 제보 단위 차액만 ADJ로 남긴다(J2).
-     * 그사이 VOID된 제보가 빠지는 것이 재판정의 실질이다. 유효 제보가 0건이 되면 VOID 판정 → 항목 VOID.
+     * 차액 절댓값 합이 policy 한도를 넘으면 아무것도 쓰지 않고 NeedsApproval(SP3 K4).
      */
     @Transactional
-    public Verdict rejudge(UUID itemId, String reason, Instant now) {
+    public JudgeOutcome rejudge(UUID itemId, String reason, Instant now, AdjustmentPolicy policy) {
         TrendItem item = lock(itemId);
         Verdict current = verdicts.findCurrentByTrendItemId(itemId)
                 .orElseThrow(() -> new JudgeRejectedException("판정 이력이 없는 항목입니다"));
@@ -135,47 +135,56 @@ public class JudgeService {
         Chain chain = chainOf(itemId);
         Inputs in = collect(item, deadlineOf(item));
         VerdictPlan plan = VerdictComputation.run(in.signal(), in.refs(), chain.params());
+        Map<UUID, Diff> diffs = diffs(chain, plan.ledgerLines());
+        BigDecimal total = total(diffs);
+        if (policy.exceededBy(total)) {
+            return new JudgeOutcome.NeedsApproval(total, plan.result());
+        }
 
         Verdict next = supersede(new Verdict(itemId, plan.result(), plan.reach(), scoreT(plan), now,
                 evidence(plan, in, chain.params(), current.getId(), reason), current.getId()));
-        settle(chain, next, plan.ledgerLines(), "재판정 · " + reason);
+        writeAdjustments(diffs, chain, next, "재판정 · " + reason, policy);
         for (Submission s : in.submissions()) {
             s.markResult(toSubmissionResult(plan.result()), now);
         }
         if (plan.result() == VerdictResult.VOID) {
             item.transitionTo(TrendState.VOID);
         }
-        return next;
+        return new JudgeOutcome.Applied(Optional.of(next), total);
     }
 
     /**
-     * 항목 VOID(P5 "항목이 VOID됨") — ADM-100 큐 VOID와 ADM-200 VOID의 공통 경로.
-     * 비VOID 제보 전부 VOID(voided_at = 제보권 반환 시점, J4). 판정이 있었으면 VOID 판정을 쌓고 원장을 제보 단위로 전액 상쇄한다.
-     *
-     * @return 새 VOID 판정(판정 전 항목이면 비어 있음)
+     * 항목 VOID(P5) — ADM-100 큐 VOID와 ADM-200 VOID의 공통 경로. 판정된 항목이면 원장을 제보 단위로 전액 상쇄하는데,
+     * 그 합이 policy 한도를 넘으면 아무것도 쓰지 않고 NeedsApproval. 판정 전 항목은 변동 0이라 항상 반영.
      */
     @Transactional
-    public Optional<Verdict> voidItem(UUID itemId, String reason, Instant now) {
+    public JudgeOutcome voidItem(UUID itemId, String reason, Instant now, AdjustmentPolicy policy) {
         TrendItem item = lock(itemId);
         if (item.getState() == TrendState.MERGED || item.getState() == TrendState.VOID) {
             throw new JudgeConflictException("이미 병합됐거나 VOID된 항목입니다");
         }
+        Optional<Verdict> current = verdicts.findCurrentByTrendItemId(itemId);
+        Chain chain = current.isPresent() ? chainOf(itemId) : null;
+        Map<UUID, Diff> diffs = chain == null ? Map.of() : diffs(chain, List.of());
+        BigDecimal total = total(diffs);
+        if (policy.exceededBy(total)) {
+            return new JudgeOutcome.NeedsApproval(total, VerdictResult.VOID);
+        }
+
         for (Submission s : submissions.findByTrendItemIdAndResultNot(itemId, SubmissionResult.VOID)) {
             s.voidOut(now);
         }
-        Optional<Verdict> current = verdicts.findCurrentByTrendItemId(itemId);
         Optional<Verdict> voided = Optional.empty();
         if (current.isPresent()) {
-            Chain chain = chainOf(itemId);
             Verdict next = supersede(new Verdict(itemId, VerdictResult.VOID, null, null, now,
                     write(new VerdictEvidence("VOID", null, null, null, null, null, 0, 0, Map.of(),
                             current.get().getId(), reason)),
                     current.get().getId()));
-            settle(chain, next, List.of(), "VOID · " + (reason == null ? "" : reason));
+            writeAdjustments(diffs, chain, next, "VOID · " + (reason == null ? "" : reason), policy);
             voided = Optional.of(next);
         }
         item.transitionTo(TrendState.VOID);
-        return voided;
+        return new JudgeOutcome.Applied(voided, total);
     }
 
     /** 판정 체인 — 원본의 파라미터·판정 시각이 재판정·VOID 차액의 기준이다(J1·J2). */
@@ -192,30 +201,45 @@ public class JudgeService {
         return new Chain(all.stream().map(Verdict::getId).toList(), frozen.toParameterSet(), original.getJudgedAt());
     }
 
-    /** 체인 원장을 제보 단위로 합산해 새 라인과의 차액만 ADJ로 남긴다 — 원 판정과 같은 감쇠 기준(J1). */
-    private void settle(Chain chain, Verdict next, List<LedgerLine> lines, String reason) {
-        Map<UUID, BigDecimal> before = new HashMap<>();
-        Map<UUID, UUID> owner = new HashMap<>();
+    /** 제보 단위 차액 한 줄. */
+    record Diff(UUID userId, BigDecimal amount) {}
+
+    /** 체인 원장을 제보 단위로 합산해 새 라인과의 차액을 계산한다(쓰기 없음). 0인 제보는 빠진다. */
+    private Map<UUID, Diff> diffs(Chain chain, List<LedgerLine> lines) {
+        Map<UUID, BigDecimal> before = new TreeMap<>();
+        Map<UUID, UUID> owner = new TreeMap<>();
         for (ScoreLedgerEntry e : ledger.findByVerdictIdIn(chain.verdictIds())) {
             if (e.getSubmissionId() == null) continue;
             before.merge(e.getSubmissionId(), e.getDelta(), BigDecimal::add);
             owner.put(e.getSubmissionId(), e.getUserId());
         }
-        Map<UUID, BigDecimal> after = new HashMap<>();
+        Map<UUID, BigDecimal> after = new TreeMap<>();
         for (LedgerLine line : lines) {
             after.put(line.submissionId(), amount(line.delta()));
             owner.put(line.submissionId(), line.userId());
         }
-        Set<UUID> touched = new HashSet<>(before.keySet());
+        Set<UUID> touched = new java.util.TreeSet<>(before.keySet());
         touched.addAll(after.keySet());
+        Map<UUID, Diff> out = new LinkedHashMap<>();
         for (UUID submissionId : touched) {
             BigDecimal diff = after.getOrDefault(submissionId, BigDecimal.ZERO)
                     .subtract(before.getOrDefault(submissionId, BigDecimal.ZERO));
-            if (diff.signum() != 0) {
-                ledger.save(ScoreLedgerEntry.verdictAdjustment(owner.get(submissionId), submissionId, next.getId(),
-                        diff, reason, chain.params().halflifeDays, chain.anchor(), null, null));
-            }
+            if (diff.signum() != 0) out.put(submissionId, new Diff(owner.get(submissionId), diff));
         }
+        return out;
+    }
+
+    /** 차액 절댓값 합(K3) — 원장 자릿수(4). */
+    static BigDecimal total(Map<UUID, Diff> diffs) {
+        return diffs.values().stream().map(d -> d.amount().abs())
+                .reduce(BigDecimal.ZERO, BigDecimal::add).setScale(4, RoundingMode.HALF_UP);
+    }
+
+    /** 차액을 ADJ로 남긴다 — 원 판정과 같은 감쇠 기준(J1). 승인 실행이면 승인 정보를 채운다. */
+    private void writeAdjustments(Map<UUID, Diff> diffs, Chain chain, Verdict next, String reason, AdjustmentPolicy policy) {
+        diffs.forEach((submissionId, d) -> ledger.save(ScoreLedgerEntry.verdictAdjustment(d.userId(), submissionId,
+                next.getId(), d.amount(), reason, chain.params().halflifeDays, chain.anchor(),
+                policy.approvalId(), policy.approvedBy())));
     }
 
     /** 체인 분기는 DB(verdict_superseded_once)가 막는다 — 행 잠금 덕에 거의 없지만 마지막 방어선을 409로 옮긴다. */

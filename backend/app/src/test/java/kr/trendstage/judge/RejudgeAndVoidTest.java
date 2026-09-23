@@ -6,11 +6,13 @@ import kr.trendstage.support.AbstractIntegrationTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -21,8 +23,13 @@ class RejudgeAndVoidTest extends AbstractIntegrationTest {
 
     private static final Instant FIRST_SEEN = Instant.parse("2026-08-01T00:00:00Z");
     private static final Instant JUDGED_AT = FIRST_SEEN.plus(Duration.ofDays(15));
+    private static final AdjustmentPolicy NO_LIMIT = AdjustmentPolicy.limitedTo(new BigDecimal("999999"));
 
     @Autowired JudgeService judge;
+
+    private static Optional<Verdict> applied(JudgeOutcome o) {
+        return ((JudgeOutcome.Applied) o).verdict();
+    }
 
     @Test
     void rejudgeWritesPerSubmissionDiffAndSecondRejudgeAddsNothing() {   // #8
@@ -41,7 +48,7 @@ class RejudgeAndVoidTest extends AbstractIntegrationTest {
         // 카르텔로 드러난 2건 VOID → 2명 → MISS
         fx.voidSubmission(subs.get(2), JUDGED_AT.plusSeconds(10));
         fx.voidSubmission(subs.get(3), JUDGED_AT.plusSeconds(10));
-        judge.rejudge(item, "카르텔", JUDGED_AT.plus(Duration.ofDays(1)));
+        judge.rejudge(item, "카르텔", JUDGED_AT.plus(Duration.ofDays(1)), NO_LIMIT);
 
         assertThat(fx.ledgerSum(users.get(0), item)).isEqualByComparingTo("-15");   // 36 − 51
         assertThat(fx.ledgerSum(users.get(1), item)).isEqualByComparingTo("-15");   // 21.6 − 36.6
@@ -55,7 +62,7 @@ class RejudgeAndVoidTest extends AbstractIntegrationTest {
                 Integer.class, item, Timestamp.from(JUDGED_AT))).isZero();
 
         int rowsAfterFirst = fx.ledgerRows(item);
-        judge.rejudge(item, "재확인", JUDGED_AT.plus(Duration.ofDays(2)));
+        judge.rejudge(item, "재확인", JUDGED_AT.plus(Duration.ofDays(2)), NO_LIMIT);
         assertThat(fx.ledgerRows(item)).isEqualTo(rowsAfterFirst);   // 차액 0 — 두 번째 재판정 이중 반영 회귀
         assertThat(fx.ledgerSum(users.get(0), item)).isEqualByComparingTo("-15");
     }
@@ -68,7 +75,7 @@ class RejudgeAndVoidTest extends AbstractIntegrationTest {
 
         UUID draft = fx.appliedDraft("{\"submitterTarget\":20,\"hitThreshold\":0.10}");   // 지금 적용값이면 HIT
         try {
-            Verdict next = judge.rejudge(item, "입력 변화 없음", JUDGED_AT.plus(Duration.ofDays(1)));
+            Verdict next = applied(judge.rejudge(item, "입력 변화 없음", JUDGED_AT.plus(Duration.ofDays(1)), NO_LIMIT)).orElseThrow();
             assertThat(next.getResult()).isEqualTo(VerdictResult.MISS);
             assertThat(jdbc.queryForObject("SELECT count(*) FROM score_ledger l JOIN verdicts v ON v.id = l.verdict_id "
                     + "WHERE v.trend_item_id = ? AND l.kind = 'ADJ'", Integer.class, item)).isZero();
@@ -89,14 +96,14 @@ class RejudgeAndVoidTest extends AbstractIntegrationTest {
         judgeAfterDeadline(item);
         Instant voidAt = JUDGED_AT.plus(Duration.ofDays(1));
 
-        assertThat(judge.voidItem(item, "허위 제보", voidAt)).isPresent();
+        assertThat(applied(judge.voidItem(item, "허위 제보", voidAt, NO_LIMIT))).isPresent();
 
         users.forEach(u -> assertThat(fx.ledgerSum(u, item)).isEqualByComparingTo("0"));
         assertThat(jdbc.queryForObject("SELECT count(*) FROM submissions WHERE trend_item_id = ? "
                 + "AND (result <> 'VOID' OR voided_at <> ?)", Integer.class, item, Timestamp.from(voidAt))).isZero();
         assertThat(fx.itemState(item)).isEqualTo("VOID");
-        assertThatThrownBy(() -> judge.voidItem(item, "다시", voidAt)).isInstanceOf(JudgeConflictException.class);
-        assertThatThrownBy(() -> judge.rejudge(item, "다시", voidAt)).isInstanceOf(JudgeConflictException.class);
+        assertThatThrownBy(() -> judge.voidItem(item, "다시", voidAt, NO_LIMIT)).isInstanceOf(JudgeConflictException.class);
+        assertThatThrownBy(() -> judge.rejudge(item, "다시", voidAt, NO_LIMIT)).isInstanceOf(JudgeConflictException.class);
     }
 
     @Test
@@ -104,7 +111,7 @@ class RejudgeAndVoidTest extends AbstractIntegrationTest {
         UUID item = fx.item(FIRST_SEEN);
         UUID s = fx.submission(fx.user(), item, 30, FIRST_SEEN.plusSeconds(1));
 
-        assertThat(judge.voidItem(item, null, FIRST_SEEN.plus(Duration.ofDays(1)))).isEmpty();
+        assertThat(applied(judge.voidItem(item, null, FIRST_SEEN.plus(Duration.ofDays(1)), NO_LIMIT))).isEmpty();
 
         assertThat(fx.itemState(item)).isEqualTo("VOID");
         assertThat(fx.submissionResult(s)).isEqualTo("VOID");
