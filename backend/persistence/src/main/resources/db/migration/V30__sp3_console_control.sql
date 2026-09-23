@@ -3,11 +3,13 @@
 -- 1) 계정 통제(K2·K6). 기존 계정은 승인권·활성 모두 생성 시각부터 — 규칙 도입 전 계정을 잠그지 않는다.
 ALTER TABLE admin_accounts
     ADD COLUMN approver_since TIMESTAMPTZ,
-    ADD COLUMN activated_at   TIMESTAMPTZ;
+    ADD COLUMN activated_at   TIMESTAMPTZ,
+    ADD COLUMN last_enabled_at TIMESTAMPTZ;
 UPDATE admin_accounts SET approver_since = created_at, activated_at = created_at;
 ALTER TABLE admin_accounts ALTER COLUMN approver_since SET NOT NULL;
 COMMENT ON COLUMN admin_accounts.approver_since IS '이 시각부터 승인권이 있다. 생성·ADMIN 승격 시 +7일(P8). 부트스트랩 계정은 생성 시각.';
 COMMENT ON COLUMN admin_accounts.activated_at IS 'NULL = 계정 생성 승인 대기(로그인 불가). 승인되거나 부트스트랩 예외로 만들면 채워진다.';
+COMMENT ON COLUMN admin_accounts.last_enabled_at IS '마지막 재활성화 시각. sla_watch 90일 미접속 판단은 last_login_at·activated_at·last_enabled_at·created_at 중 가장 늦은 시각 기준 — 재활성화 직후 다시 꺼지지 않게.';
 
 -- 2) 신고 자동 임시 비공개 기록(K9) — 있으면 sla_watch가 다시 처리하지 않는다
 ALTER TABLE reports ADD COLUMN auto_hidden_at TIMESTAMPTZ;

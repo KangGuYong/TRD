@@ -1,5 +1,6 @@
 package kr.trendstage.sla;
 
+import kr.trendstage.scheduler.SlaWatchJob;
 import kr.trendstage.scheduler.SlaWatchService;
 import kr.trendstage.support.Fixtures;
 import kr.trendstage.support.TestClockConfig;
@@ -39,6 +40,7 @@ class SlaLastAdminTest {
 
     static { POSTGRES.start(); }
 
+    @Autowired SlaWatchJob job;
     @Autowired SlaWatchService sla;
     @Autowired JdbcTemplate jdbc;
 
@@ -46,10 +48,11 @@ class SlaLastAdminTest {
     void lastActiveAdminIsNeverDisabled() {
         Instant now = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS);
         UUID only = new Fixtures(jdbc).admin();
-        jdbc.update("UPDATE admin_accounts SET created_at = ?, last_login_at = NULL WHERE id = ?",
-                Timestamp.from(now.minus(java.time.Duration.ofDays(120))), only);
+        jdbc.update("UPDATE admin_accounts SET created_at = ?, activated_at = ?, last_login_at = NULL WHERE id = ?",
+                Timestamp.from(now.minus(java.time.Duration.ofDays(120))), Timestamp.from(now.minus(java.time.Duration.ofDays(120))), only);
 
-        sla.disableInactiveAdmins(now);
+        assertThat(sla.inactiveAdminIds(now)).contains(only);   // 미접속 후보이긴 하다
+        job.disableInactiveAdmins(now);
 
         assertThat(jdbc.queryForObject("SELECT disabled_at IS NULL FROM admin_accounts WHERE id = ?", Boolean.class, only)).isTrue();
     }

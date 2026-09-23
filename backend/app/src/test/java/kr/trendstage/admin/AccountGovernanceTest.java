@@ -44,6 +44,30 @@ class AccountGovernanceTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void rejectedCreationDisablesAccount() throws Exception {   // 최종 리뷰 #4 — 반려된 계정이 "승인 대기"로 영영 남지 않는다
+        UUID admin = fx.admin();
+        fx.admin();
+        String loginId = "rej_" + UUID.randomUUID().toString().substring(0, 8);
+        String body = mvc.perform(post("/admin/accounts").with(asAdmin(admin, AdminRole.ADMIN))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"loginId\":\"" + loginId + "\",\"displayName\":\"반려\",\"role\":\"OPERATOR\",\"password\":\"pw-12345678\"}"))
+                .andExpect(status().isAccepted())
+                .andReturn().getResponse().getContentAsString();
+        UUID accountId = UUID.fromString(com.jayway.jsonpath.JsonPath.read(body, "$.account.id"));
+        UUID approvalId = UUID.fromString(com.jayway.jsonpath.JsonPath.read(body, "$.approvalRequestId"));
+
+        mvc.perform(post("/admin/approvals/{id}/reject", approvalId).with(asAdmin(fx.admin(), AdminRole.ADMIN))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"불필요한 계정\"}"))
+                .andExpect(status().isOk());
+
+        assertThat(jdbc.queryForObject("SELECT disabled_at IS NOT NULL FROM admin_accounts WHERE id = ?", Boolean.class, accountId)).isTrue();
+        assertThat(jdbc.queryForObject("SELECT activated_at IS NULL FROM admin_accounts WHERE id = ?", Boolean.class, accountId)).isTrue();
+        login(loginId, "pw-12345678").andExpect(status().isForbidden());
+        mvc.perform(get("/admin/accounts").with(asAdmin(admin, AdminRole.ADMIN)))
+                .andExpect(jsonPath("$[?(@.id == '%s')].pendingApproval", accountId).value(org.hamcrest.Matchers.hasItem(false)));
+    }
+
+    @Test
     void enablingPendingAccountIsRejected() throws Exception {
         UUID pending = fx.pendingAdmin("REVIEWER");
         mvc.perform(post("/admin/accounts/{id}/enable", pending).with(asAdmin(fx.admin(), AdminRole.ADMIN)))

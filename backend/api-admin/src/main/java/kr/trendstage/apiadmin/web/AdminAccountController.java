@@ -102,9 +102,9 @@ public class AdminAccountController {
         AdminAccount account = repository.findById(id)
                 .orElseThrow(() -> new AdminValidationException("존재하지 않는 계정입니다"));
         if (account.getActivatedAt() == null) {
-            throw new AdminValidationException("승인 대기 계정은 활성화할 수 없습니다 — 승인 요청을 처리하세요");
+            throw new AdminValidationException("승인되지 않은 계정은 활성화할 수 없습니다 — 승인 대기면 승인 요청을 처리하세요(반려된 계정은 다시 만드세요)");
         }
-        account.enable();
+        account.enable(clock.instant());
 
         auditLogService.record(actor.id(), actor.role(), "ACCOUNT_ENABLE", "ADMIN_ACCOUNT", id, Map.of());
         return toSummary(account);
@@ -114,7 +114,8 @@ public class AdminAccountController {
         return new AdminAccountSummary(
                 a.getId().toString(), a.getLoginId(), a.getDisplayName(), a.getRole().name(),
                 format(a.getLastLoginAt()), format(a.getDisabledAt()), format(a.getCreatedAt()),
-                format(a.getActivatedAt()), format(a.getApproverSince()), a.getActivatedAt() == null);
+                format(a.getActivatedAt()), format(a.getApproverSince()),
+                a.getActivatedAt() == null && a.getDisabledAt() == null);   // 반려(비활성화)된 생성 요청은 대기가 아니다
     }
 
     private static String format(Instant instant) {

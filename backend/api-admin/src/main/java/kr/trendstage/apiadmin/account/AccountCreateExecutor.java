@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
 import java.time.Clock;
 import java.util.Map;
 
-/** ACCOUNT_CREATE 승인 — 계정을 활성화한다. 반려되면 미활성으로 남는다(아이디 점유). */
+/** ACCOUNT_CREATE 승인 — 계정을 활성화한다. 반려되면 비활성화된다(미활성 그대로, 아이디 점유). */
 @Component
 public class AccountCreateExecutor implements ApprovalExecutor {
 
@@ -31,6 +31,14 @@ public class AccountCreateExecutor implements ApprovalExecutor {
                 .orElseThrow(() -> new IllegalStateException("대상 계정 없음: " + request.getTargetRef()));
         account.activate(clock.instant());
         return Map.of("loginId", account.getLoginId(), "role", account.getRole().name());
+    }
+
+    /** 반려 — 계정을 비활성화한다(승인 대기로 영영 남지 않게). activated_at은 NULL 그대로라 로그인·재활성화 모두 불가. */
+    @Override
+    public void onReject(ApprovalRequest request) {
+        AdminAccount account = accounts.findByIdForUpdate(request.getTargetRef())
+                .orElseThrow(() -> new IllegalStateException("대상 계정 없음: " + request.getTargetRef()));
+        account.disable(clock.instant());
     }
 
     @Override

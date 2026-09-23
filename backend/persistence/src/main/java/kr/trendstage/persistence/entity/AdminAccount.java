@@ -63,6 +63,10 @@ public class AdminAccount {
     @Column(name = "activated_at")
     private Instant activatedAt;
 
+    /** 마지막 재활성화 시각 — sla_watch 미접속 판단에 들어간다(재활성화 직후 다시 꺼지지 않게). */
+    @Column(name = "last_enabled_at")
+    private Instant lastEnabledAt;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt = Instant.now();
 
@@ -105,7 +109,16 @@ public class AdminAccount {
     }
 
     public void disable(Instant at) { this.disabledAt = at; }
-    public void enable() { this.disabledAt = null; }
+    public void enable(Instant at) {
+        this.disabledAt = null;
+        this.lastEnabledAt = at;
+    }
+
+    /** 마지막 활동 시각 — 로그인·활성화(승인)·재활성화·생성 중 가장 늦은 것(sla_watch 90일 미접속 기준). */
+    public Instant lastActiveAt() {
+        return java.util.stream.Stream.of(lastLoginAt, activatedAt, lastEnabledAt, createdAt)
+                .filter(java.util.Objects::nonNull).max(Instant::compareTo).orElse(createdAt);
+    }
 
     /** ADM-500: 최초 시딩 등록 시 자동 생성된 합성 유저 계정과 연결. */
     public void linkSeedUser(UUID seedUserId) { this.seedUserId = seedUserId; }
@@ -145,6 +158,7 @@ public class AdminAccount {
 
     public Instant getApproverSince() { return approverSince; }
     public Instant getActivatedAt() { return activatedAt; }
+    public Instant getLastEnabledAt() { return lastEnabledAt; }
 
     public UUID getId() { return id; }
     public String getLoginId() { return loginId; }

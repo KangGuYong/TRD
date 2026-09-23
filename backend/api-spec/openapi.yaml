@@ -976,6 +976,10 @@ paths:
           description: >
             RESTORE는 OPEN·EXPLAINING(미결정) 상태여야 하고, HIDE_PERMANENT·EDIT_RESTORE는 EXPLAINING 상태여야
             함(오신고는 1차 처리 없이 RESTORE 가능 · K9). EDIT_RESTORE인데 newCanonicalName 누락도 422.
+        '409':
+          description: >
+            type=report-restore-blocked — OPEN 신고의 RESTORE인데 항목이 PERMANENT_HIDDEN이거나 같은 항목의 다른 신고가
+            EXPLAINING(소명 중). 그 소명 절차에서 결정한다. 아무것도 바뀌지 않는다.
   /admin/seeding:
     post:
       tags: [admin-trends]
@@ -1685,7 +1689,7 @@ components:
         createdAt: { type: [string, 'null'] }
         activatedAt: { type: [string, 'null'], description: null이면 승인 대기 계정(부트스트랩이 아니면 활성화 전) }
         approverSince: { type: [string, 'null'], description: 이 시각 이후부터 승인 자격(신규 계정·ADMIN 승격 후 7일 유예) }
-        pendingApproval: { type: boolean, description: activatedAt == null }
+        pendingApproval: { type: boolean, description: 'activatedAt == null && disabledAt == null — 반려된 생성 요청(비활성화됨)은 대기가 아니다' }
     AccountCreateResponse:
       type: object
       properties:

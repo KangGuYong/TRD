@@ -30,7 +30,7 @@ public class AccountRoleChangeExecutor implements ApprovalExecutor {
     @Override
     public Map<String, String> execute(ApprovalRequest request) {
         Map<String, String> p = gate.payload(request);
-        AdminAccount account = accounts.findById(request.getTargetRef())
+        AdminAccount account = accounts.findByIdForUpdate(request.getTargetRef())
                 .orElseThrow(() -> new IllegalStateException("대상 계정 없음: " + request.getTargetRef()));
         AdminRole from = AdminRole.valueOf(p.get("from"));
         if (account.getRole() != from) {
