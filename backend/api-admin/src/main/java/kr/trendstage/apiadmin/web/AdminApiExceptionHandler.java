@@ -82,6 +82,11 @@ public class AdminApiExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(problem(409, e.getMessage()));
     }
 
+    @ExceptionHandler(AdminConflictException.class)
+    public ResponseEntity<Map<String, Object>> handle(AdminConflictException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(Problems.of(409, e.type(), e.getMessage()));
+    }
+
     @ExceptionHandler(DraftLockedException.class)
     public ResponseEntity<Map<String, Object>> handle(DraftLockedException e) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(problem(409, e.getMessage()));

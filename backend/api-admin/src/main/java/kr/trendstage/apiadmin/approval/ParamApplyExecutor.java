@@ -8,6 +8,7 @@ import kr.trendstage.persistence.type.ParamStatus;
 import org.springframework.stereotype.Component;
 
 import java.time.Clock;
+import java.util.Map;
 
 @Component
 public class ParamApplyExecutor implements ApprovalExecutor {
@@ -26,17 +27,23 @@ public class ParamApplyExecutor implements ApprovalExecutor {
     }
 
     @Override
-    public void execute(ApprovalRequest request) {
+    public Map<String, String> execute(ApprovalRequest request) {
         ParameterDraft draft = drafts.findById(request.getTargetRef())
                 .orElseThrow(() -> new IllegalStateException("대상 드래프트 없음: " + request.getTargetRef()));
         if (draft.getStatus() != ParamStatus.REVIEW) {
             throw new AdminValidationException("드래프트가 이미 처리된 상태입니다: " + draft.getStatus());
         }
         draft.markApplied(clock.instant());
+        return Map.of("draftId", draft.getId().toString());
     }
 
     @Override
     public void onReject(ApprovalRequest request) {
         drafts.findById(request.getTargetRef()).ifPresent(ParameterDraft::returnToDraft);
+    }
+
+    @Override
+    public String describe(ApprovalRequest request) {
+        return "파라미터 적용 · 드래프트 " + request.getTargetRef().toString().substring(0, 8);
     }
 }

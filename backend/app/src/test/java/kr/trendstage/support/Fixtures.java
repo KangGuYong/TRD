@@ -118,6 +118,21 @@ public class Fixtures {
         jdbc.update("DELETE FROM parameter_drafts WHERE id = ?", draftId);
     }
 
+    /** 승인 대기 중인 파라미터 드래프트(값은 기본값과 같다 — 적용돼도 판정에 영향 없음). {draftId, approvalId}. 끝나면 deleteDraft. */
+    public UUID[] paramDraftInReview(UUID requesterId) {
+        UUID draft = jdbc.queryForObject("INSERT INTO parameter_drafts (author_id, status, payload, sim_result) VALUES "
+                + "(?, 'REVIEW', '{\"submitterTarget\":20,\"hitThreshold\":0.2}'::jsonb, '{}'::jsonb) RETURNING id",
+                UUID.class, requesterId);
+        UUID approval = jdbc.queryForObject("INSERT INTO approval_requests (action_type, target_ref, requested_by, payload) "
+                + "VALUES ('PARAM_APPLY', ?, ?, '{\"reason\":\"테스트\"}'::jsonb) RETURNING id", UUID.class, draft, requesterId);
+        jdbc.update("UPDATE parameter_drafts SET approval_id = ? WHERE id = ?", approval, draft);
+        return new UUID[]{draft, approval};
+    }
+
+    public String approvalStatus(UUID approvalId) {
+        return jdbc.queryForObject("SELECT status::text FROM approval_requests WHERE id = ?", String.class, approvalId);
+    }
+
     /** 이미 판정된 제보(항목 포함, 항목은 RESOLVED — 다른 테스트의 배치가 다시 판정하지 않게). TI·판정완료 건수 테스트용. */
     public UUID judgedSubmission(UUID userId, String result, Instant resolvedAt) {
         UUID item = item(resolvedAt.minus(java.time.Duration.ofDays(15)));

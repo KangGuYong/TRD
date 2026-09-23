@@ -2,6 +2,8 @@ package kr.trendstage.apiadmin.params;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
+import kr.trendstage.apiadmin.approval.ActionType;
+import kr.trendstage.apiadmin.approval.ApprovalGate;
 import kr.trendstage.apiadmin.auth.AdminValidationException;
 import kr.trendstage.apiadmin.auth.DraftLockedException;
 import kr.trendstage.audit.AuditLogService;
@@ -15,7 +17,6 @@ import kr.trendstage.persistence.entity.ApprovalRequest;
 import kr.trendstage.persistence.entity.ParameterDraft;
 import kr.trendstage.persistence.entity.Verdict;
 import kr.trendstage.persistence.params.CurrentParameterSetResolver;
-import kr.trendstage.persistence.repo.ApprovalRequestRepository;
 import kr.trendstage.persistence.repo.ParameterDraftRepository;
 import kr.trendstage.persistence.repo.VerdictRepository;
 import kr.trendstage.persistence.type.AdminRole;
@@ -43,7 +44,7 @@ public class ParamStudioService {
     private static final long PARAM_DRAFT_LOCK_KEY = 457_829_316L;
 
     private final ParameterDraftRepository drafts;
-    private final ApprovalRequestRepository approvals;
+    private final ApprovalGate gate;
     private final VerdictRepository verdicts;
     private final AuditLogService auditLogService;
     private final ObjectMapper objectMapper;
@@ -51,12 +52,12 @@ public class ParamStudioService {
     private final EntityManager entityManager;
     private final CurrentParameterSetResolver currentParameterSetResolver;
 
-    public ParamStudioService(ParameterDraftRepository drafts, ApprovalRequestRepository approvals,
+    public ParamStudioService(ParameterDraftRepository drafts, ApprovalGate gate,
                                VerdictRepository verdicts, AuditLogService auditLogService,
                                ObjectMapper objectMapper, Clock clock, EntityManager entityManager,
                                CurrentParameterSetResolver currentParameterSetResolver) {
         this.drafts = drafts;
-        this.approvals = approvals;
+        this.gate = gate;
         this.verdicts = verdicts;
         this.auditLogService = auditLogService;
         this.objectMapper = objectMapper;
@@ -119,9 +120,8 @@ public class ParamStudioService {
         if (draft.getStatus() == ParamStatus.REVIEW) {
             throw new DraftLockedException("이미 승인 대기 중인 드래프트입니다");
         }
-        ApprovalRequest approval = approvals.save(new ApprovalRequest(
-                "PARAM_APPLY", draft.getId(), actorId,
-                "{\"reason\":\"%s\"}".formatted(reason == null ? "" : reason.replace("\"", "'"))));
+        ApprovalRequest approval = gate.request(ActionType.PARAM_APPLY, draft.getId(),
+                Map.of("reason", reason), actorId, actorRole);
         draft.moveToReview(approval.getId());
 
         auditLogService.record(actorId, actorRole, "PARAM_APPROVAL_REQUEST", "PARAMETER_DRAFT", draft.getId(), Map.of(
