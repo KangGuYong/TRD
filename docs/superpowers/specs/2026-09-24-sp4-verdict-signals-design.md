@@ -49,7 +49,7 @@ R5("제보는 머릿수가 아니라 여러 축으로 본다")를 코드로 옮�
 
 ```
 independent = 독립 제보자 수          # 시딩 제외, independenceMode로 압축(S5)
-target      = max(targetFloor, ceil(activeSubmitters × targetRatio))   # activeSubmitters 없으면 targetFloor
+target      = max(targetFloor, ceil(activeSubmitters × targetRatio − 1e-9))   # activeSubmitters 없으면 targetFloor. 1e-9는 부동소수 잡음(60 × 0.1) 제거
 ratio       = clip(independent / target, 0, 1)
 
 activeDays  = 시딩 제외 제보의 서로 다른 KST 날짜 수
@@ -69,9 +69,9 @@ T = ratio × persistence × diversity
 ### 2.2 타입
 
 - `TrendSignal`: `Integer activeSubmitters` 추가(nullable). `Entry`에 `String platformCode`(nullable, `Platform` enum 이름), `Integer deviceGroup`, `Integer ipGroup`(nullable) 추가. 기존 `platform`(자유 텍스트)은 옛 근거 호환용으로 남기되 새 판정에서는 `null`.
-- `ParameterSet`: `submitterTarget` → **`targetFloor`로 이름을 바꾸고**, `targetRatio`, `activeWindowDays`, `persistenceFloor`, `persistenceFullDays`, `diversityFloor`, `diversityFullPlatforms`, `independenceMode` 추가. 생성자에서 범위 검증(§5.1 표).
+- `ParameterSet`: `submitterTarget` → **`targetFloor`로 이름을 바꾸고**, 새 축은 레코드 `SignalAxes(targetRatio, activeWindowDays, persistenceFloor, persistenceFullDays, diversityFloor, diversityFullPlatforms, independenceMode)` 하나로 묶어 `axes` 필드로 둔다(기본 `SignalAxes.NEUTRAL`). 범위 검증은 `SignalAxes` 생성자(§5.1 표).
 - `VerdictEngine.evaluate`는 `VerdictOutcome`에 **`TBreakdown`**(`independent, target, activeSubmitters, ratio, activeDays, persistence, platforms, diversity, t`)을 담아 돌려준다. 판정 근거·ADM-200·스튜디오·백테스트가 같은 분해를 표시한다.
-- `ParamsSnapshot`: 새 필드 추가. **역직렬화 시 없는 필드는 중립 기본값**(S8) — 원시 타입 기본 0이 들어가지 않도록 박싱 타입 + 명시 기본값, 테스트로 고정.
+- `ParamsSnapshot`: `axes`(SignalAxes) 필드 추가, JSON 컴포넌트 이름 `submitterTarget`은 옛 근거 호환으로 유지. **역직렬화 시 `axes`가 없으면 `NEUTRAL`**(S8) — 새 축을 원시 필드로 풀어 두면 빠진 값이 0으로 채워지므로 객체 하나로 묶는다. 테스트로 고정.
 - `VerdictEvidence`: `tBreakdown` 추가. `distinctPlatforms`는 플랫폼 코드 기준 값.
 
 ### 2.3 산정 근거 표시 (CLAUDE.md "관리자 API는 산정 근거를 함께 반환")
@@ -103,7 +103,7 @@ T = ratio × persistence × diversity
 
 - **앱**: `expo-application` 추가. 안드로이드 `getAndroidId()`, iOS `getIosIdForVendorAsync()`, 웹은 최초 실행 시 만든 무작위 ID(`expo-secure-store`가 아니라 웹 저장소). 모든 공개 API 요청에 `X-Device-Id` 헤더(최대 128자).
 - **서버**(`api-public` `SubmissionService`): 제보 생성 시
-  - `device_hash = HMAC-SHA256(SIGNAL_HASH_SECRET, "device:" + X-Device-Id)` — 헤더 없거나 비면 `NULL`, 길이 초과면 400
+  - `device_hash = HMAC-SHA256(SIGNAL_HASH_SECRET, "device:" + X-Device-Id)` — 헤더 없거나 비면 `NULL`, 길이 초과(128자)면 422
   - `ip_hash = HMAC-SHA256(SIGNAL_HASH_SECRET, "ip:" + 키)` — IPv4는 주소 전체, IPv6는 앞 /64. 주소는 `request.getRemoteAddr()`. 프록시 뒤 배포 시 `SERVER_FORWARD_HEADERS_STRATEGY`로 신뢰 프록시 설정(기본 `none`)
   - 원문은 저장·로그·예외 메시지 어디에도 남기지 않는다
 - 시딩(`AdminSeedService`)은 두 해시 모두 `NULL`.
@@ -127,7 +127,7 @@ T = ratio × persistence × diversity
 | 독립성 | `independenceMode` | `OFF` | `OFF` · `DEVICE` · `DEVICE_OR_IP` |
 
 - 드래프트 `payload`(JSONB)에 9개를 저장하고 나머지는 지금처럼 `defaults()`. 옛 드래프트 payload(`submitterTarget`·`hitThreshold`만)는 `submitterTarget → targetFloor`, 나머지 중립으로 읽는다.
-- `PUT /admin/params/draft`는 9개 필드를 받는다. 범위 위반은 400(필드명 포함). 수정하면 시뮬레이션·백테스트 결과를 모두 지운다.
+- `PUT /admin/params/draft`는 9개 필드를 받는다. 범위 위반·누락은 422(메시지가 필드명으로 시작). 수정하면 시뮬레이션·백테스트 결과를 모두 지운다.
 - 시뮬레이션(180일 재생)은 그대로 두되 결과에 축별 변화 건수를 더하지 않는다(YAGNI) — 사례별 분해는 백테스트가 보여준다.
 
 ### 5.2 사례 파일 형식 (`formatVersion: 1`)
@@ -154,7 +154,7 @@ T = ratio × persistence × diversity
 
 - `label`: `HIT` | `MISS`. `labelReach`: `HIT`일 때만, 선택. `activeSubmitters`: 선택(없으면 목표치 = `targetFloor`).
 - `submitter`·`device`·`ip`는 아무 이름표 — 같은 이름표 = 같은 사람·기기·IP. `seed` 기본 `false`.
-- 검증(위반 시 400, 메시지에 `cases[3].submissions[5].at` 같은 위치): `formatVersion == 1`, `caseId` 중복 없음, 사례 1~500건, 사례당 제보 ≥ 1, `at < deadline`, 필수 필드, 파일 ≤ 2MB.
+- 검증(위반 시 422, 메시지에 `cases[3].submissions[5].at` 같은 위치): `formatVersion == 1`, `caseId` 중복 없음, 사례 1~500건, 사례당 제보 ≥ 1, `at < deadline`, 필수 필드, 파일 ≤ 2MB.
 - 사례 → `TrendSignal` 변환: 이름표를 결정적 UUID로, `evidenceUrl`을 `PlatformResolver`로, `device`·`ip`를 §4와 같은 방식으로 그룹 번호로. 운영 판정과 **같은 엔진**을 탄다.
 
 ### 5.3 API
@@ -167,7 +167,7 @@ T = ratio × persistence × diversity
 | `POST /admin/params/draft/backtest {datasetId}` | O/A | 현재 운영값·초안값으로 실행, 결과를 드래프트에 저장. 감사 `PARAM_BACKTEST` |
 | `GET /admin/params/draft` | O/A/Au | 기존 응답 + 9개 값 + `backtestResult` |
 
-- 승인 요청(`POST /admin/params/draft/request-approval`) 조건: **시뮬레이션 결과와 백테스트 결과가 둘 다 있을 것**(둘 다 마지막 수정 이후 — 수정 시 지워지므로 자동). 없으면 400 "백테스트를 먼저 실행해야 승인 요청을 보낼 수 있습니다".
+- 승인 요청(`POST /admin/params/draft/request-approval`) 조건: **시뮬레이션 결과와 백테스트 결과가 둘 다 있을 것**(둘 다 마지막 수정 이후 — 수정 시 지워지므로 자동). 없으면 422 "백테스트를 먼저 실행해야 승인 요청을 보낼 수 있습니다".
 - 승인 대기함(`ParamApplyExecutor.describe`) 요약: `데이터셋 '과거 사례 1차'(30건) — 정밀도 0.62→0.78, 재현율 0.80→0.75, 판정 변경 4건`.
 - 실행기(`PARAM_APPLY`)는 바꾸지 않는다 — 승인 즉시 운영값, 이후 판정부터(비소급).
 
@@ -193,13 +193,13 @@ T = ratio × persistence × diversity
 ```
 submissions
   + platform     VARCHAR(20) NULL → (V31_1 채움) → NOT NULL + CHECK (platform IN (…11개…))
-  + device_hash  CHAR(64) NULL
-  + ip_hash      CHAR(64) NULL
+  + device_hash  VARCHAR(64) NULL CHECK (소문자 hex 64자)
+  + ip_hash      VARCHAR(64) NULL CHECK (소문자 hex 64자)
   ~ source_platform  DROP NOT NULL        -- 보관용(S12)
   + 인덱스 (created_at) WHERE result <> 'VOID' AND NOT is_seed   -- activeSubmitters 계산
 
 backtest_datasets (신설)
-  id UUID PK, name VARCHAR(120) NOT NULL, sha256 CHAR(64) NOT NULL UNIQUE,
+  id UUID PK, name VARCHAR(120) NOT NULL, sha256 VARCHAR(64) NOT NULL UNIQUE CHECK (소문자 hex 64자),
   case_count INT NOT NULL, payload JSONB NOT NULL,
   uploaded_by UUID NOT NULL REFERENCES admin_accounts, created_at TIMESTAMPTZ NOT NULL
   -- 불변: 애플리케이션은 INSERT만. UPDATE/DELETE 경로 없음
@@ -241,11 +241,11 @@ parameter_drafts
 
 **통합 (`app`)**
 9. V31: 기존 제보 행이 판별 코드로 채워지고 CHECK가 목록 밖 값을 거부
-10. 제보 API: 해시만 저장(원문과 다름, 64자), 같은 기기 ID → 같은 해시, 헤더 없음 → 성공·`NULL`, 129자 → 400
+10. 제보 API: 해시만 저장(원문과 다름, 64자), 같은 기기 ID → 같은 해시, 헤더 없음 → 성공·`NULL`, 129자 → 422
 11. 판정: 근거 JSON에 해시 문자열이 없고 그룹 번호·`activeSubmitters`·`tBreakdown`이 있음
 12. 재판정: SP4 이전 형식 근거의 판정을 재판정해도 결과·원장 불변
-13. 스튜디오: 9개 저장·범위 400, 수정 시 두 결과 삭제, 백테스트 없이 승인 요청 400, AUDITOR 쓰기 403
-14. 데이터셋: 형식 오류 400(위치 포함), 같은 파일 재업로드 → 같은 id, 2MB·500건 초과 400
+13. 스튜디오: 9개 저장·범위 422, 수정 시 두 결과 삭제, 백테스트 없이 승인 요청 422, AUDITOR 쓰기 403
+14. 데이터셋: 형식 오류 422(위치 포함), 같은 파일 재업로드 → 같은 id, 2MB·500건 초과 422
 15. 합성 시나리오: 예시 보정값으로 전 사례가 라벨과 일치, 기본값으로는 옛 공식 결과와 같음
 16. **완료 기준 경로**: 업로드 → 백테스트 → 시뮬레이션 → 승인 요청 → 다른 ADMIN 승인 → 다음 `verdict_runner` 판정이 새 파라미터(근거의 `params`·`tBreakdown`)로 나옴
 
