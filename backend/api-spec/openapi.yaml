@@ -495,6 +495,7 @@ paths:
         '409':
           description: approval-pending — 이 항목에 이미 대기 중인 승인 요청(재판정 또는 VOID)이 있음
           content: { application/json: { schema: { $ref: '#/components/schemas/Problem' } } }
+        '422': { description: "사유 누락, 존재하지 않는 항목, 또는 아직 판정된 적 없는 항목(판정 이력 없음)" }
   /admin/verdicts/{id}/rejudge:
     post:
       tags: [admin-trends]
@@ -521,6 +522,7 @@ paths:
         '409':
           description: approval-pending — 이 항목에 이미 대기 중인 승인 요청(재판정 또는 VOID)이 있음
           content: { application/json: { schema: { $ref: '#/components/schemas/Problem' } } }
+        '422': { description: "사유 누락, 존재하지 않는 항목, 또는 아직 판정된 적 없는 항목(판정 이력 없음)" }
   /admin/verdicts/{id}/extend-grace:
     post:
       tags: [admin-trends]
@@ -540,7 +542,7 @@ paths:
       responses:
         '200': { description: 연장됨(본문 없음) }
         '403': { $ref: '#/components/responses/Forbidden' }
-        '422': { description: "연장 일수 범위 초과, 이미 판정됨, 또는 이미 최대 유예 기간 도달" }
+        '422': { description: "연장 일수 범위 초과, 존재하지 않는 항목, 이미 판정됨, 또는 이미 최대 유예 기간 도달" }
   # ─────────────────────────────  콘솔 · 유저/원장  ─────────────────────
   /admin/users:
     get:
@@ -1451,7 +1453,11 @@ components:
         trendItemId: { type: string, format: uuid }
         canonicalName: { type: string }
         result: { type: string, description: "판정 이력이 없으면 '-'" }
-        reachLevel: { $ref: '#/components/schemas/ReachLevel' }
+        reachLevel:
+          oneOf:
+            - $ref: '#/components/schemas/ReachLevel'
+            - type: 'null'
+          description: MISS·VOID거나 판정 이력이 없으면 null
         scoreT: { type: [string, 'null'] }
         judgedAt: { type: [string, 'null'] }
         superseded: { type: boolean, description: 재판정으로 대체된 이전 판정 여부 }
