@@ -46,6 +46,6 @@ public class ItemVoidExecutor implements ApprovalExecutor {
     public String describe(ApprovalRequest request) {
         Map<String, String> p = gate.payload(request);
         String name = trendItems.findById(request.getTargetRef()).map(i -> i.getCanonicalName()).orElse("(삭제된 항목)");
-        return "판정 VOID · %s · 예상 차액 %s점 · 사유: %s".formatted(name, p.get("expectedAdjTotal"), p.get("reason"));
+        return "판정 VOID · %s · 예상 차액 %s점 · 사유: %s".formatted(name, VerdictRejudgeExecutor.points(p.get("expectedAdjTotal")), p.get("reason"));
     }
 }

@@ -21,6 +21,10 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.not;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -67,6 +71,9 @@ class VerdictApprovalTest extends AbstractIntegrationTest {
         assertThat(verdictCount(item)).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT payload->>'expectedAdjTotal' FROM approval_requests WHERE id = ?",
                 String.class, approvalId)).isEqualTo("182.0000");
+        // 승인 대기함 요약은 사람이 읽는 표기 — "182.0000점"이 아니라 "182점"
+        mvc.perform(get("/admin/approvals").with(asAdmin(approver, AdminRole.ADMIN)))
+                .andExpect(jsonPath("$[?(@.id == '%s')].summary", approvalId).value(hasItem(containsString("예상 차액 182점"))));
 
         approve(approvalId);
 
@@ -123,8 +130,12 @@ class VerdictApprovalTest extends AbstractIntegrationTest {
                 .andExpect(status().isAccepted())
                 .andReturn().getResponse().getContentAsString();
         assertThat(fx.itemState(item)).isEqualTo("RESOLVED");
+        subs.forEach(s -> assertThat(fx.submissionResult(s)).isNotEqualTo("VOID"));   // 202 = 아무것도 쓰지 않았다(K4)
+        UUID approvalId = UUID.fromString(com.jayway.jsonpath.JsonPath.read(body, "$.approvalRequestId"));
+        mvc.perform(get("/admin/approvals").with(asAdmin(approver, AdminRole.ADMIN)))
+                .andExpect(jsonPath("$[?(@.id == '%s')].summary", approvalId).value(hasItem(not(containsString(".0000")))));
 
-        approve(UUID.fromString(com.jayway.jsonpath.JsonPath.read(body, "$.approvalRequestId")));
+        approve(approvalId);
 
         assertThat(fx.itemState(item)).isEqualTo("VOID");
         users.forEach(u -> assertThat(fx.ledgerSum(u, item)).isEqualByComparingTo("0"));
@@ -144,6 +155,7 @@ class VerdictApprovalTest extends AbstractIntegrationTest {
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.type").value("void-needs-approval"));
         assertThat(fx.queueStatus(queueId)).isEqualTo("PENDING");
+        subs.forEach(s -> assertThat(fx.submissionResult(s)).isNotEqualTo("VOID"));   // 409 = 아무것도 쓰지 않았다(K4)
         assertThat(fx.itemState(item)).isEqualTo("RESOLVED");
     }
 
