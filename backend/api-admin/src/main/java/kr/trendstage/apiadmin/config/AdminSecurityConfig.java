@@ -1,5 +1,7 @@
 package kr.trendstage.apiadmin.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import kr.trendstage.persistence.repo.AdminAccountRepository;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -10,6 +12,7 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
@@ -50,7 +53,8 @@ public class AdminSecurityConfig {
     @Bean
     @Order(2)
     public SecurityFilterChain adminApi(HttpSecurity http, SecurityContextRepository securityContextRepository,
-                                         CookieCsrfTokenRepository csrfTokenRepository)
+                                         CookieCsrfTokenRepository csrfTokenRepository,
+                                         AdminAccountRepository accounts, ObjectMapper objectMapper)
             throws Exception {
         http
             .securityMatcher("/admin/**")
@@ -64,6 +68,7 @@ public class AdminSecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/admin/auth/login").permitAll()
                 .anyRequest().authenticated()
             )
+            .addFilterBefore(new AdminSessionRevalidationFilter(accounts, objectMapper), AuthorizationFilter.class)
             .exceptionHandling(e -> e.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)));
         return http.build();
     }
