@@ -30,7 +30,7 @@
 | **R1** 유저 투표로 유행 결정 금지 | `verdicts` INSERT는 `JudgeService`(배치 판정·재판정·항목 VOID, 재판정·VOID는 supersedes 행)뿐이며 모두 `VerdictComputation` 계산 결과만 쓴다. 투표(`votes`)는 별도 테이블, 판정 입력에서 물리적으로 분리. 관리자 API에 "판정 결과 직접 변경" 엔드포인트 자체가 없음(§7). |
 | **R2** 원장 불변(append-only) | `score_ledger`·`verdicts`에 DB 트리거로 `UPDATE/DELETE` 거부(`V7`, 구현됨). 정정은 `ADJ`/`supersedes` INSERT만. ORM 레벨에서도 엔티티에 setter 미노출 + `@Immutable`(`ScoreLedgerEntry`·`Verdict` 둘 다). |
 | **R3** 등급 = 적중률 주축(AS AND TI) | 승급 판정은 순수함수 `GradePolicy.evaluate()` 하나로만. 제보 건수 단독 승급 경로 없음(타입상 불가하게 설계). |
-| **R4** 자동은 플래그와 가역적 보전 조치까지 | 제재·비공개 **확정**은 사람. 병합은 유사도 ≥0.85만 자동 확정(되돌리려면 분리), 0.75~0.85는 사람(관리자 큐). `abuse_scan`(`abuse_flags` INSERT만)·`sanctions` 2인 승인 상태머신은 **미구현(Phase 2)**. `sla_watch`가 적용할 `TEMP_HIDDEN`(가역, ADM-410)은 **미구현(SP3)** — 현재 자동 임시비공개 자체가 일어나지 않는다. |
+| **R4** 자동은 플래그와 가역적 보전 조치까지 | 제재·비공개 **확정**은 사람. 병합은 유사도 ≥0.85만 자동 확정(되돌리려면 분리), 0.75~0.85는 사람(관리자 큐). `abuse_scan`(`abuse_flags` INSERT만)·`sanctions` 2인 승인 상태머신은 **미구현(Phase 2)**. `sla_watch`가 적용할 `TEMP_HIDDEN`(가역, ADM-410)은 **구현됨(SP3)** — 신고 4h 초과 시 자동으로 적용되고, 신고는 `OPEN`으로 남아 사람이 확정한다. |
 | **R5** 판정 입력은 제보뿐 | `VerdictEngine`은 `TrendSignal`(관측 마감 전 비VOID 제보의 제보자·시각·플랫폼·시딩 여부·가입일)만 입력받는다. 외부 지표 테이블·수집기는 존재하지 않는다. VOID·시딩은 제보자 수와 선점 순위에서 제외(구현됨). 시간 분포·플랫폼·독립성 축은 SP4. |
 
 > 점수·등급·판정 계산은 전부 **파라미터 주입형 순수 함수**(`ScoreEngine`, `VerdictEngine`, `GradePolicy`)로 분리한다. 동일 함수를 `verdict_runner`(운영)와 ADM-600 파라미터 스튜디오(시뮬레이션)가 재사용해야 하기 때문(`CLAUDE.md` 규약).
@@ -123,10 +123,10 @@ backend/
 │   └─ params/         ParameterSet (가중치·임계값·반감기 주입 객체)
 ├─ persistence/        # JPA/JDBC, Flyway, append-only 트리거. order_rank는 저장 컬럼이 아니라 뷰 매핑(`SubmissionOrderRank`, `@Immutable`, V11)
 ├─ api-public/         # /v1/** 앱 API + JWT 필터체인
-├─ api-admin/          # /admin/** 콘솔 API + 세션·RBAC · 2FA(**미구현(SP3)**) · ApprovalGate(**미구현(SP3)** — 현행 `ApprovalService`+`ParamApplyExecutor`)
+├─ api-admin/          # /admin/** 콘솔 API + 세션·RBAC(요청마다 재검증 — 비활성·승인대기·역할변경 401, SP3) · 2FA(**미구현** — SP3 §0 비범위) · `ApprovalGate`(**구현됨, SP3** — 실행기 6종) · `AdminUserController`(/admin/users/**, ADM-311, SP3)
 ├─ merge/              # 클러스터 병합·임베딩: `MergeService`·`ClusterMergeCandidateService`·`MergeComputation`·`EmbeddingClient` (배치·관리자 공용)
 ├─ judge/              # 판정 실행: `JudgeService`(배치 판정·재판정·항목 VOID·ADM-111 미리보기의 유일한 경로) · `VerdictEvidence`(evidence_json 형식) — scheduler·api-admin 공용
-├─ scheduler/          # 배치 잡 + ShedLock (목록 순회만, 트랜잭션은 서비스 빈)
+├─ scheduler/          # 배치 잡 + ShedLock (목록 순회만, 트랜잭션은 서비스 빈). `SlaWatchJob`(SP3, `@Scheduled` 코드 기본 `0 0 * * * *`) → `SlaWatchService` 3단계(신고 자동 임시비공개·병합 마감 연장·관리자 비활성화)
 ├─ api-spec/           # OpenAPI (앱/콘솔 타입 코드생성 원본)
 ├─ audit/              # admin_audit_log (조회행위 포함), 해시체인
 └─ app/                # 부트스트랩(단일 실행 파일), 프로파일 분리
@@ -151,7 +151,7 @@ backend/
 | `endorsements` | 유저 단위 dedup. 현행 저장만(점수·판정 미반영) |
 | `merge_queue` | **미구현(SP2)**: `assigned_to`·`claimed_at`(15분 클레임, 03 §6 M5), `hold_count`, `decision_key UNIQUE`(멱등키) — 현재 스키마(`V15`)는 `status`·`similarity`·`resolved_by`뿐이고 클레임 컬럼 자체가 없다 |
 | `verdicts` | **append-only**. `supersedes`, `evidence_json`(`VerdictEvidence` — 선점 순위·`TrendSignal`·판정 파라미터 동결). `(trend_item_id) WHERE supersedes IS NULL` 부분 UNIQUE(`V4` — `verdict_one_original_per_item`), `(supersedes) WHERE supersedes IS NOT NULL` 부분 UNIQUE(`V28` — `verdict_superseded_once`, 재판정 체인 분기 방지) |
-| `score_ledger` | **append-only**. `reason`, `kind`(HIT/MISS/VOID/ADJ). `delta`는 감쇠 없는 원값(§5.2). `halflife_days`·`decay_anchor_at`(행별 감쇠 기준, O11 = (b), V28). `(verdict_id, submission_id)` UNIQUE(`V28`, 판정 멱등). `approved_by`는 `users(id)` FK뿐이라 관리자를 못 넣는다 — **미구현(SP3)**(승인자는 감사 로그에만 남음) |
+| `score_ledger` | **append-only**. `reason`, `kind`(HIT/MISS/VOID/ADJ). `delta`는 감쇠 없는 원값(§5.2). `halflife_days`·`decay_anchor_at`(행별 감쇠 기준, O11 = (b), V28). `(verdict_id, submission_id)` UNIQUE(`V28`, 판정 멱등). `approved_by`(`users(id)` FK, 관리자를 못 가리키는 잔재)는 쓰지 않는다 — SP3에서 `approved_by_admin_id`(`admin_accounts` FK)를 추가해 승인 실행 ADJ 행에 채운다(`ledger_approval_pair` CHECK, V30) |
 | `user_grades` | 스냅샷(파생). 주간 재계산 |
 | `abuse_flags` | 플래그만. 제재 아님 |
 | `appeals`, `sanctions`, `votes`, `admin_audit_log`, `parameter_drafts` | §7·§8 참조 |
@@ -200,7 +200,7 @@ FROM submissions WHERE trend_item_id = :target AND result <> 'VOID'
 |---|---|---|
 | 일 1회 | `cluster_merge` | `trend_items.merge_checked_at`로 처리 완료 마킹 + `merge_queue_one_open_per_new` UNIQUE로 중복 적재 방지(구현됨). 회색지대는 큐 적재만. ADM-900 수동 실행(같은 ShedLock 이름, 실행 중 409) |
 | 일 1회 | `verdict_runner` | 관측 마감 지난 PENDING → JUDGING, 이어서 JUDGING 항목마다 `JudgeService.judge()`(별도 빈, 항목 행 잠금 + 항목별 트랜잭션). 실패한 항목은 JUDGING으로 남아 다음 실행에서 재시도. 원본 판정 재생성 방지는 `verdicts` 부분 UNIQUE(`V4`), 원장 중복 방지는 `score_ledger(verdict_id, submission_id)` UNIQUE(`V28`) |
-| 1시간 | `sla_watch` | **미구현(SP3)**. 신고 4h→`TEMP_HIDDEN`+에스컬레이션 / 병합 24h→판정 유예 자동 연장 / 90일 미접속 관리자 비활성화. 유예 연장은 실제로는 `trend_items.judgment_deadline_override`(수동 `VerdictAdminService.extendGrace`, 1~7일 단위·D+21 상한)이며 `grace_until` 컬럼은 존재하지 않는다. 통보는 `SlaNotifier`(Phase 1 로그) |
+| 1시간 | `sla_watch` | **구현됨(SP3)**. 신고 4h→`TEMP_HIDDEN`(신고는 `OPEN` 유지, `reports.auto_hidden_at` 기록) / 병합 대기 24h→두 항목 마감을 `max(현재 마감, now+24h)`(상한 최초 제보+21일)로 연장, `JUDGING`이고 새 마감이 미래면 `PENDING`으로 복귀 / 90일 미접속 관리자 비활성화(마지막 활성 ADMIN은 건너뜀). 유예 연장은 `trend_items.judgment_deadline_override`(수동 `VerdictAdminService.extendGrace`와 같은 컬럼)에 반영되며 `grace_until` 컬럼은 여전히 없다. 세 단계(신고·병합·계정)는 서로 독립 — 하나가 실패해도 나머지는 돈다. 통보는 여전히 `SlaNotifier`(Phase 1 로그, 웹훅은 Phase 2·O10) |
 | 주 1회(월 00:00 KST) | `grade_recalc` | 공식 등급 스냅샷 — AS(행별 감쇠)·TI(180일)·판정완료 건수(전 기간)로 `GradePolicy` 평가. 강등 규칙(Phase 2) 전까지 직전 등급 아래로 내리지 않음(J8). `@Scheduled`에 `zone = Asia/Seoul` 명시(컨테이너 JVM은 UTC). 제보권 리필(이월 없음)은 주 경계 자체라 배치가 없다 |
 | 일 1회 | `abuse_scan` | **미구현(Phase 2)**. 플래그 INSERT만(R4) |
 | 월 1회 | `l4_quota` | **미구현(Phase 3)**. 정원 재산정, 초과분 L3 이동(페널티 아님 표기) |
@@ -221,13 +221,13 @@ GET  /v1/trends/{id}            상세(뜻/유래/전파경로/연령대)
 POST /v1/trends/{id}/vote       "더 뜰까요" 투표 (판정과 분리·R1)
 GET  /v1/me/grade               등급·AS·TI·다음 승급 부족분
 GET  /v1/me/ledger              점수 원장 전건
-POST /v1/appeals                이의 제기 — 미구현(SP3): 컨트롤러 없음, 404
+POST /v1/appeals                이의 제기 — 미구현 — Phase 2, SP3 스펙 §0 비범위: 컨트롤러 없음, 404
 GET  /v1/leaderboard            상위 10(동의자 한정) — 미구현: 컨트롤러 없음, 404
 ```
 디자인 매핑: 온보딩 → 프로필/관심분야/알림시간, 홈(오늘의 5개) → `GET /v1/trends?daily`, 검색 판정 → `GET /v1/trends?q=`(**미구현(SP2)**), 제보 폼 → `POST /v1/submissions`.
 
 ### 7.2 콘솔 (api-admin)
-큐(병합/어뷰징/이의/신고), 트렌드 상세·판정관리(예외만), 유저원장(ADJ 추가), 파라미터 스튜디오(드래프트→시뮬→2인승인), 배치 관리(ADM-900), 감사로그. **판정결과 직접변경·T 수동입력·verdict 삭제 엔드포인트는 존재하지 않음**(ADM-200 금지기능). **재판정은 `JudgeService`가 원 판정 때 동결한 파라미터로 재실행한다(J2)** — 새 파라미터를 소급하지 않고, 원장은 제보 단위 차액만 ADJ로 남긴다. VOID(ADM-100·ADM-200)도 같은 서비스의 항목 VOID 경로다. **미구현(SP3)**: 재판정 ADJ 차액에는 승인·100점 상한 검사가 없다 — `ApprovalGate` 자체가 없다(§8 참조).
+큐(병합/어뷰징/이의/신고), 트렌드 상세·판정관리(예외만), 유저원장(ADJ 추가), 파라미터 스튜디오(드래프트→시뮬→2인승인), 배치 관리(ADM-900), 감사로그. **판정결과 직접변경·T 수동입력·verdict 삭제 엔드포인트는 존재하지 않음**(ADM-200 금지기능). **재판정은 `JudgeService`가 원 판정 때 동결한 파라미터로 재실행한다(J2)** — 새 파라미터를 소급하지 않고, 원장은 제보 단위 차액만 ADJ로 남긴다. VOID(ADM-100·ADM-200)도 같은 서비스의 항목 VOID 경로다. **구현됨(SP3)**: 재판정·항목 VOID의 ADJ 차액(제보별 변동 절댓값의 합)이 100점을 넘으면 `ApprovalGate`가 쓰기 전에 막아 202로 승인 요청만 만들고, 승인 시점 입력으로 다시 계산해 실행한다(§8 참조).
 
 ### 7.3 공통 응답 규약
 등급·판정 관련 응답은 **산정 근거를 동봉**: `"TI 0.42 / 요구치 0.45 / 부족분 0.03"`. OpenAPI 스키마에 `breakdown` 필수 필드로 강제.
@@ -240,9 +240,9 @@ GET  /v1/leaderboard            상위 10(동의자 한정) — 미구현: 컨�
 |---|---|
 | 인증 | 앱=JWT(리프레시 회전), 콘솔=서버세션+2FA+30분 타임아웃(ADM-800) |
 | 권한(RBAC) | REVIEWER/OPERATOR/ADMIN/AUDITOR. 메서드 시큐리티 + 권한 매트릭스(02 §1.1). 판정검수자가 파라미터 못 만짐(02 C6) |
-| 2인 승인(4-eyes) | 유저제재·등급수동조정·파라미터적용·상쇄원장 100점 초과·**관리자 계정 생성/권한 변경**. 서버 한 곳 `ApprovalGate.require(kind, amount)`가 강제(**미구현(SP3)** — 현행은 `PARAM_APPLY` executor 하나뿐이고 재판정이 승인 경로를 우회), `approval_requests` 상태머신(요청→1인→2인→실행), 요청자≠승인자 검증, 신규 계정 7일 승인권 유예 |
-| 감사 로그 | **Phase 0부터 필수**(ADM-700, 소급 불가). 상태변경·원장추가·정책변경·**조회행위**(`PII_VIEW`는 서버 엔드포인트에서 기록, 클라 토글 금지 — 기록 자체는 **미구현(SP3)**)·인증 기록. `detail` 포함 응답은 **미구현(SP3)** — 현행 `AuditLogController`는 actor/role/action/target/시각만 반환. 해시체인·append-only 트리거(WORM)는 구현됨 |
-| 개인정보 | 기본 마스킹, 열람 시 사유입력→접속기록. **미구현(SP3)** — `/admin/users/**` 언마스크 엔드포인트·`PII_VIEW` 기록이 없어 현재 ADM-311의 열람 토글은 서버에 아무것도 남기지 않는다(02 참조). 디바이스지문·IP는 동의 항목 별도 명시 |
+| 2인 승인(4-eyes) | 유저제재·등급수동조정(Phase 2, 실행기 없음)·파라미터적용·상쇄원장 100점 초과·**관리자 계정 생성/권한 변경**. 서버 한 곳 `ApprovalGate`가 강제(**구현됨, SP3**) — 실행기 6종(`PARAM_APPLY`·`VERDICT_REJUDGE`·`ITEM_VOID`·`LEDGER_ADJ`·`ACCOUNT_CREATE`·`ACCOUNT_ROLE_CHANGE`), `approval_requests` 상태머신(요청→승인 1회→실행 — K1: **요청자 + 승인자 1명**), 요청자≠승인자·승인권 유예 검증, 신규 계정 7일 승인권 유예. 승인 자격자가 요청자 외 0명이면 계정 생성만 부트스트랩 예외로 단독 허용(감사 `ACCOUNT_CREATE_BOOTSTRAP`) |
+| 감사 로그 | **Phase 0부터 필수**(ADM-700, 소급 불가). 상태변경·원장추가·정책변경·인증 기록. **조회행위**(`PII_VIEW`)는 가릴 개인정보 컬럼이 없어 **미구현**(본인인증 도입 시 함께, SP3 §0 비범위). `GET /admin/audit-log`는 필터(`action`·`actorId`·`targetId`·`from`·`to`)·커서 페이지네이션(`beforeId`/`nextBeforeId`, 100건씩)·`detail` 포함 응답을 지원한다(**구현됨, SP3**). 해시체인·append-only 트리거(WORM)는 구현됨 |
+| 개인정보 | 기본 마스킹, 열람 시 사유입력→접속기록. **여전히 미구현**(SP3 §0 비범위) — `users`에 가릴 개인정보 컬럼 자체가 없어(핸들·가입일·Firebase UID뿐) 언마스크 엔드포인트·`PII_VIEW` 기록을 만들지 않았다. ADM-311은 실서버 원장을 보여주지만(SP3) 마스킹 토글 UI는 지웠다(02 참조). 디바이스지문·IP는 동의 항목 별도 명시 |
 | 시간 | UTC 저장, KST 표시. 배치 경계(월 00:00)는 타임존 명시 |
 | 멱등·동시성 | 병합 큐 항목 중복 적재는 `merge_queue_one_open_per_new` UNIQUE로 방지(구현됨). 판정 재실행 방지는 `verdicts` 부분 UNIQUE(구현됨, `score_ledger` 쪽은 미구현·§6 참조). 큐 소프트락(15분 클레임, `assigned_to`·`claimed_at`)은 **미구현(SP2)** — 현재 `merge_queue`에 클레임 컬럼 자체가 없다(→ Phase 2 Redis 전환은 §2.5) |
 | 알림 | 앱: expo-notifications(아침 정시 1건 + 급상승 진입). 콘솔: SLA초과 `SlaNotifier`(Phase 1 로그, Phase 2 사내 웹훅 — O10) |
@@ -261,11 +261,11 @@ GET  /v1/leaderboard            상위 10(동의자 한정) — 미구현: 컨�
 ### 9.2 관리자 콘솔 (React) — 디자인 `관리자 콘솔.dc.html`
 - 레이아웃: 좌측 다크 사이드바(네비 그룹+큐 배지) + 상단바(화면ID·역할) + 본문. **데스크톱 전용**. 큐 배지와 ADM-010 타일은 단일 `GET /admin/queues/summary`에서 그린다(P10) — 하드코딩·픽스처 금지, 미구현 큐는 "미구현" 표시.
 - 진입 = **ADM-010 오늘의 작업**(큐 카운트·SLA초과), 대시보드 아님(02 C1).
-- "감사 로그에 기록됩니다" 문구는 서버가 실제로 기록하는 곳에만 둔다(SP3 전까지 표시 금지).
+- "감사 로그에 기록됩니다" 문구는 서버가 실제로 기록하는 곳에만 둔다 — **구현됨(SP3)**: `Layout.tsx`는 "모든 개입(변경)은 감사 로그에 기록됩니다"로, 조회행위(`PII_VIEW` 등)까지 기록된다는 옛 문구는 지웠다(§0 비범위).
 - 큐 화면 공통: 키보드 단축키(J/K/M/S/V)·서버 커서 페이징(현재 목록은 전량 반환)·5초 Undo 토스트는 **미구현**(02 참조). 되돌릴 수 없는 액션의 확인모달+사유 입력은 화면마다 다르다.
-- 병합검수(ADM-100): 좌우 비교 + **선점순위 미리보기** + 권한없으면 액션 비활성(역할전환 데모처럼).
+- 병합검수(ADM-100): 좌우 비교 + **선점순위 미리보기** + 권한없으면 액션 비활성(역할전환 데모처럼). VOID가 승인 한도를 넘으면 409(`void-needs-approval`)를 ADM-200 안내로 보여준다(**구현됨, SP3**).
 - 파라미터 스튜디오(ADM-600): **시뮬 없이는 승인요청 버튼 비활성**, 기본=예약(비소급).
-- 유저 원장(ADM-311): **미구현** — `/admin/users/**` 컨트롤러 자체가 없어 [상쇄 원장 추가]·[제재 상신]·[등급 수동 조정] 버튼이 서버를 호출하지 않고 성공 토스트만 띄운다(02 참조). 목표 설계는 원장에 수정·삭제 UI 부재, ADJ 추가만, 개인정보 마스킹 토글→사유.
+- 유저 원장(ADM-311): **구현됨(SP3)** — 핸들 검색 → 실데이터 원장·산정 근거. [상쇄 원장 추가]는 응답에 따라 "기록됨"/"승인 대기로 올렸습니다". 개인정보 마스킹 토글·안내는 지웠다(가릴 컬럼이 없음). [제재 상신]·[등급 수동 조정]은 "미구현(Phase 2)"으로 비활성.
 - 상태/데이터: TanStack Query + Table, 권한은 서버 응답 기반 렌더 가드(클라 가드는 UX용, 실제 통제는 서버).
 
 ---
