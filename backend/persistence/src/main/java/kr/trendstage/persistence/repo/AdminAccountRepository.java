@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -31,4 +32,13 @@ public interface AdminAccountRepository extends JpaRepository<AdminAccount, UUID
     @Query("SELECT count(a) FROM AdminAccount a WHERE a.role = :role "
             + "AND a.disabledAt IS NULL AND a.activatedAt IS NOT NULL AND a.approverSince <= :now AND a.id <> :excluding")
     long countEligibleApprovers(@Param("excluding") UUID excluding, @Param("now") Instant now, @Param("role") AdminRole role);
+
+    /** sla_watch — 활성 계정 중 마지막 로그인(없으면 생성)이 cutoff 이전. */
+    @Query("SELECT a FROM AdminAccount a WHERE a.disabledAt IS NULL AND a.activatedAt IS NOT NULL "
+            + "AND COALESCE(a.lastLoginAt, a.createdAt) <= :cutoff")
+    List<AdminAccount> findInactiveSince(@Param("cutoff") Instant cutoff);
+
+    /** 활성 ADMIN 수 — 마지막 ADMIN을 잠그지 않기 위해(K11). role은 바인드 파라미터로 넘긴다(위 countEligibleApprovers 참고). */
+    @Query("SELECT count(a) FROM AdminAccount a WHERE a.role = :role AND a.disabledAt IS NULL AND a.activatedAt IS NOT NULL")
+    long countByRoleAndDisabledAtIsNullAndActivatedAtIsNotNull(@Param("role") AdminRole role);
 }

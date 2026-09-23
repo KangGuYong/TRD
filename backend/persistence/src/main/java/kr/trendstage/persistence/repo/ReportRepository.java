@@ -4,6 +4,7 @@ import kr.trendstage.persistence.entity.Report;
 import kr.trendstage.persistence.type.ReportStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -23,4 +24,7 @@ public interface ReportRepository extends JpaRepository<Report, UUID> {
 
     /** ADM-010 SLA — 1차 처리(OPEN) 대기 중인 신고, 오래된 순. */
     List<Report> findByStatusOrderByCreatedAtAsc(ReportStatus status);
+
+    /** sla_watch — 4h를 넘긴 OPEN 신고 중 아직 자동 처리하지 않은 것. */
+    List<Report> findByStatusAndAutoHiddenAtIsNullAndCreatedAtLessThanEqual(ReportStatus status, Instant cutoff);
 }

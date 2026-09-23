@@ -34,7 +34,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * 스펙 §10 #11 — 승인 자격자가 요청자 외 0명이면 ADMIN 단독 생성(K6), 자격자가 생기면 승인 대기.
  * 공유 DB에는 자격자가 늘 있으므로 전용 컨테이너를 쓴다.
  */
-@SpringBootTest(properties = {"logging.level.org.hibernate.SQL=WARN", "logging.level.org.hibernate.orm.jdbc.bind=WARN"})
+@SpringBootTest(properties = {"logging.level.org.hibernate.SQL=WARN", "logging.level.org.hibernate.orm.jdbc.bind=WARN",
+        "jobs.sla-watch.cron=-"})
 @AutoConfigureMockMvc
 @Import(TestClockConfig.class)
 class AccountBootstrapModeTest {

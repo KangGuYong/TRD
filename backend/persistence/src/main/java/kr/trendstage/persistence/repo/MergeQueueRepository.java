@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -23,4 +24,7 @@ public interface MergeQueueRepository extends JpaRepository<MergeQueueEntry, UUI
     Optional<MergeQueueEntry> findByIdForUpdate(@Param("id") UUID id);
 
     Optional<MergeQueueEntry> findByDecisionKey(String decisionKey);
+
+    /** sla_watch — 24h를 넘긴 처리 대기 병합 후보. */
+    List<MergeQueueEntry> findByStatusAndCreatedAtLessThanEqual(MergeQueueStatus status, Instant cutoff);
 }

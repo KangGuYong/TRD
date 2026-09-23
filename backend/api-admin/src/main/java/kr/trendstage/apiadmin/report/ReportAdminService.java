@@ -25,7 +25,7 @@ import java.util.UUID;
 
 /**
  * ADM-410 신고 콘텐츠 큐. 4h SLA 초과 시 자동 임시비공개(TEMP_HIDDEN)는 정책으로 확정됐고(R4 개정, 2026-09-17,
- * P1) SP3의 sla_watch 잡이 수행한다 — 이 서비스는 사람의 결정(수동 임시비공개/복원/영구 비공개)만 다룬다.
+ * P1) sla_watch(scheduler)가 수행한다 — 이 서비스는 사람의 결정만 다룬다.
  * visibility는 순수 표시 계층 — 판정/점수와 분리(R2).
  */
 @Service
@@ -92,7 +92,8 @@ public class ReportAdminService {
 
     @Transactional
     public Report decide(UUID reportId, ReportDecision decision, String note, String newCanonicalName, AdminPrincipal actor) {
-        Report report = requireExplaining(reportId);
+        // 오신고는 1차 처리 없이 바로 복원할 수 있다(K9). 영구 비공개·수정 후 복원은 소명(EXPLAINING) 뒤에만.
+        Report report = decision == ReportDecision.RESTORE ? requireUndecided(reportId) : requireExplaining(reportId);
         if (decision == ReportDecision.EDIT_RESTORE && (newCanonicalName == null || newCanonicalName.isBlank())) {
             throw new AdminValidationException("EDIT_RESTORE는 newCanonicalName이 필수입니다");
         }
@@ -131,6 +132,14 @@ public class ReportAdminService {
         Report report = requireReport(id);
         if (report.getStatus() != ReportStatus.EXPLAINING) {
             throw new AdminValidationException("소명 대기 상태가 아닙니다: " + report.getStatus());
+        }
+        return report;
+    }
+
+    private Report requireUndecided(UUID id) {
+        Report report = requireReport(id);
+        if (report.getStatus() == ReportStatus.DECIDED) {
+            throw new AdminValidationException("이미 결정된 신고입니다");
         }
         return report;
     }

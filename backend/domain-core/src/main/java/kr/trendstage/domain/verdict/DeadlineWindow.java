@@ -45,4 +45,24 @@ public final class DeadlineWindow {
         if (!current.isBefore(target)) return Optional.empty();
         return Optional.of(new MergeDeadline(target, capped));
     }
+
+    /** 병합 검수 SLA(24h) 초과 시 보장하는 관측 여유(SP3 K10). */
+    public static final int MERGE_SLA_GRACE_HOURS = 24;
+
+    /**
+     * 병합 대기가 SLA를 넘겼을 때의 새 마감 — max(현재 마감, now + 24h), 상한 최초 제보 + 21일.
+     * 당기지 않는다. 늘릴 게 없으면 empty.
+     */
+    public static Optional<Instant> slaExtended(Instant firstSeenAt, Instant override, Instant now) {
+        Instant current = effectiveDeadline(firstSeenAt, override);
+        Instant ceiling = firstSeenAt.plus(Duration.ofDays(MAX_DEADLINE_DAYS));
+        Instant wanted = now.plus(Duration.ofHours(MERGE_SLA_GRACE_HOURS));
+        Instant target = wanted.isAfter(ceiling) ? ceiling : wanted;
+        return target.isAfter(current) ? Optional.of(target) : Optional.empty();
+    }
+
+    /** 마감이 상한(최초 제보 + 21일)에 닿았는가 — 더 연장할 수 없다(ADM-010 알림). */
+    public static boolean ceilingReached(Instant firstSeenAt, Instant override) {
+        return !effectiveDeadline(firstSeenAt, override).isBefore(firstSeenAt.plus(Duration.ofDays(MAX_DEADLINE_DAYS)));
+    }
 }

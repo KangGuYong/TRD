@@ -38,7 +38,7 @@ public class ReportAdminController {
 
     public record ReportResponse(String id, String trendItemId, String reason, String detail, String status,
                                   String submissionId, String explanationDeadline, String explanationText,
-                                  String decision, String decisionNote, String createdAt) {}
+                                  String decision, String decisionNote, String createdAt, String autoHiddenAt) {}
     public record SubmissionCandidate(String submissionId, String handle, String rawInput, String oneLine,
                                        String evidenceUrl, String createdAt) {}
     public record TriageRequest(UUID submissionId, String note) {}
@@ -95,7 +95,8 @@ public class ReportAdminController {
                 r.getExplanationDeadline() == null ? null : DISPLAY_FORMAT.format(r.getExplanationDeadline()),
                 r.getExplanationText(),
                 r.getDecision() == null ? null : r.getDecision().name(), r.getDecisionNote(),
-                DISPLAY_FORMAT.format(r.getCreatedAt()));
+                DISPLAY_FORMAT.format(r.getCreatedAt()),
+                r.getAutoHiddenAt() == null ? null : DISPLAY_FORMAT.format(r.getAutoHiddenAt()));
     }
 
     private SubmissionCandidate toCandidate(Submission s) {

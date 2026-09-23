@@ -33,7 +33,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 @SpringBootTest(properties = {
         // 로컬 전용 application-local.yml(있다면)이 켜는 SQL·바인딩 로그를 테스트에서는 끈다.
         "logging.level.org.hibernate.SQL=WARN",
-        "logging.level.org.hibernate.orm.jdbc.bind=WARN"
+        "logging.level.org.hibernate.orm.jdbc.bind=WARN",
+        // sla_watch는 매시 정각에 돈다 — 테스트가 정각을 지나면 공유 DB를 건드려 다른 테스트를 흔든다(Spring '-'는 크론 비활성).
+        "jobs.sla-watch.cron=-"
 })
 @AutoConfigureMockMvc
 @Import(TestClockConfig.class)
