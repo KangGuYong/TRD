@@ -54,7 +54,7 @@ public class ApprovalGate {
     }
 
     public long eligibleApproverCount(UUID excludingAccountId, Instant now) {
-        return accounts.countEligibleApprovers(excludingAccountId, now);
+        return accounts.countEligibleApprovers(excludingAccountId, now, AdminRole.ADMIN);
     }
 
     /** 승인 요청 생성. 같은 항목에 대기 중인 재판정·VOID가 있으면 DB 부분 UNIQUE가 막고 409(K5). */

@@ -1,6 +1,7 @@
 package kr.trendstage.persistence.repo;
 
 import kr.trendstage.persistence.entity.AdminAccount;
+import kr.trendstage.persistence.type.AdminRole;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -22,8 +23,12 @@ public interface AdminAccountRepository extends JpaRepository<AdminAccount, UUID
     @Query("SELECT a FROM AdminAccount a WHERE a.loginId = :loginId")
     Optional<AdminAccount> findByLoginIdForUpdate(@Param("loginId") String loginId);
 
-    /** 승인 자격자 수(K2) — 활성 ADMIN, 유예 경과, 특정 계정 제외. 부트스트랩 예외 판정(K6)에 쓴다. */
-    @Query("SELECT count(a) FROM AdminAccount a WHERE a.role = kr.trendstage.persistence.type.AdminRole.ADMIN "
+    /**
+     * 승인 자격자 수(K2) — 활성 ADMIN, 유예 경과, 특정 계정 제외. 부트스트랩 예외 판정(K6)에 쓴다.
+     * role은 바인드 파라미터로 넘긴다 — JPQL에 enum 리터럴을 직접 쓰면 Hibernate가 Postgres 네이티브 enum
+     * 타입명(admin_role) 대신 Java 타입명(AdminRole)으로 캐스트를 생성해 "type AdminRole does not exist"로 깨진다.
+     */
+    @Query("SELECT count(a) FROM AdminAccount a WHERE a.role = :role "
             + "AND a.disabledAt IS NULL AND a.activatedAt IS NOT NULL AND a.approverSince <= :now AND a.id <> :excluding")
-    long countEligibleApprovers(@Param("excluding") UUID excluding, @Param("now") Instant now);
+    long countEligibleApprovers(@Param("excluding") UUID excluding, @Param("now") Instant now, @Param("role") AdminRole role);
 }

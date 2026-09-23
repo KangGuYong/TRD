@@ -2,6 +2,7 @@ package kr.trendstage.apiadmin.web;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import kr.trendstage.apiadmin.account.AdminAccountManagementService;
 import kr.trendstage.apiadmin.auth.AdminAccountService;
 import kr.trendstage.apiadmin.auth.AdminPrincipal;
 import kr.trendstage.audit.AuditLogService;
@@ -27,14 +28,17 @@ public class AdminAuthController {
     private final AuditLogService auditLogService;
     private final SecurityContextRepository securityContextRepository;
     private final CsrfTokenRepository csrfTokenRepository;
+    private final AdminAccountManagementService management;
 
     public AdminAuthController(AdminAccountService accountService, AuditLogService auditLogService,
                                 SecurityContextRepository securityContextRepository,
-                                CsrfTokenRepository csrfTokenRepository) {
+                                CsrfTokenRepository csrfTokenRepository,
+                                AdminAccountManagementService management) {
         this.accountService = accountService;
         this.auditLogService = auditLogService;
         this.securityContextRepository = securityContextRepository;
         this.csrfTokenRepository = csrfTokenRepository;
+        this.management = management;
     }
 
     public record LoginRequest(String loginId, String password) {}
@@ -85,5 +89,13 @@ public class AdminAuthController {
     /** SPA 부팅용 — 응답에 XSRF-TOKEN 쿠키를 싣는 것 외에 하는 일이 없다(CsrfCookieFilter가 발급). */
     @GetMapping("/auth/csrf")
     public void csrf() {
+    }
+
+    public record PasswordChangeRequest(String current, String next) {}
+
+    @PostMapping("/me/password")
+    public void changePassword(@RequestBody PasswordChangeRequest req) {
+        AdminPrincipal p = (AdminPrincipal) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        management.changeOwnPassword(p.id(), p.role(), req.current(), req.next());
     }
 }

@@ -52,6 +52,10 @@ public class AdminAccountService {
             throw new AccountDisabledException("비활성화된 계정입니다");
         }
 
+        if (account.getActivatedAt() == null) {
+            throw new AccountPendingException("승인 대기 중인 계정입니다 — 다른 ADMIN의 승인 후 로그인할 수 있습니다");
+        }
+
         Instant now = clock.instant();
 
         // 잠긴 동안에는 비밀번호를 검사하지 않는다 — 맞았는지 틀렸는지 알려주지 않기 위해.
