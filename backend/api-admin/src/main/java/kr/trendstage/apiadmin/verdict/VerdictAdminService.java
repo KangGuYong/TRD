@@ -2,6 +2,7 @@ package kr.trendstage.apiadmin.verdict;
 
 import kr.trendstage.apiadmin.auth.AdminValidationException;
 import kr.trendstage.audit.AuditLogService;
+import kr.trendstage.domain.verdict.DeadlineWindow;
 import kr.trendstage.judge.JudgeService;
 import kr.trendstage.persistence.entity.TrendItem;
 import kr.trendstage.persistence.entity.Verdict;
@@ -83,7 +84,8 @@ public class VerdictAdminService {
         Instant originalDeadline = item.getFirstSeenAt().plus(Duration.ofDays(JUDGE_WINDOW_DAYS));
         Instant currentDeadline = item.getJudgmentDeadlineOverride() != null
                 ? item.getJudgmentDeadlineOverride() : originalDeadline;
-        Instant ceiling = originalDeadline.plus(Duration.ofDays(MAX_GRACE_DAYS));
+        // 상한 = 최초 제보 + 21일. 병합 후 최소 관측 보장(MergeService)과 같은 상수를 쓴다.
+        Instant ceiling = item.getFirstSeenAt().plus(Duration.ofDays(DeadlineWindow.MAX_DEADLINE_DAYS));
         Instant requested = currentDeadline.plus(Duration.ofDays(days));
         Instant capped = requested.isAfter(ceiling) ? ceiling : requested;
 

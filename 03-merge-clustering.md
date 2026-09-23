@@ -38,12 +38,12 @@
 | 영한 혼용 | `chill guy` ↔ `칠가이` ↔ `칠 가이` |
 | 외래어 표기 흔들림 | `초콜릿 / 초콜렛 / 쪼꼬렛` |
 
-> **현행 구현은 NFC 정규화·공백 정리·소문자화뿐이다**(`NameNormalizer`). 특수문자 제거·조사 탈락·반복 문자 축약·영한 혼용·외래어 표기 흔들림은 전부 **미구현(SP2)** — 표의 예시(`두바이 초콜릿!!` → `두바이초콜릿`)는 목표 동작이다. 그래서 §1의 `두바이초콜릿` / `두바이 초콜릿` 쌍도 오늘은 완전일치로 병합되지 않으며, §2②의 "여기서 대부분이 걸러진다"도 아직 성립하지 않는다. `aliases[]`도 병합 시 기록만 되고 어떤 조회도 읽지 않는다.
+> **현행 구현은 NFC 정규화·공백 정리·소문자화뿐이다**(`NameNormalizer`). 특수문자 제거·조사 탈락·반복 문자 축약·영한 혼용·외래어 표기 흔들림은 전부 **미구현(SP2b)** — 표의 예시(`두바이 초콜릿!!` → `두바이초콜릿`)는 목표 동작이다. 그래서 §1의 `두바이초콜릿` / `두바이 초콜릿` 쌍도 오늘은 완전일치로 병합되지 않으며, §2②의 "여기서 대부분이 걸러진다"도 아직 성립하지 않는다. `aliases[]`는 병합 시 기록되며(승자가 패자의 `normalized_key`·`aliases`를 흡수), 완전일치 조회는 병합된 항목 이름을 `merged_into` 체인을 따라 승자로 합류시킨다(제보·워치·시딩 공통, `TrendItemLookup`, SP2 구현) — 다만 `aliases[]` 자체를 조회가 직접 읽지는 않는다.
 
 > **유니코드 정규화를 놓치면 눈에는 똑같이 보이는데 시스템은 다르다고 판단한다.** 디버깅이 매우 어려운 유형의 버그이므로 입력 단계에서 NFC로 강제 통일할 것.
 
 ### ② 완전일치 매칭
-정규화 키가 같으면 즉시 병합한다 — 목표는 여기서 대부분이 걸러지는 것이지만, 위에서 보듯 정규화가 아직 제한적이라 오늘 실제로 걸러지는 비율은 낮다(SP2).
+정규화 키가 같으면 즉시 병합한다 — 목표는 여기서 대부분이 걸러지는 것이지만, 위에서 보듯 정규화가 아직 제한적이라 오늘 실제로 걸러지는 비율은 낮다(SP2b). 병합된(tombstone) 항목의 키로 들어온 조회는 `merged_into`를 따라 살아 있는 승자로 합류한다(`TrendItemLookup`, SP2 구현). 동시에 들어온 첫 제보 둘은 `normalized_key` UNIQUE에 대한 `ON CONFLICT`로 한 항목에 수렴한다.
 
 ### ③ 임베딩 유사도
 표기가 완전히 달라도 같은 대상인 경우를 잡는다.
@@ -66,34 +66,35 @@
 
 ## 3. 유형 1: 제보 → 기존 클러스터 편입
 
-아래는 SP2 목표 절차다. 현행 코드가 하는 것은 3·4·5·6·7(dedup)·8·10(감사로그)과 9의 큐 상태 전이 —
-0(멱등키)·1의 `FOR UPDATE`·2(RESOLVED 가드)·9의 `decision_key`는 없다.
-9의 큐 상태 전이는 `MergeQueueController.merge()`가 수행하며, 이 컨트롤러 메서드 자체가
-`@Transactional`이고 `MergeService`는 별도 빈이라 프록시를 타므로 **병합과 같은 트랜잭션이다**
-(`open-in-view: false`라 이 트랜잭션이 없으면 큐 상태가 아예 저장되지 않는다).
-단, 이 원자성을 검증하는 테스트는 없다 — `src/test` 어디에도 `MergeQueue` 참조가 없다.
+아래는 구현된 절차다(SP2). 큐를 거치는 관리자 결정은 `MergeDecisionService.decide()`(1~4번, 큐 행 잠금·멱등키)와
+`MergeService.merge()`(5번 이후, 항목 쌍 잠금·병합 실행)가 **한 트랜잭션**으로 이어서 실행한다 — 컨트롤러 메서드가
+`@Transactional`이고 두 서비스가 별도 빈이라 프록시를 타므로 커밋·롤백이 같이 간다. `cluster_merge`의 ≥0.85 자동
+병합은 큐 없이 `ClusterMergeDecider`가 5번부터 바로 시작한다(1~4번은 큐 결정 전용).
 
 ```
 BEGIN TRANSACTION
-  0. 멱등키 검사: merge_queue.decision_key = :Idempotency-Key 가 이미 있으면 이전 결과 반환
-  1. SELECT ... FROM trend_items WHERE id IN (:target, :source) ORDER BY id FOR UPDATE   ← id 오름차순(데드락 회피)
-  2. 상태 가드: 두 항목 모두 PENDING. JUDGING → 409(재시도), RESOLVED → 409(병합 불가, §3.2)   ← **미구현(SP2)**. 현행 가드는 MERGED뿐이라 RESOLVED도 병합된다
-     > SP1부터 배치 판정이 `trend_items.state`(JUDGING·RESOLVED·VOID)를 실제로 기록하므로 상태 가드로 충분하다
-     > (SP1 이전 DB는 초기화 대상 — V28). SP1이 SP2에 선행한 이유다.
-     > 현재 `cluster_merge` 후보 스캔은 RESOLVED 항목을 포함하므로(`ClusterMergeCandidateService:72`)
-     > 자동 병합 경로에서 실제로 발생한다.
-  3. submissions.trend_item_id = :target
-  4. aliases[] 에 신규 정규화 키 추가
-  5. canonical_name 재결정
-  6. first_seen_at = MIN(기존, 신규)
-  7. 같은 유저 중복 제보 → 늦은 쪽 VOID + 제보권 반환 (§4.4)
-  8. order_rank 전체 재계산 (§3.1, `submission_order_rank` 뷰가 자동 재계산 — 별도 구현 불필요)
-  9. merge_queue 상태 전이 + decision_key 기록
- 10. admin_audit_log 기록 (사유·전후 스냅샷을 detail 에)
+  1. SELECT ... FROM merge_queue WHERE id = :queueId FOR UPDATE          ← 큐 행을 항목보다 먼저 잠근다
+  2. 멱등키 확인: key = entry.decision_key 이면 부작용 없이 이전 결과를 그대로 반환
+  3. entry.status <> PENDING 이면 409(merge-queue-decided, 이미 처리된 후보)
+  4. key가 다른 큐 항목에 이미 쓰였으면 422(idempotency-key-mismatch) — 커밋 시점 UNIQUE 위반도 같은 422로 잡는다
+  5. SELECT ... FROM trend_items WHERE id IN (:target, :source) ORDER BY id FOR UPDATE   ← id 오름차순(데드락 회피)
+  6. 상태 가드(`MergeGuard`): 두 항목 모두 판정 전 상태(DRAFT·PENDING) + 현행 판정 행 없음.
+     JUDGING → 409(merge-judging, 재시도 의미 있음). RESOLVED·VOID·판정 행 존재 → 409(merge-resolved, §3.2 — 판정 후 병합은 Phase 2 O9).
+     이미 MERGED(경합으로 먼저 처리됨)면 예외 없이 큐 항목을 SKIPPED로 정리하고 감사로그 `MERGE_QUEUE_STALE`만 남긴다.
+  7. submissions.trend_item_id = :target
+  8. aliases[] 에 패자의 normalized_key·aliases 흡수
+  9. canonical_name 재결정
+ 10. first_seen_at = MIN(기존, 신규)
+ 11. 같은 유저 중복 제보 → 늦은 쪽 VOID + 제보권 반환 (§4.4)
+ 12. order_rank 전체 재계산 (§3.1, `submission_order_rank` 뷰가 자동 재계산 — 별도 구현 불필요)
+ 13. 관측 마감 보장: 병합 시점 + 최소 3일보다 이르면 그 시점까지 연장(상한 새 first_seen_at + 21일). 마감을 당기지는 않는다
+ 14. trend_items.state = 'MERGED', merged_into = :survivor_id (패자 tombstone, §4.2)
+ 15. merge_queue 상태 전이 + decision_key 기록
+ 16. admin_audit_log 기록 (사유·전후 스냅샷을 detail 에)
 COMMIT
 ```
 
-### 3.1 order_rank 재계산 (8번)
+### 3.1 order_rank 재계산 (12번)
 
 **"기존 최대값 + 1"로 부여하면 안 된다.**
 
@@ -107,13 +108,13 @@ WHERE trend_item_id = :target AND result <> 'VOID' AND NOT is_seed   -- 시딩�
 
 파생값으로 두고 병합마다 재정렬 → **판정 시점(D+14)에 `verdicts.evidence_json`으로 스냅샷 동결.** 이후 병합이 더 일어나도 확정 점수는 흔들리지 않는다.
 
-### 3.2 first_seen_at 변경의 파급 (6번)
+### 3.2 first_seen_at 변경의 파급 (10번)
 
 `first_seen_at`이 앞당겨지면 두 가지가 바뀐다.
-- `order_rank` — 8번에서 재계산되므로 트랜잭션 안에서 해결된다.
+- `order_rank` — 12번에서 재계산되므로 트랜잭션 안에서 해결된다.
 - 시간 분포 신호(SP4 이후) — 첫 제보 시각 기준의 활동일·쏠림 비율이 이동한다. 판정 시점에 재집계하므로 판정 전이면 문제 없다.
 
-**판정 후(RESOLVED) 항목은 병합하지 않는다(2번 가드, P4).** 흡수된 제보가 다음 판정에서 원장에 다시 실려 이중 점수가 되기 때문이다. 판정 후 병합이 필요한 경우(ADJ 상쇄 경로)는 Phase 2(O9)에서 다룬다.
+**판정 후(RESOLVED) 항목은 병합하지 않는다(6번 가드, P4, `MergeGuard`).** 흡수된 제보가 다음 판정에서 원장에 다시 실려 이중 점수가 되기 때문이다. 판정 후 병합이 필요한 경우(ADJ 상쇄 경로)는 Phase 2(O9)에서 다룬다.
 
 ### 3.3 병합 검수 SLA 24시간의 근거
 
@@ -155,9 +156,10 @@ DELETE 금지 이유 셋:
 
 | 상태 | 처리 |
 |---|---|
-| 양쪽 모두 PENDING | 문제 없음. 판정 전이라 점수 미발생 |
-| 하나라도 JUDGING | 409. 판정 트랜잭션이 끝난 뒤 재시도 — **미구현(SP2)**. `JUDGING` 전이는 SP1에서 구현됐고(관측 마감 후 `verdict_runner`가 설정, 01 §2.2), 병합 가드만 남았다 |
-| 하나라도 RESOLVED | **병합 거부(409)** (P4) — **미구현(SP2)**, 현행은 그대로 병합되어 이중 점수가 난다. 판정 후 병합(`ADJ` 상쇄 경로, R2)은 Phase 2(O9) |
+| 양쪽 모두 DRAFT·PENDING (판정 행 없음) | 문제 없음. 판정 전이라 점수 미발생 |
+| 하나라도 JUDGING | 409(`merge-judging`). 판정 트랜잭션이 끝난 뒤 재시도 — 구현됨(`MergeGuard`) |
+| 하나라도 RESOLVED·VOID·판정 행 존재 | **병합 거부(409, `merge-resolved`)** (P4) — 구현됨. 판정 후 병합(`ADJ` 상쇄 경로, R2)은 Phase 2(O9) |
+| 하나라도 이미 MERGED | 다른 결정으로 먼저 처리된 경합 — 큐 항목을 SKIPPED로 정리(예외 없음). 큐를 거치지 않는 직접 호출은 409(`merge-target-merged`) |
 
 ADJ 경로를 도입할 때는 영향받은 유저에게 **자동 통보 필수.** 점수가 소리 없이 바뀌면 반드시 분쟁이 된다.
 
@@ -169,7 +171,7 @@ ADJ 경로를 도입할 때는 영향받은 유저에게 **자동 통보 필수.
 
 ## 5. 분리(Split) — 과병합 롤백
 
-**미구현.** 현행 ADM-100의 '분리'(`recordSeparateDecision`)는 유사도 제안 기각일 뿐 클러스터를 쪼개지 않는다(큐 상태는 `SKIPPED`). 실제 split은 SP2 이후.
+**미구현.** 현행 ADM-100의 '분리'(`recordSeparateDecision`)는 유사도 제안 기각일 뿐 클러스터를 쪼개지 않는다(큐 상태는 `SKIPPED`). 실제 split은 SP2b 이후.
 
 클러스터에서 일부 제보를 골라 새 클러스터로 분리.
 
@@ -184,14 +186,15 @@ ADJ 경로를 도입할 때는 영향받은 유저에게 **자동 통보 필수.
 
 | 장치 | 내용 |
 |---|---|
-| 큐 항목 클레임 | 카드 오픈 시 `merge_queue.assigned_to`·`claimed_at` 기록, 15분 만료 후 큐 복귀. 클레임 중인 항목은 다른 검수자에게 읽기 전용 |
-| 큐 상태 모델 | `PENDING → CLAIMED → (MERGED \| SEPARATED \| VOIDED \| HELD)`. `HELD` 3회 → `ESCALATED`(OPERATOR 큐). 보류와 분리는 다른 상태 (현행 `SKIPPED` → `SEPARATED` 개명 포함) |
-| 행 잠금 | 병합 트랜잭션에서 두 항목을 id 오름차순 `FOR UPDATE`(§3 1번) |
-| 낙관적 락 | `trend_items.version` 으로 커밋 시점 충돌 감지 → "다른 검수자가 이미 처리했습니다" 후 최신 상태 재표시 |
-| 멱등성 키 | `Idempotency-Key` 헤더 → `merge_queue.decision_key UNIQUE`. 같은 키 재요청은 이전 결과 반환 |
-| 완전일치 유일성 | `trend_items.normalized_key`에 **전체 UNIQUE가 이미 있다**(`V24:15`). `watches.normalized_key`가 이를 FK로 참조하므로(`V24:19`) 부분 UNIQUE로 바꿀 수 없다 — PostgreSQL에서 부분 유니크 인덱스는 FK 대상이 될 수 없다. 남은 문제는 tombstone이다: `TrendItem.mergeInto()`가 패자의 키를 그대로 두고 완전일치 조회가 MERGED를 거르지 않아 **신규 제보가 이미 병합된 죽은 클러스터에 붙는다.** 조회가 `merged_into`를 따라 승자에 합류하도록 고친다(**미구현(SP2)**) |
+| 큐 항목 클레임 | 카드 오픈 시 `merge_queue.assigned_to`·`claimed_at` 기록, 15분 만료 후 큐 복귀. 클레임 중인 항목은 다른 검수자에게 읽기 전용 — **미구현(SP2b)** |
+| 큐 상태 모델 | `PENDING → CLAIMED → (MERGED \| SEPARATED \| VOIDED \| HELD)`. `HELD` 3회 → `ESCALATED`(OPERATOR 큐) — **미구현(SP2b)**. 현행은 `PENDING → (MERGED \| SKIPPED \| VOIDED)`뿐이고, 경합으로 stale해진 후보도 `SKIPPED`로 정리한다(§4.3). 보류·에스컬레이션·`SKIPPED`→`SEPARATED` 개명은 SP2b |
+| 큐 행 잠금 | 큐 결정 트랜잭션 첫 단계로 `merge_queue` 행을 `FOR UPDATE`(§3 1번) — 구현됨 |
+| 항목 쌍 행 잠금 | 두 항목을 id 오름차순 `FOR UPDATE`(§3 5번), 큐 행 잠금 *다음* 순서 — 구현됨 |
+| 낙관적 락 | `trend_items.version` — 행 잠금이 걸리지 않는 다른 갱신 경로(예: 관리자 오버라이드)와의 충돌을 잡는 보조 수단으로 유지 |
+| 멱등성 키 | `Idempotency-Key` 헤더 필수(없으면 400) → `merge_queue.decision_key UNIQUE`(V29). 같은 키 재요청은 부작용 없이 이전 결과 반환, 다른 결정으로 재사용하면 422(`idempotency-key-mismatch`) — 구현됨(`MergeDecisionService`) |
+| 완전일치 유일성 | `trend_items.normalized_key`에 **전체 UNIQUE가 이미 있다**(`V24:15`). `watches.normalized_key`가 이를 FK로 참조하므로(`V24:19`) 부분 UNIQUE로 바꿀 수 없다. tombstone 문제는 조회 쪽에서 해결됐다: `TrendItemLookup.followToLive()`가 `merged_into`를 따라 승자까지 가므로 신규 제보·워치·시딩이 죽은 클러스터에 붙지 않는다 — 구현됨 |
 
-현행은 트랜잭션과 `trend_items.version` 낙관적 락, 그리고 `normalized_key` UNIQUE만 있다(행 잠금·클레임·멱등키 없음, 상태 가드는 MERGED뿐). SP2에서 구현.
+현행은 큐 행 → 항목 쌍 순서의 `FOR UPDATE`, `merge_queue.decision_key` UNIQUE 멱등키, `TrendItemLookup`의 tombstone 합류가 모두 구현돼 있다. 남은 것은 큐 워크플로(클레임·보류·에스컬레이션)와 정규화 규칙 확장뿐이며 SP2b로 넘어간다.
 
 ---
 

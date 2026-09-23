@@ -14,7 +14,11 @@ import static org.junit.jupiter.api.Assertions.*;
 class MergeComputationTest {
 
     private static MergeComputation.SubmissionInput input(UUID user, String rawInput, Instant createdAt) {
-        return new MergeComputation.SubmissionInput(UUID.randomUUID(), user, rawInput, createdAt);
+        return new MergeComputation.SubmissionInput(UUID.randomUUID(), user, rawInput, createdAt, false);
+    }
+
+    private static MergeComputation.SubmissionInput seed(UUID user, Instant createdAt) {
+        return new MergeComputation.SubmissionInput(UUID.randomUUID(), user, "시딩", createdAt, true);
     }
 
     @Test void 같은_유저가_양쪽에_제보하면_늦은_쪽만_VOID_대상() {
@@ -69,8 +73,27 @@ class MergeComputationTest {
 
         assertEquals(List.of(s2.submissionId(), s3.submissionId(), s1.submissionId()),
                 order.stream().map(MergeComputation.OrderComputed::submissionId).toList());
-        assertEquals(1, order.get(0).rank());
-        assertEquals(2, order.get(1).rank());
-        assertEquals(3, order.get(2).rank());
+        assertEquals(Integer.valueOf(1), order.get(0).rank());
+        assertEquals(Integer.valueOf(2), order.get(1).rank());
+        assertEquals(Integer.valueOf(3), order.get(2).rank());
+    }
+
+    @Test void 선점_순위는_시딩을_빼고_동시각은_같은_순위() {
+        Instant t0 = Instant.parse("2026-08-01T00:00:00Z");
+        var s = seed(UUID.randomUUID(), t0);                                   // 가장 이르지만 시딩
+        var a = input(UUID.randomUUID(), "x", t0.plus(1, ChronoUnit.HOURS));
+        var b = input(UUID.randomUUID(), "x", t0.plus(1, ChronoUnit.HOURS));   // a와 동시각
+        var c = input(UUID.randomUUID(), "x", t0.plus(2, ChronoUnit.HOURS));
+
+        var order = MergeComputation.computeCombinedOrder(List.of(c, s, b, a));
+
+        assertEquals(4, order.size());
+        assertEquals(Integer.valueOf(1), order.get(0).rank());
+        assertEquals(Integer.valueOf(1), order.get(1).rank());
+        assertEquals(Integer.valueOf(3), order.get(2).rank());   // RANK: 1,1,3
+        assertEquals(c.submissionId(), order.get(2).submissionId());
+        assertNull(order.get(3).rank());                          // 시딩은 순위 없이 뒤에
+        assertTrue(order.get(3).seed());
+        assertEquals(s.submissionId(), order.get(3).submissionId());
     }
 }

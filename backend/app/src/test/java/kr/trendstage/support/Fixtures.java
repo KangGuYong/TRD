@@ -5,6 +5,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -100,6 +101,73 @@ public class Fixtures {
     public void gradeSnapshot(UUID userId, String grade, Instant computedAt) {
         jdbc.update("INSERT INTO user_grades (user_id, grade, trust_index, active_score, judged_count, computed_at) "
                 + "VALUES (?, ?::grade_level, 0.5, 40, 6, ?)", userId, grade, Timestamp.from(computedAt));
+    }
+
+    // ── 병합(SP2) ─────────────────────────────────────────────
+
+    /** 처리 대기 병합 큐 행. */
+    public UUID mergeQueueEntry(UUID newItem, UUID oldItem, double similarity) {
+        return jdbc.queryForObject("INSERT INTO merge_queue (new_trend_item_id, old_trend_item_id, similarity) "
+                + "VALUES (?, ?, ?) RETURNING id", UUID.class, newItem, oldItem, similarity);
+    }
+
+    public String queueStatus(UUID queueId) {
+        return jdbc.queryForObject("SELECT status::text FROM merge_queue WHERE id = ?", String.class, queueId);
+    }
+
+    /** loser를 survivor로 병합된 tombstone으로 만든다(제보는 옮기지 않는다 — 상태만). */
+    public void merged(UUID loser, UUID survivor) {
+        jdbc.update("UPDATE trend_items SET state = 'MERGED', merged_into = ? WHERE id = ?", survivor, loser);
+    }
+
+    public void setState(UUID itemId, String state) {
+        jdbc.update("UPDATE trend_items SET state = ?::trend_state WHERE id = ?", state, itemId);
+    }
+
+    /** 상태는 그대로 두고 현행 판정 행만 만든다(상태·판정 행 불일치 가드 테스트용). */
+    public void verdictRow(UUID itemId) {
+        jdbc.update("INSERT INTO verdicts (trend_item_id, result, score_t, judged_at, evidence_json) "
+                + "VALUES (?, 'MISS', 0.1, now(), '{}'::jsonb)", itemId);
+    }
+
+    public String key(UUID itemId) {
+        return jdbc.queryForObject("SELECT normalized_key FROM trend_items WHERE id = ?", String.class, itemId);
+    }
+
+    public UUID itemOf(UUID submissionId) {
+        return jdbc.queryForObject("SELECT trend_item_id FROM submissions WHERE id = ?", UUID.class, submissionId);
+    }
+
+    /** 선점 순위(뷰). 순위가 없으면(시딩·VOID) null. */
+    public Integer orderRank(UUID submissionId) {
+        List<Integer> r = jdbc.queryForList("SELECT order_rank FROM submission_order_rank WHERE id = ?",
+                Integer.class, submissionId);
+        return r.isEmpty() ? null : r.get(0);
+    }
+
+    public Instant deadlineOverride(UUID itemId) {
+        Timestamp t = jdbc.queryForObject("SELECT judgment_deadline_override FROM trend_items WHERE id = ?",
+                Timestamp.class, itemId);
+        return t == null ? null : t.toInstant();
+    }
+
+    public void setDeadlineOverride(UUID itemId, Instant at) {
+        jdbc.update("UPDATE trend_items SET judgment_deadline_override = ? WHERE id = ?", Timestamp.from(at), itemId);
+    }
+
+    public Instant voidedAt(UUID submissionId) {
+        Timestamp t = jdbc.queryForObject("SELECT voided_at FROM submissions WHERE id = ?", Timestamp.class, submissionId);
+        return t == null ? null : t.toInstant();
+    }
+
+    public Instant mergeCheckedAt(UUID itemId) {
+        Timestamp t = jdbc.queryForObject("SELECT merge_checked_at FROM trend_items WHERE id = ?", Timestamp.class, itemId);
+        return t == null ? null : t.toInstant();
+    }
+
+    public int auditCount(String action, UUID targetId) {
+        return jdbc.queryForObject("SELECT count(*) FROM admin_audit_log WHERE action = ? AND target_id = ?",
+                Integer.class, action, targetId);
     }
 
     private UUID insertSubmission(UUID userId, UUID itemId, int confidence, Instant createdAt, boolean seed) {

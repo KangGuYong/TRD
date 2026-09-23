@@ -51,15 +51,18 @@ export const fxMergeQueue: MergeCandidate[] = [
 export const fxMergePreview: MergePreview = {
   newCanonicalName: "새싹 챌린지",
   orderRank: [
-    { handle: "user_4410", rankBefore: 1, rankAfter: 1 },
-    { handle: "user_1122", rankBefore: 2, rankAfter: 2 },
-    { handle: "user_8821", rankBefore: 1, rankAfter: 3 },
-    { handle: "user_0092", rankBefore: 2, rankAfter: 4 },
+    { handle: "user_4410", rankBefore: 1, rankAfter: 1, seed: false },
+    { handle: "user_1122", rankBefore: 2, rankAfter: 2, seed: false },
+    { handle: "user_8821", rankBefore: 1, rankAfter: 3, seed: false },
+    { handle: "seed_ops", rankBefore: null, rankAfter: null, seed: true },
   ],
   firstSeenAtBefore: "2026-08-11 09:00",
-  firstSeenAtAfter: "2026-08-11 09:00",
-  baselineShifted: false,
-  dedupVoidedHandles: [],
+  firstSeenAtAfter: "2026-08-10 21:00",
+  deadlineBefore: "2026-08-25 09:00",
+  deadlineAfter: "2026-08-27 14:00",
+  deadlineGuarded: true,
+  dedupVoidedHandles: ["user_1122"],
+  quotaRefundHandles: ["user_1122"],
 };
 
 export const fxParamDraft: ParameterDraftView = {
@@ -73,7 +76,7 @@ export const fxParamDraft: ParameterDraftView = {
 };
 
 export const fxClusterMergeResult: ClusterMergeResult = {
-  candidates: 8, autoMerged: 1, queued: 2, separated: 5, failed: 0,
+  candidates: 8, autoMerged: 1, queued: 2, separated: 4, skippedJudged: 1, deferred: 0, failed: 0,
 };
 
 export const fxUser: AdminUserDetail = {

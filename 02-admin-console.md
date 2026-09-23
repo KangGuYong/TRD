@@ -161,12 +161,14 @@
 **설계 포인트**
 
 - **미구현**: 위 와이어프레임의 정렬·필터 바(`[ 유사도 순 ▾ ] [ 카테고리 전체 ▾ ] [ 내 담당만 ☐ ]`)는 `MergeQueueScreen`에 없다 — 큐는 생성 순서로만 나열된다.
-- **키보드 단축키는 미구현.** `J/K/M/S/V` 뱃지는 화면에 떠 있지만 장식이다 — `onKeyDown` 등 키 리스너가 코드에 없다.
+- **키보드 단축키는 미구현(SP2b).** `J/K/M/S/V` 뱃지는 화면에 떠 있지만 장식이다 — `onKeyDown` 등 키 리스너가 코드에 없다.
+- **"보류 → 다음"은 미구현(SP2b).** 버튼은 떠 있지만 비활성화돼 있고(`Btn disabled`), 서버에 `hold` 엔드포인트 자체가 없다 — 큐 워크플로 묶음(SP2b)에서 클레임·에스컬레이션과 함께 연결한다.
 - 제보자의 TI·등급을 함께 노출하되, **이것이 병합 판단에 영향을 주면 안 된다는 점을 안내 문구로 명시**(실제로는 툴팁이 아니라 상시 노출되는 문구). 참고용일 뿐 고등급자 제보를 우대하면 시스템 공정성이 깨진다.
 - 병합 결정 시 `order_rank` 재부여 결과를 **확정 전 미리보기**로 보여준다(`GET /admin/merge-queue/{id}/preview` — 실제 병합과 같은 계산을 재사용하는 dry-run. 구현됨).
 - [VOID]는 신규 항목의 항목 VOID 사건이다 — ADM-200 VOID와 같은 `JudgeService.voidItem` 경로를 쓴다(제보 전부 VOID·제보권 반환, 이미 판정된 항목이면 VOID 판정과 원장 전액 상쇄까지). 이미 VOID·병합된 항목은 409.
-- **미구현**: 클레임(`assigned_to`·`claimed_at`), 상태 모델의 `CLAIMED`/`HELD`/`ESCALATED`, `Idempotency-Key` 헤더 — 전부 없다. 실제 `MergeQueueStatus`는 `PENDING`/`MERGED`/`SKIPPED`/`VOIDED` 4종뿐이고 만료·보류·에스컬레이션 개념이 없다.
-- RESOLVED 병합 거부(정책 P4)는 **미구현(SP2)**. `MergeQueueController.merge()`·`MergeService.merge()` 모두 대상 `TrendItem.state`가 `RESOLVED`인지 검사하지 않고(`MERGED`만 검사한다), `ClusterMergeCandidateService`의 후보 탐지 쿼리도 `RESOLVED`를 후보에서 빼지 않는다(`List.of(DRAFT, PENDING, JUDGING, RESOLVED)`) — 지금 RESOLVED 항목을 병합 결정하면 409가 아니라 그냥 병합된다. 상태만 보는 가드로는 부족하다 — SP1 전까지 배치 판정 항목도 `state`가 `PENDING`으로 남으므로 `verdicts.existsByTrendItemIdAndSupersedesIsNull(id)`를 함께 봐야 한다. **SP2에서 가장 먼저 고쳐야 할 간극.** VOID는 사유 서버 검증 없음(§4 참조).
+- **병합·분리·VOID는 `Idempotency-Key` 헤더 필수(없으면 400) · 같은 키 재요청은 부작용 없이 이전 결과 반환 · 다른 결정으로 재사용하면 422(`idempotency-key-mismatch`) · 409는 사유별로 구분된다(`merge-judging`·`merge-resolved`·`merge-target-merged`·`merge-queue-decided`) — 구현됨(`MergeDecisionService`, `merge_queue.decision_key UNIQUE` V29).**
+- RESOLVED 병합 거부(정책 P4)는 **구현됨(SP2)**. `MergeGuard`가 대상 `TrendItem.state`(판정 전 = DRAFT·PENDING)와 현행 판정 행 존재 여부를 함께 확인해 그 외 상태(JUDGING·RESOLVED·VOID)를 409로 막고, `ClusterMergeCandidateService`의 후보 탐지도 DRAFT·PENDING만 스캔해 판정된 항목과는 애초에 매칭되지 않는다(닮은 후보가 판정됐으면 병합·큐 없이 감사 로그 `MERGE_SKIPPED_JUDGED`만 남긴다). VOID는 사유 서버 검증 없음(§4 참조).
+- **미구현(SP2b)**: 클레임(`assigned_to`·`claimed_at`), 상태 모델의 `CLAIMED`/`HELD`/`ESCALATED` — 실제 `MergeQueueStatus`는 `PENDING`/`MERGED`/`SKIPPED`/`VOIDED` 4종뿐이고 만료·보류·에스컬레이션 개념이 없다.
 
 ---
 
@@ -195,7 +197,7 @@
 
 **"예상 판정"은 반드시 잠정임을 명시**한다. 관리자가 이 값을 보고 유저에게 미리 알려주는 사고가 실제로 잦다. 예상 판정은 `JudgeService.preview()`가 판정과 같은 신호(시딩 제외)·현재 파라미터로 계산만 하고 저장하지 않는다. 제보 목록에서 시딩 제보는 순위 대신 "시딩"으로 표시한다(선점 순위에서 빠진다).
 
-**미구현**: 위 와이어프레임의 `[ 항목 분리 ]` 버튼은 `TrendDetailScreen`에 없다 — 실제로는 VOID 처리·판정 유예 연장 둘뿐이다. 클러스터 분리(split)는 **미구현(SP2)**이다 — ADM-100의 [별도 항목으로 분리]는 병합 후보를 기각할 뿐(`MergeService.recordSeparateDecision`은 감사 로그 한 행만 남기고 데이터를 건드리지 않는다) 클러스터를 쪼개지 않는다.
+**미구현**: 위 와이어프레임의 `[ 항목 분리 ]` 버튼은 `TrendDetailScreen`에 없다 — 실제로는 VOID 처리·판정 유예 연장 둘뿐이다. 클러스터 분리(split)는 **미구현(SP2b)**이다 — ADM-100의 [별도 항목으로 분리]는 병합 후보를 기각할 뿐(`MergeService.recordSeparateDecision`은 감사 로그 한 행만 남기고 데이터를 건드리지 않는다) 클러스터를 쪼개지 않는다.
 
 ---
 

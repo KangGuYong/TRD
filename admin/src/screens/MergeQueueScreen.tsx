@@ -8,6 +8,15 @@ import { useRole, CAN } from "../state/role";
 import * as fx from "../fixtures";
 import type { MergePreview } from "../api/types";
 
+/** 서버 409·422 type별 안내(SP2 K2). 없는 type은 서버 detail을 그대로 보여준다. */
+const DECISION_MESSAGES: Record<string, string> = {
+  "merge-judging": "판정 중인 항목입니다. 잠시 후 다시 시도하세요",
+  "merge-resolved": "이미 판정된 항목은 병합할 수 없습니다 (판정 후 병합은 Phase 2)",
+  "merge-queue-decided": "이미 처리된 후보입니다 — 목록을 새로 고칩니다",
+  "merge-target-merged": "대상 항목이 이미 다른 항목으로 병합됐습니다 — 목록을 새로 고칩니다",
+  "idempotency-key-mismatch": "요청이 꼬였습니다. 새로고침 후 다시 시도하세요",
+};
+
 export default function MergeQueueScreen() {
   const q = useMergeQueue();
   const { role } = useRole();
@@ -39,7 +48,14 @@ export default function MergeQueueScreen() {
       flash(`${label} 처리됨 (감사 로그 기록)`);
       setReason("");
     } catch (e) {
-      flash(e instanceof ApiError ? e.message : `${label} 처리에 실패했습니다`);
+      if (e instanceof ApiError && e.type && DECISION_MESSAGES[e.type]) {
+        flash(DECISION_MESSAGES[e.type]);
+        if (e.type === "merge-queue-decided" || e.type === "merge-target-merged") {
+          await qc.invalidateQueries({ queryKey: ["admin", "merge-queue"] });
+        }
+      } else {
+        flash(e instanceof ApiError ? e.message : `${label} 처리에 실패했습니다`);
+      }
     } finally {
       setBusyId(null);
     }
@@ -72,11 +88,6 @@ export default function MergeQueueScreen() {
     <div style={{ maxWidth: 1000 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <span style={{ font: "500 12px Pretendard", color: C.sub }}>자동 병합 금지 구간 0.75–0.85</span>
-        <span style={{ display: "flex", gap: 5 }}>
-          {[["J/K", "이동"], ["M", "병합"], ["S", "분리"], ["V", "VOID"]].map(([k, d]) => (
-            <span key={k} style={{ font: "600 10px ui-monospace, monospace", padding: "5px 6px", borderRadius: 5, background: "rgba(20,19,15,0.06)", color: C.sub }}>{k} {d}</span>
-          ))}
-        </span>
       </div>
 
       <StateView query={q}>
@@ -141,7 +152,7 @@ export default function MergeQueueScreen() {
                     <Btn tone="primary" disabled={!CAN.merge(role) || busyId === mi.id} onClick={() => act(mi.id, "병합", "merge")}>병합</Btn>
                     <Btn disabled={!CAN.merge(role) || busyId === mi.id} onClick={() => act(mi.id, "분리", "separate")}>별도 항목으로 분리</Btn>
                     <Btn tone="danger" disabled={!CAN.void(role) || busyId === mi.id} onClick={() => act(mi.id, "VOID", "void")} title={!CAN.void(role) ? "OPERATOR 이상 필요" : undefined}>VOID (허위/규정위반)</Btn>
-                    <Btn onClick={() => flash("다음 항목으로 보류")}>보류 → 다음</Btn>
+                    <Btn disabled title="미구현 — 큐 워크플로 묶음(SP2b)에서 서버와 연결">보류 (미구현)</Btn>
                   </div>
                   {!CAN.void(role) && <div style={{ marginTop: 11, font: "500 11.5px Pretendard", color: C.fading }}>현재 역할({role})에는 VOID 권한이 없습니다. OPERATOR 이상 필요.</div>}
                 </div>
@@ -171,7 +182,7 @@ export default function MergeQueueScreen() {
                     {previewData.orderRank.map((o, i) => (
                       <div key={i} style={{ display: "flex", justifyContent: "space-between", font: "500 12px ui-monospace, monospace" }}>
                         <span>{o.handle}</span>
-                        <span>{o.rankBefore ?? "-"} → {o.rankAfter}</span>
+                        <span>{o.seed ? "시딩 · 순위 없음" : `${o.rankBefore ?? "-"} → ${o.rankAfter}`}</span>
                       </div>
                     ))}
                   </div>
@@ -179,15 +190,24 @@ export default function MergeQueueScreen() {
                 <div style={{ marginTop: 14 }}>
                   <Label>최초 목격 시각</Label>
                   <div style={{ font: "500 12.5px Pretendard" }}>{previewData.firstSeenAtBefore} → {previewData.firstSeenAtAfter}</div>
-                  {previewData.baselineShifted && (
+                </div>
+                <div style={{ marginTop: 14 }}>
+                  <Label>관측 마감</Label>
+                  <div style={{ font: "500 12.5px Pretendard" }}>{previewData.deadlineBefore} → {previewData.deadlineAfter}</div>
+                  {previewData.deadlineGuarded && (
                     <div style={{ marginTop: 8, padding: "9px 12px", borderRadius: 8, background: "rgba(216,150,60,0.1)", color: C.sub, font: "600 11.5px Pretendard" }}>
-                      최초 목격 시각이 앞당겨집니다 — 기존 판정 기준선(baseline)이 재계산 대상이 됩니다.
+                      남은 관측 기간이 3일보다 짧아 병합 시점부터 최소 3일을 보장합니다 (상한: 최초 제보 + 21일)
                     </div>
                   )}
                 </div>
                 {previewData.dedupVoidedHandles.length > 0 && (
                   <div style={{ marginTop: 14, padding: "9px 12px", borderRadius: 8, background: "rgba(20,19,15,0.05)", font: "500 11.5px Pretendard", color: C.sub }}>
                     동일 유저 중복 제보로 VOID 처리될 제보자: {previewData.dedupVoidedHandles.join(", ")}
+                  </div>
+                )}
+                {previewData.quotaRefundHandles.length > 0 && (
+                  <div style={{ marginTop: 8, padding: "9px 12px", borderRadius: 8, background: "rgba(20,19,15,0.05)", font: "500 11.5px Pretendard", color: C.sub }}>
+                    제보권 1장이 반환될 제보자: {previewData.quotaRefundHandles.join(", ")}
                   </div>
                 )}
                 <div style={{ marginTop: 16 }}>

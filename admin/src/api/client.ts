@@ -1,6 +1,7 @@
 /** /admin API 클라이언트. 세션 쿠키는 브라우저가 자동 전송(credentials: include). */
 export class ApiError extends Error {
-  constructor(public status: number, message: string) {
+  /** type: 서버 오류 본문의 type(about:blank면 undefined) — 화면이 사유별로 안내할 때 쓴다. */
+  constructor(public status: number, message: string, public type?: string) {
     super(message);
   }
 }
@@ -14,8 +15,8 @@ function readCookie(name: string): string | null {
   return match ? decodeURIComponent(match.slice(name.length + 1)) : null;
 }
 
-async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
+async function request<T>(method: string, path: string, body?: unknown, extraHeaders?: Record<string, string>): Promise<T> {
+  const headers: Record<string, string> = { "Content-Type": "application/json", ...extraHeaders };
   if (method !== "GET") {
     // 매 요청마다 쿠키를 새로 읽는다 — 로그인 직후 서버가 토큰을 교체해도 따로 처리할 필요가 없다.
     const token = readCookie(CSRF_COOKIE);
@@ -29,13 +30,15 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   });
   if (!res.ok) {
     let detail = res.statusText;
+    let type: string | undefined;
     try {
       const p = await res.json();
       detail = p.detail ?? p.message ?? detail;
+      type = p.type && p.type !== "about:blank" ? p.type : undefined;
     } catch {
       /* non-json */
     }
-    throw new ApiError(res.status, detail);
+    throw new ApiError(res.status, detail, type);
   }
   // void 컨트롤러 메서드는 200 + 빈 본문을 준다(204가 아님) — 상태코드로만 판단하면 JSON.parse가 깨진다.
   const text = await res.text();
@@ -44,7 +47,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 
 export const api = {
   get: <T>(p: string) => request<T>("GET", p),
-  post: <T>(p: string, b?: unknown) => request<T>("POST", p, b),
+  post: <T>(p: string, b?: unknown, h?: Record<string, string>) => request<T>("POST", p, b, h),
   put: <T>(p: string, b?: unknown) => request<T>("PUT", p, b),
 };
 

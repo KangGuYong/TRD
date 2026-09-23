@@ -39,6 +39,9 @@ public class MergeQueueEntry {
     @Column(name = "resolved_by")
     private UUID resolvedBy;
 
+    @Column(name = "decision_key", length = 80)
+    private String decisionKey;
+
     protected MergeQueueEntry() {}
 
     public MergeQueueEntry(UUID newTrendItemId, UUID oldTrendItemId, BigDecimal similarity) {
@@ -47,10 +50,12 @@ public class MergeQueueEntry {
         this.similarity = similarity;
     }
 
-    public void resolve(MergeQueueStatus status, UUID resolvedBy, Instant at) {
+    /** 결정 기록. key는 결정 요청의 Idempotency-Key — 배치가 정리하는 행은 null. */
+    public void resolve(MergeQueueStatus status, UUID resolvedBy, Instant at, String key) {
         this.status = status;
         this.resolvedBy = resolvedBy;
         this.resolvedAt = at;
+        this.decisionKey = key;
     }
 
     public UUID getId() { return id; }
@@ -61,4 +66,5 @@ public class MergeQueueEntry {
     public Instant getCreatedAt() { return createdAt; }
     public Instant getResolvedAt() { return resolvedAt; }
     public UUID getResolvedBy() { return resolvedBy; }
+    public String getDecisionKey() { return decisionKey; }
 }

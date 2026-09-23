@@ -10,6 +10,7 @@ import kr.trendstage.persistence.entity.Watch;
 import kr.trendstage.persistence.repo.SubmissionRepository;
 import kr.trendstage.persistence.repo.TrendItemRepository;
 import kr.trendstage.persistence.repo.WatchRepository;
+import kr.trendstage.persistence.trend.TrendItemLookup;
 import kr.trendstage.persistence.type.SubmissionResult;
 import kr.trendstage.persistence.type.TrendState;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -26,9 +27,11 @@ public class WatchService {
     private final WatchRepository watches;
     private final TrendItemRepository trends;
     private final SubmissionRepository submissions;
+    private final TrendItemLookup lookup;
 
-    public WatchService(WatchRepository watches, TrendItemRepository trends, SubmissionRepository submissions) {
-        this.watches = watches; this.trends = trends; this.submissions = submissions;
+    public WatchService(WatchRepository watches, TrendItemRepository trends, SubmissionRepository submissions,
+                        TrendItemLookup lookup) {
+        this.watches = watches; this.trends = trends; this.submissions = submissions; this.lookup = lookup;
     }
 
     @Transactional
@@ -53,10 +56,8 @@ public class WatchService {
     }
 
     private WatchItemResponse toResponse(Watch w) {
-        TrendItem item = trends.findByNormalizedKey(w.getNormalizedKey()).orElse(null);
-        if (item != null && item.getState() == TrendState.MERGED && item.getMergedInto() != null) {
-            item = trends.findById(item.getMergedInto()).orElse(item);
-        }
+        // 병합 체인을 끝까지 따라간다(한 단계만 보면 중간 tombstone에서 멈춘다)
+        TrendItem item = lookup.findLiveByNormalizedKey(w.getNormalizedKey()).orElse(null);
         if (item == null) {
             return new WatchItemResponse(w.getKeyword(), null, "아직 관측되지 않음");
         }

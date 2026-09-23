@@ -134,7 +134,7 @@ paths:
           description: >
             제보를 받을 수 없음 — Problem.type으로 구분한다.
             quota-exhausted: 이번 주 제보권 소진(월 00:00 KST 리필, 제출 − VOID 반환 기준).
-            item-closed: 관측이 끝난 항목(마감 이후·판정 중·판정 완료·VOID·병합됨). 제보권은 쓰지 않는다.
+            item-closed: 관측이 끝난 항목(마감 이후·판정 중·판정 완료·VOID). 제보권은 쓰지 않는다. 병합된 항목 이름으로 제보하면 병합 승자에 합류한다.
             about:blank: 필드 값 오류(확신도 등).
           content: { application/json: { schema: { $ref: '#/components/schemas/Problem' } } }
   /v1/submissions/me:
@@ -363,34 +363,77 @@ paths:
               schema:
                 type: array
                 items: { $ref: '#/components/schemas/MergeCandidate' }
-  /admin/merge-queue/{id}/action:
-    post:
+  /admin/merge-queue/{id}/preview:
+    get:
       tags: [admin-queues]
-      summary: 병합 결정 (병합/분리/VOID/보류) — 권한 부족 시 403
-      description: order_rank 재부여는 확정 전 미리보기로 제공. VOID는 OPERATOR 이상.
+      summary: 병합 후 미리보기(dry-run) — 선점 순위(시딩 제외)·중복 VOID·제보권 반환·관측 마감 조정
       security: [{ cookieAuth: [] }]
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
-        - name: Idempotency-Key
-          in: header
-          required: true
-          schema: { type: string }
-          description: 재시도 이중 실행 방지 멱등성 키(04 §5.4)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MergePreview' }
+        '422': { description: 없는 후보이거나 이미 처리됨 }
+  /admin/merge-queue/{id}/merge:
+    post:
+      tags: [admin-queues]
+      summary: 병합 확정 (REVIEWER 이상) — 늦게 생긴 항목을 먼저 생긴 항목으로 흡수
+      description: |
+        두 항목을 id 오름차순으로 행 잠금한 뒤, 둘 다 판정 전 상태이고 현행 판정 행이 없을 때만 병합한다.
+        병합으로 관측 마감이 병합 시점 + 3일보다 이르면 그 시점으로 연장한다(상한 최초 제보 + 21일).
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
-        required: true
         content:
           application/json:
-            schema:
-              type: object
-              required: [action]
-              properties:
-                action: { type: string, enum: [MERGE, SPLIT, VOID, HOLD] }
-                targetClusterId: { type: [string, 'null'], format: uuid }
-                reason: { type: string, description: 감사 로그 기록. VOID는 필수 }
+            schema: { $ref: '#/components/schemas/MergeDecisionRequest' }
       responses:
-        '200': { description: 처리됨 }
+        '200': { $ref: '#/components/responses/MergeDecided' }
+        '400': { $ref: '#/components/responses/IdempotencyKeyRequired' }
         '403': { $ref: '#/components/responses/Forbidden' }
-        '409': { description: 다른 검수자가 이미 처리함 — 낙관적 락 충돌(03 §6) }
+        '409': { $ref: '#/components/responses/MergeConflict' }
+        '422': { $ref: '#/components/responses/IdempotencyKeyMismatch' }
+  /admin/merge-queue/{id}/separate:
+    post:
+      tags: [admin-queues]
+      summary: 별도 항목으로 분리 (REVIEWER 이상) — 후보 기각, 데이터 변경 없음
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MergeDecisionRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/MergeDecided' }
+        '400': { $ref: '#/components/responses/IdempotencyKeyRequired' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/MergeConflict' }
+        '422': { $ref: '#/components/responses/IdempotencyKeyMismatch' }
+  /admin/merge-queue/{id}/void:
+    post:
+      tags: [admin-queues]
+      summary: 새 항목 VOID (OPERATOR 이상) — 판정된 항목이면 원장 상쇄까지
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MergeDecisionRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/MergeDecided' }
+        '400': { $ref: '#/components/responses/IdempotencyKeyRequired' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/MergeConflict' }
+        '422': { $ref: '#/components/responses/IdempotencyKeyMismatch' }
 
   # ─────────────────────────────  콘솔 · 트렌드/수집  ────────────────────
   /admin/trends/{id}:
@@ -945,6 +988,12 @@ components:
       in: path
       required: true
       schema: { type: string, format: uuid }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, minLength: 1, maxLength: 80 }
+      description: 결정 요청의 멱등키. 같은 키 재요청은 이전 결과를 그대로 돌려준다(merge_queue.decision_key UNIQUE).
 
   responses:
     Unauthorized:
@@ -956,13 +1005,27 @@ components:
     NotFound:
       description: 없음
       content: { application/json: { schema: { $ref: '#/components/schemas/Problem' } } }
+    MergeDecided:
+      description: 처리됨(같은 키 재요청이면 replayed=true)
+      content: { application/json: { schema: { $ref: '#/components/schemas/MergeDecisionResponse' } } }
+    MergeConflict:
+      description: |
+        병합 불가. type으로 구분 — merge-judging(판정 중, 재시도 의미 있음) · merge-resolved(판정 완료·VOID·판정 행 존재, 영구)
+        · merge-target-merged(대상이 이미 병합됨, 후보를 정리함) · merge-queue-decided(다른 요청이 이미 처리함)
+      content: { application/json: { schema: { $ref: '#/components/schemas/Problem' } } }
+    IdempotencyKeyRequired:
+      description: Idempotency-Key 헤더 없음 또는 형식 오류 (type idempotency-key-required)
+      content: { application/json: { schema: { $ref: '#/components/schemas/Problem' } } }
+    IdempotencyKeyMismatch:
+      description: 같은 키로 다른 결정, 또는 키가 다른 후보에 이미 쓰임 (type idempotency-key-mismatch)
+      content: { application/json: { schema: { $ref: '#/components/schemas/Problem' } } }
 
   schemas:
     Problem:
       description: RFC 9457 형식 오류 응답
       type: object
       properties:
-        type: { type: string, description: "about:blank | quota-exhausted | item-closed" }
+        type: { type: string, description: "about:blank | quota-exhausted | item-closed | merge-judging | merge-resolved | merge-target-merged | merge-queue-decided | idempotency-key-required | idempotency-key-mismatch" }
         title: { type: string }
         status: { type: integer }
         detail: { type: string }
@@ -1369,10 +1432,48 @@ components:
         lastLoginAt: { type: [string, 'null'], format: date-time }
     ClusterMergeResult:
       type: object
-      required: [candidates, autoMerged, queued, separated, failed]
+      required: [candidates, autoMerged, queued, separated, skippedJudged, deferred, failed]
       properties:
         candidates: { type: integer }
         autoMerged: { type: integer }
         queued: { type: integer }
         separated: { type: integer }
+        skippedJudged: { type: integer, description: 판정된 항목과 닮아 병합하지 않고 기록만 함 }
+        deferred: { type: integer, description: 판정·다른 병합과 경합해 다음 실행에서 다시 봄 }
         failed: { type: integer }
+    MergeDecisionRequest:
+      type: object
+      properties:
+        reason: { type: string, description: 감사 로그 기록 }
+    MergeDecisionResponse:
+      type: object
+      required: [queueId, decision, status, replayed]
+      properties:
+        queueId: { type: string, format: uuid }
+        decision: { type: string, enum: [MERGE, SEPARATE, VOID] }
+        status: { type: string, enum: [MERGED, SKIPPED, VOIDED] }
+        survivorId: { type: [string, 'null'], format: uuid }
+        loserId: { type: [string, 'null'], format: uuid }
+        decidedBy: { type: [string, 'null'], format: uuid }
+        decidedAt: { type: [string, 'null'], format: date-time }
+        replayed: { type: boolean }
+    MergePreview:
+      type: object
+      properties:
+        newCanonicalName: { type: string }
+        orderRank:
+          type: array
+          items:
+            type: object
+            properties:
+              handle: { type: string }
+              rankBefore: { type: [integer, 'null'] }
+              rankAfter: { type: [integer, 'null'], description: 시딩이면 null }
+              seed: { type: boolean }
+        firstSeenAtBefore: { type: string }
+        firstSeenAtAfter: { type: string }
+        deadlineBefore: { type: string }
+        deadlineAfter: { type: string }
+        deadlineGuarded: { type: boolean, description: 병합으로 최소 관측 3일 보장이 적용됨 }
+        dedupVoidedHandles: { type: array, items: { type: string } }
+        quotaRefundHandles: { type: array, items: { type: string }, description: 중복 VOID로 제보권이 돌아가는 제보자(시딩 제외) }

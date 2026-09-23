@@ -106,7 +106,7 @@ WHERE trend_item_id = :target AND result <> 'VOID' AND NOT is_seed
 병합으로 `first_seen_at`이 앞당겨지면 `order_rank`와 (SP4 이후) 시간 분포 신호가 바뀐다.
 판정 전(PENDING)이면 병합 트랜잭션 안에서 재계산한다 — **빼먹어도 에러가 나지 않고 선점 가중치만 조용히 틀린다. 반드시 테스트 케이스로 걸어둘 것.** 판정 후(RESOLVED)면 **병합 자체를 거부(409)**해야 한다 — 흡수된 제보가 다음 판정에서 원장에 다시 실려 이중 점수가 된다. 판정 후 병합(ADJ 상쇄 경로)은 Phase 2(O9).
 
-> **미구현(SP2).** 현행 `MergeService`의 가드는 `MERGED`뿐이고 `cluster_merge` 후보 스캔은 RESOLVED를 포함하므로, ≥0.85 자동 병합 경로에서 이중 점수가 지금도 발생할 수 있다. SP1부터 판정이 `state`(JUDGING·RESOLVED·VOID)를 실제로 기록하므로 가드는 상태로 걸 수 있다 — SP1 이전 DB는 초기화 대상이다(V28).
+> **구현(SP2).** `MergeService`가 두 항목을 id 오름차순으로 `SELECT … FOR UPDATE` 잠근 뒤 `MergeGuard`로 판정 전 상태(DRAFT·PENDING) + 현행 판정 행 없음을 확인하고, 아니면 409(`merge-judging`·`merge-resolved`)로 거부한다. `cluster_merge`는 판정된 항목과 닮으면 병합하지 않고 감사 로그 `MERGE_SKIPPED_JUDGED`만 남긴다. 순위 재계산은 뷰라서 자동이고 `MergeRecomputeTest`로 건다. 병합으로 관측 마감이 병합 시점 + 3일보다 당겨지면 그 시점까지 연장한다(상한 최초 제보 + 21일).
 
 ### ⚠ 같은 유저의 중복 제보는 VOID 처리
 
@@ -134,7 +134,7 @@ WHERE trend_item_id = :target AND result <> 'VOID' AND NOT is_seed
 | 주기             | 잡                 | 비고                                 |
 | ---------------- | ------------------ | ------------------------------------ |
 | 시간당           | `sla_watch`      | **미구현(SP3)**. 신고 4h → 자동 임시 비공개 / 병합 24h → 판정 유예 연장 / 90일 미접속 관리자 비활성화 |
-| 일 1회           | `cluster_merge`  | 임베딩 병합 + 관리자 큐 적재. ADM-900에서 수동 실행 가능 |
+| 일 1회           | `cluster_merge`  | 임베딩 병합 + 관리자 큐 적재. 판정된 항목과 닮으면 병합하지 않고 기록만(SP2). ADM-900에서 수동 실행 가능 |
 | 일 1회           | `verdict_runner` | 관측 마감 지난 항목 JUDGING → `JudgeService`가 항목별 트랜잭션으로 판정 → 원장 기록. 판정 로직은 `JudgeService` 하나를 배치·재판정·VOID·미리보기가 공유 |
 | 일 1회           | `abuse_scan`     | **미구현(Phase 2)**. 플래그만 생성, 제재는 안 함 |
 | 주 1회(월 00:00 **KST**) | `grade_recalc`   | 공식 등급 스냅샷(코드에 zone 명시). TI 최근 180일, 강등 규칙(Phase 2) 전까지 등급을 내리지 않는다. 제보권 리필(이월 없음)은 주 경계 자체라 배치가 없다 |
@@ -226,7 +226,7 @@ WHERE trend_item_id = :target AND result <> 'VOID' AND NOT is_seed
 
 - 점수·등급 계산 로직은 **순수 함수로 분리**하고 파라미터를 주입받게 할 것. 파라미터 스튜디오의 시뮬레이션이 같은 함수를 재사용해야 한다.
 - 시간 관련 값은 전부 UTC 저장, 표시만 KST.
-- 병합 연산은 **단일 트랜잭션 + 행 잠금 + 멱등성 키**. 검수자 동시 처리 충돌은 실제로 발생한다.
+- 병합 연산은 **단일 트랜잭션 + 행 잠금 + 멱등성 키**. 검수자 동시 처리 충돌은 실제로 발생한다. 큐 결정은 `Idempotency-Key` 필수 — `merge_queue.decision_key` UNIQUE(V29)가 보장, 잠금 순서는 큐 행 → 항목(id 오름차순).
 - 배치는 재실행 가능해야 한다(idempotent). `verdict_runner` 재실행이 점수를 두 번 주면 안 됨. 멱등성은 코드 가드가 아니라 DB 제약으로 보장한다 — `verdicts` 부분 UNIQUE(`verdict_one_original_per_item`, V4, 구현됨), `score_ledger(verdict_id, submission_id)` UNIQUE(V28), 재판정 체인 분기 방지 `verdict_superseded_once`(V28).
 - 판정 로직은 `JudgeService`(`judge` 모듈) 하나로 모은다. **배치 클래스 안에서 같은 빈의 `@Transactional` 메서드를 직접 호출하지 말 것** — 프록시를 타지 않아 트랜잭션이 무효가 되고 dirty-check 변경이 flush되지 않는다.
 - 제약(UNIQUE·CHECK)은 코드 가드 대신 DB에 둔다.
