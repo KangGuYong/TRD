@@ -157,6 +157,12 @@ export default function VerdictScreen() {
             <b style={{ fontSize: 14 }}>
               {dialog.item.canonicalName} — {actionLabel(dialog.kind)}
             </b>
+            {dialog.kind === "rejudge" && (
+              <p style={{ margin: "10px 0 0", color: C.sub, fontSize: 12.5, lineHeight: 1.5 }}>
+                원 판정 때의 파라미터로, 그사이 VOID된 제보를 뺀 지금의 제보를 다시 계산합니다.
+                새 파라미터를 과거 판정에 소급하지 않습니다.
+              </p>
+            )}
             {dialog.kind === "grace" && (
               <div style={{ marginTop: 14 }}>
                 <Label>연장 일수 (1~7일)</Label>

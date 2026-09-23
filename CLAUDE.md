@@ -38,7 +38,7 @@ HIT/MISS 판정은 `verdict_runner` 배치가 정해진 공식으로만 내리�
 
 외부 사이트 지표(해시태그 게시물 수, 갤러리 글 수, 검색량 등)는 어떤 형태로도 판정에 들어가지 않는다.
 "2주 안에 N명이 제보했다"는 단순 누적 카운트는 유행의 증거로 불충분하다. 서로 다른 제보자 수에 더해 **제보의 시간 분포(지속성)**, **플랫폼 다양성**, **제보자 독립성**을 신호 축으로 둔다(SP4에서 도입).
-VOID 제보는 신호에서 제외한다. 시딩(`is_seed=true`)도 제외해야 하지만 **미구현(SP1)** — 현행은 원장 기록에서만 빠지고 제보자 수에는 그대로 들어간다. Phase 1 시딩을 시작하기 전에 고쳐야 R1이 성립한다.
+VOID·시딩(`is_seed=true`) 제보는 신호에서 제외한다(T와 선점 순위 모두). 시딩이 제보자 수에 들어가면 시딩 계정 수만큼 HIT가 공짜로 만들어져 R1이 깨진다.
 (현행 코드는 제보자 수 축만 구현. 나머지 축은 SP4에서 Phase 0 백테스트와 함께 도입.)
 
 > `SP0~SP4(SP0.5 포함)`는 설계 재검토(2026-09-17)가 나눈 서브프로젝트 실행 단위다 — SP0 문서 정비 / SP0.5 즉시 수정 / SP1 판정 파이프라인 / SP2 병합 무결성 / SP3 콘솔 통제·SLA / SP4 판정 신호 재설계. 이 순서대로 진행하며 Phase 1 시작 전에 SP1까지 끝나야 한다. 상세는 `docs/superpowers/specs/2026-09-17-design-review-design.md`.
@@ -72,9 +72,8 @@ m        확산배수 (L1 0.2 / L2 0.5 / L3 1.0 / L4 1.5)
 ```
 
 **원장(`score_ledger`)에는 감쇠 없는 원값을 기록한다.** 반감기 90일 감쇠는 AS를 계산하는 조회 시점에만 적용한다. 원장에 감쇠를 미리 곱해 두면 "그때 얼마를 받았나"가 불변이 아니게 되고(R2), 반감기를 바꾸려면 과거 원장을 UPDATE해야 해 사실상 변경이 불가능해진다. 조회 시점에도 곱하면 이중 적용이다.
-(현행 코드는 `ScoreEngine`이 Δ에 감쇠를 곱해 기록하고 `ActiveScore`가 다시 곱하는 **이중 적용** 상태다. SP1에서 원값 기록으로 전환.)
 
-> ⚠ 조회 시점 감쇠는 반대급부가 있다 — 반감기를 바꾸면 **과거 AS가 전부 재계산된다.** ADM-600의 "기본값은 비소급 예약 적용"과 충돌하므로, 조회에 쓸 반감기를 전역 현재값으로 할지 원장 기록 시점의 파라미터 버전으로 할지는 O11(미결, SP1에서 결정).
+> ⚠ 조회 시점 감쇠를 전역 반감기로 하면 반감기를 바꿀 때 **과거 AS가 전부 재계산된다**(ADM-600 "비소급"과 충돌). 그래서 원장 행마다 `halflife_days`·`decay_anchor_at`을 기록하고 AS는 행별 값으로 감쇠한다(O11 = (b), 2026-09-20 결정) — 반감기를 바꿔도 과거 AS는 그대로다. 재판정·VOID 차액(ADJ)은 원 판정과 같은 감쇠 기준으로 기록해 정확히 상쇄된다.
 
 **실패 페널티가 이득의 절반인 것은 의도된 설계다.** 대칭으로 만들면 유저가 "이미 뜬 것만" 제보하게 되어 조기경보 목적이 무너진다. 임의로 바꾸지 말 것.
 
@@ -99,7 +98,7 @@ TI = (HIT + 2) / (HIT + MISS + 5)     # 최근 180일 기준
 ```sql
 SELECT id, RANK() OVER (ORDER BY created_at ASC) AS order_rank
 FROM submissions
-WHERE trend_item_id = :target AND result <> 'VOID'
+WHERE trend_item_id = :target AND result <> 'VOID' AND NOT is_seed
 ```
 
 ### ⚠ first_seen_at 이 바뀌면 order_rank 재계산, 판정 후면 병합 금지
@@ -107,11 +106,11 @@ WHERE trend_item_id = :target AND result <> 'VOID'
 병합으로 `first_seen_at`이 앞당겨지면 `order_rank`와 (SP4 이후) 시간 분포 신호가 바뀐다.
 판정 전(PENDING)이면 병합 트랜잭션 안에서 재계산한다 — **빼먹어도 에러가 나지 않고 선점 가중치만 조용히 틀린다. 반드시 테스트 케이스로 걸어둘 것.** 판정 후(RESOLVED)면 **병합 자체를 거부(409)**해야 한다 — 흡수된 제보가 다음 판정에서 원장에 다시 실려 이중 점수가 된다. 판정 후 병합(ADJ 상쇄 경로)은 Phase 2(O9).
 
-> **미구현(SP2).** 현행 `MergeService`의 가드는 `MERGED`뿐이고 `cluster_merge` 후보 스캔은 RESOLVED를 포함하므로, ≥0.85 자동 병합 경로에서 이중 점수가 지금도 발생할 수 있다. 게다가 상태만 보는 가드로는 부족하다 — SP1 전까지 배치 판정이 `state`를 flush하지 못해 판정된 항목도 `PENDING`으로 남으므로, 가드는 `verdicts.existsByTrendItemIdAndSupersedesIsNull(id)`를 함께 봐야 한다. **SP1이 SP2에 선행해야 하는 이유.**
+> **미구현(SP2).** 현행 `MergeService`의 가드는 `MERGED`뿐이고 `cluster_merge` 후보 스캔은 RESOLVED를 포함하므로, ≥0.85 자동 병합 경로에서 이중 점수가 지금도 발생할 수 있다. SP1부터 판정이 `state`(JUDGING·RESOLVED·VOID)를 실제로 기록하므로 가드는 상태로 걸 수 있다 — SP1 이전 DB는 초기화 대상이다(V28).
 
 ### ⚠ 같은 유저의 중복 제보는 VOID 처리
 
-병합 후 자기 자신과 중복되면, 확신도를 두 번 건 헤지가 되어 베팅 구조가 무너진다. 늦은 쪽은 VOID 처리된다(`MergeService.dedupSameUserSubmissions`, 구현됨). 제보권 반환은 `QuotaService` 자체가 없어 **미구현(SP1)** — 제보권 차감·리필도 전부 TODO 상태다.
+병합 후 자기 자신과 중복되면, 확신도를 두 번 건 헤지가 되어 베팅 구조가 무너진다. 늦은 쪽은 VOID 처리된다(`MergeService.dedupSameUserSubmissions`). `voided_at`이 속한 주에 제보권 한 장이 반환된다(저장 카운터 없이 제보 행에서 파생, `QuotaService`).
 
 ---
 
@@ -127,7 +126,7 @@ WHERE trend_item_id = :target AND result <> 'VOID'
                                               ↓
                                     [score_ledger 기록]
                                               ↓
-                                  [주간 등급 재계산 · 제보권 리필(SP1에서 신설)]
+                                  [주간 등급 재계산 · 제보권 리필(주 경계)]
 ```
 
 ### 배치 잡
@@ -136,9 +135,9 @@ WHERE trend_item_id = :target AND result <> 'VOID'
 | ---------------- | ------------------ | ------------------------------------ |
 | 시간당           | `sla_watch`      | **미구현(SP3)**. 신고 4h → 자동 임시 비공개 / 병합 24h → 판정 유예 연장 / 90일 미접속 관리자 비활성화 |
 | 일 1회           | `cluster_merge`  | 임베딩 병합 + 관리자 큐 적재. ADM-900에서 수동 실행 가능 |
-| 일 1회           | `verdict_runner` | D+14 판정 → 원장 기록. 판정 로직은 `JudgeService` 하나를 배치·재판정·시뮬이 공유(**SP1에서 신설**) |
+| 일 1회           | `verdict_runner` | 관측 마감 지난 항목 JUDGING → `JudgeService`가 항목별 트랜잭션으로 판정 → 원장 기록. 판정 로직은 `JudgeService` 하나를 배치·재판정·VOID·미리보기가 공유 |
 | 일 1회           | `abuse_scan`     | **미구현(Phase 2)**. 플래그만 생성, 제재는 안 함 |
-| 주 1회(월 00:00) | `grade_recalc`   | 등급 재계산 + 제보권 리필(이월 없음, **미구현(SP1)**). **TI·판정완료 건수가 `submissions.result` 미갱신으로 0.4·0에 고정돼 현재는 승급이 일어나지 않는다**(SP1에서 수정) |
+| 주 1회(월 00:00 **KST**) | `grade_recalc`   | 공식 등급 스냅샷(코드에 zone 명시). TI 최근 180일, 강등 규칙(Phase 2) 전까지 등급을 내리지 않는다. 제보권 리필(이월 없음)은 주 경계 자체라 배치가 없다 |
 | 월 1회           | `l4_quota`       | **미구현(Phase 3)**. L4 정원 재산정  |
 
 ---
@@ -179,8 +178,8 @@ WHERE trend_item_id = :target AND result <> 'VOID'
 ### Phase 1 (4~12주) — 클로즈드 베타
 
 운영진 시딩 주 20건 + 초대 유저 50~100명.
-시딩분은 `is_seed=true`로 **점수 원장에 반영하지 않는다.** 판정 신호(T)에서도 제외해야 하지만 **미구현(SP1)** — Phase 1 시작 전에 고쳐야 한다(R5 참조). 시딩은 클러스터 앵커 역할만 한다.
-**선행 조건: 제보권 쿼터·리필·VOID 반환 구현(SP1).** 쿼터 없는 베팅 구조는 난사를 보상한다.
+시딩분은 `is_seed=true`로 **점수 원장에 반영하지 않고 판정 신호(T)·선점 순위에서도 제외한다**(R5). 시딩은 클러스터 앵커 역할만 한다.
+**선행 조건: 제보권 쿼터·리필·VOID 반환(SP1에서 구현).** 쿼터 없는 베팅 구조는 난사를 보상한다.
 필요 화면 추가: ADM-100, 110/111, 311, 410, 500
 **ADM-311(유저 원장)은 이의 제기 대응의 근거 화면이고, ADM-410(신고 큐)은 법적 리스크 대응이라 Phase 1로 앞당긴다.** ADM-410은 구현돼 있고, ADM-311은 백엔드가 없어 픽스처로만 떠 있다(**미구현(SP3)**).
 
@@ -206,7 +205,7 @@ WHERE trend_item_id = :target AND result <> 'VOID'
 | O8 | 시간 분포·플랫폼 다양성·제보자 독립성 축의 가중치 | SP4                                    |
 | O9 | 판정 후 병합(ADJ 상쇄 경로) 도입 시점        | Phase 2. 그 전까지 RESOLVED 병합은 409      |
 | O10 | SLA 통보 채널(메신저 웹훅)                  | Phase 2. Phase 1은 로그                     |
-| O11 | AS 조회 감쇠에 쓸 반감기 버전(전역 현재값 vs 원장 기록 시점 파라미터) | SP1. ADM-600 "비소급"과의 충돌 해소 |
+| O11 | AS 조회 감쇠에 쓸 반감기 버전(전역 현재값 vs 원장 기록 시점 파라미터) | **결정됨(b)** — 원장 행별 반감기(2026-09-20) |
 
 > O3(디시 데이터 수집 방식)은 2026-08-13 판정 모델 피벗으로 폐기.
 
@@ -228,8 +227,8 @@ WHERE trend_item_id = :target AND result <> 'VOID'
 - 점수·등급 계산 로직은 **순수 함수로 분리**하고 파라미터를 주입받게 할 것. 파라미터 스튜디오의 시뮬레이션이 같은 함수를 재사용해야 한다.
 - 시간 관련 값은 전부 UTC 저장, 표시만 KST.
 - 병합 연산은 **단일 트랜잭션 + 행 잠금 + 멱등성 키**. 검수자 동시 처리 충돌은 실제로 발생한다.
-- 배치는 재실행 가능해야 한다(idempotent). `verdict_runner` 재실행이 점수를 두 번 주면 안 됨. 멱등성은 코드 가드가 아니라 DB 제약으로 보장한다 — `verdicts` 부분 UNIQUE(`verdict_one_original_per_item`, V4, 구현됨), `score_ledger(verdict_id, submission_id)` UNIQUE(**SP1에서 신설**).
-- 판정 로직은 `JudgeService` 하나로 모은다(SP1에서 신설). **배치 클래스 안에서 같은 빈의 `@Transactional` 메서드를 직접 호출하지 말 것** — 프록시를 타지 않아 트랜잭션이 무효가 되고 dirty-check 변경이 flush되지 않는다.
+- 배치는 재실행 가능해야 한다(idempotent). `verdict_runner` 재실행이 점수를 두 번 주면 안 됨. 멱등성은 코드 가드가 아니라 DB 제약으로 보장한다 — `verdicts` 부분 UNIQUE(`verdict_one_original_per_item`, V4, 구현됨), `score_ledger(verdict_id, submission_id)` UNIQUE(V28), 재판정 체인 분기 방지 `verdict_superseded_once`(V28).
+- 판정 로직은 `JudgeService`(`judge` 모듈) 하나로 모은다. **배치 클래스 안에서 같은 빈의 `@Transactional` 메서드를 직접 호출하지 말 것** — 프록시를 타지 않아 트랜잭션이 무효가 되고 dirty-check 변경이 flush되지 않는다.
 - 제약(UNIQUE·CHECK)은 코드 가드 대신 DB에 둔다.
 - 관리자 API는 모든 응답에 **산정 근거를 함께 반환.** `"TI 0.42 / 요구치 0.45 / 부족분 0.03"` 형태.
 

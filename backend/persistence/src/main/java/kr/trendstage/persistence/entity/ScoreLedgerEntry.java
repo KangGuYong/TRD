@@ -47,32 +47,51 @@ public class ScoreLedgerEntry {
     @Column(name = "approval_id")
     private UUID approvalId;
 
+    /** 이 행을 기록할 때의 반감기(일). AS 조회 감쇠에 쓴다 — 파라미터가 바뀌어도 과거 행은 그대로(J1). */
+    @Column(name = "halflife_days", nullable = false)
+    private int halflifeDays;
+
+    /** 감쇠 기준 시각. 판정 행은 판정 시각, 재판정·VOID 차액은 원 판정 시각(J1). */
+    @Column(name = "decay_anchor_at", nullable = false)
+    private Instant decayAnchorAt;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt = Instant.now();
 
     protected ScoreLedgerEntry() {}
 
-    /** 판정 발생 원장(HIT/MISS/VOID). */
-    public static ScoreLedgerEntry ofVerdict(UUID userId, UUID submissionId, UUID verdictId,
-                                             LedgerKind kind, BigDecimal delta, String reason) {
+    /** 판정 발생 원장(HIT/MISS). delta는 원값 — 감쇠는 AS 조회 때(J1). */
+    public static ScoreLedgerEntry ofVerdict(UUID userId, UUID submissionId, UUID verdictId, LedgerKind kind,
+                                             BigDecimal delta, String reason, int halflifeDays, Instant decayAnchorAt) {
         ScoreLedgerEntry e = new ScoreLedgerEntry();
         e.userId = userId; e.submissionId = submissionId; e.verdictId = verdictId;
         e.kind = kind; e.delta = delta; e.reason = reason;
+        e.halflifeDays = halflifeDays; e.decayAnchorAt = decayAnchorAt;
         return e;
     }
 
-    /** 상쇄 원장(ADJ). 사유 필수, 승인자 표시. */
+    /** 재판정·항목 VOID의 제보 단위 차액(ADJ). 원 판정과 같은 감쇠 기준이어야 AS에서 정확히 상쇄된다. */
+    public static ScoreLedgerEntry verdictAdjustment(UUID userId, UUID submissionId, UUID verdictId, BigDecimal delta,
+                                                     String reason, int halflifeDays, Instant decayAnchorAt) {
+        return ofVerdict(userId, submissionId, verdictId, LedgerKind.ADJ, delta, reason, halflifeDays, decayAnchorAt);
+    }
+
+    /** 수동 상쇄 원장(ADJ, ADM-311 — SP3). 사유 필수, 승인자 표시. */
     public static ScoreLedgerEntry adjustment(UUID userId, BigDecimal delta, String reason,
-                                              UUID approvedBy, UUID approvalId) {
+                                              UUID approvedBy, UUID approvalId, int halflifeDays, Instant decayAnchorAt) {
         ScoreLedgerEntry e = new ScoreLedgerEntry();
         e.userId = userId; e.kind = LedgerKind.ADJ; e.delta = delta; e.reason = reason;
         e.approvedBy = approvedBy; e.approvalId = approvalId;
+        e.halflifeDays = halflifeDays; e.decayAnchorAt = decayAnchorAt;
         return e;
     }
 
     public UUID getId() { return id; }
     public UUID getUserId() { return userId; }
     public UUID getSubmissionId() { return submissionId; }
+    public UUID getVerdictId() { return verdictId; }
+    public int getHalflifeDays() { return halflifeDays; }
+    public Instant getDecayAnchorAt() { return decayAnchorAt; }
     public LedgerKind getKind() { return kind; }
     public BigDecimal getDelta() { return delta; }
     public String getReason() { return reason; }

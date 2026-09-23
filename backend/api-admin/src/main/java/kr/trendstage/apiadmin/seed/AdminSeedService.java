@@ -12,6 +12,7 @@ import kr.trendstage.persistence.entity.AdminAccount;
 import kr.trendstage.persistence.entity.Submission;
 import kr.trendstage.persistence.entity.TrendItem;
 import kr.trendstage.persistence.entity.UserAccount;
+import kr.trendstage.persistence.params.CurrentParameterSetResolver;
 import kr.trendstage.persistence.repo.AdminAccountRepository;
 import kr.trendstage.persistence.repo.SubmissionRepository;
 import kr.trendstage.persistence.repo.TrendItemRepository;
@@ -23,6 +24,7 @@ import kr.trendstage.persistence.type.TrendState;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -44,15 +46,20 @@ public class AdminSeedService {
     private final TrendItemRepository trendItems;
     private final SubmissionRepository submissions;
     private final AuditLogService auditLogService;
+    private final CurrentParameterSetResolver currentParams;
+    private final Clock clock;
 
     public AdminSeedService(AdminAccountRepository adminAccounts, UserRepository users,
                             TrendItemRepository trendItems, SubmissionRepository submissions,
-                            AuditLogService auditLogService) {
+                            AuditLogService auditLogService, CurrentParameterSetResolver currentParams,
+                            Clock clock) {
         this.adminAccounts = adminAccounts;
         this.users = users;
         this.trendItems = trendItems;
         this.submissions = submissions;
         this.auditLogService = auditLogService;
+        this.currentParams = currentParams;
+        this.clock = clock;
     }
 
     public record SeedSubmissionRequest(
@@ -87,7 +94,7 @@ public class AdminSeedService {
         }
 
         String normalized = NameNormalizer.normalize(req.name());
-        Instant now = Instant.now();
+        Instant now = clock.instant();
 
         TrendItem item = trendItems.findByNormalizedKey(normalized).orElse(null);
         if (item != null) {
@@ -102,7 +109,7 @@ public class AdminSeedService {
         Submission sub = submissions.save(new Submission(
                 seedUserId, item.getId(), req.name(), normalized,
                 req.confidence().shortValue(), req.platform(), req.evidenceUrl(), req.oneLine(),
-                false, true));
+                false, true, now));
 
         auditLogService.record(actorId, actorRole, "SEED_SUBMISSION_CREATE", "TREND_ITEM", item.getId(),
                 Map.of("name", req.name(), "confidence", req.confidence()));
@@ -112,7 +119,7 @@ public class AdminSeedService {
 
     @Transactional(readOnly = true)
     public List<SeedAccuracyRow> listAccuracy() {
-        ParameterSet p = ParameterSet.defaults();
+        ParameterSet p = currentParams.resolve();
         return adminAccounts.findAll().stream()
                 .filter(a -> a.getSeedUserId() != null)
                 .map(a -> {

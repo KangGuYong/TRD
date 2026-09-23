@@ -1,6 +1,5 @@
 package kr.trendstage.domain.params;
 
-import kr.trendstage.domain.verdict.SubmissionSignal;
 import kr.trendstage.domain.verdict.VerdictEngine;
 import kr.trendstage.domain.verdict.VerdictOutcome;
 import kr.trendstage.domain.verdict.VerdictResult;
@@ -17,8 +16,7 @@ public final class ParamSimulation {
     public static SimulationSummary run(List<VerdictSnapshot> snapshots, ParameterSet p) {
         int missToHit = 0, hitToMiss = 0, reachChanged = 0;
         for (VerdictSnapshot v : snapshots) {
-            SubmissionSignal sig = new SubmissionSignal(v.distinctSubmitters(), v.distinctPlatforms());
-            VerdictOutcome after = VerdictEngine.evaluate(sig, p);
+            VerdictOutcome after = VerdictEngine.evaluate(v.signal(), p);
             if (v.result() == VerdictResult.MISS && after.result() == VerdictResult.HIT) {
                 missToHit++;
             } else if (v.result() == VerdictResult.HIT && after.result() == VerdictResult.MISS) {

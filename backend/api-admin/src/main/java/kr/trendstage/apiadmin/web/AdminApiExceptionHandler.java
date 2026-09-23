@@ -8,6 +8,8 @@ import kr.trendstage.apiadmin.auth.DraftLockedException;
 import kr.trendstage.apiadmin.auth.DuplicateLoginIdException;
 import kr.trendstage.apiadmin.auth.InvalidCredentialsException;
 import kr.trendstage.apiadmin.auth.SelfModificationException;
+import kr.trendstage.judge.JudgeConflictException;
+import kr.trendstage.judge.JudgeRejectedException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
@@ -39,6 +41,16 @@ public class AdminApiExceptionHandler {
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<Map<String, Object>> handle(AccessDeniedException e) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(problem(403, "권한이 없습니다"));
+    }
+
+    @ExceptionHandler(JudgeRejectedException.class)
+    public ResponseEntity<Map<String, Object>> handle(JudgeRejectedException e) {
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(problem(422, e.getMessage()));
+    }
+
+    @ExceptionHandler(JudgeConflictException.class)
+    public ResponseEntity<Map<String, Object>> handle(JudgeConflictException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(problem(409, e.getMessage()));
     }
 
     @ExceptionHandler(DuplicateLoginIdException.class)

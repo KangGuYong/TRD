@@ -5,6 +5,7 @@ dependencies {
     implementation(project(":persistence"))
     implementation(project(":audit"))
     implementation(project(":merge"))
+    implementation(project(":judge"))
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-security")     // 세션 + RBAC + 2FA
     implementation("org.springframework.boot:spring-boot-starter-validation")

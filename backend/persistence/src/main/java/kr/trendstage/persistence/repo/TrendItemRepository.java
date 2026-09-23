@@ -1,9 +1,13 @@
 package kr.trendstage.persistence.repo;
 
+import jakarta.persistence.LockModeType;
 import kr.trendstage.persistence.entity.TrendItem;
 import kr.trendstage.persistence.type.TrendState;
 import kr.trendstage.persistence.type.TrendVisibility;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
@@ -22,4 +26,9 @@ public interface TrendItemRepository extends JpaRepository<TrendItem, UUID> {
 
     /** api-public 공개 조회 필터링용 — visibility=PUBLIC만 노출(신고 처리 결과 반영, ADM-410). */
     List<TrendItem> findByStateInAndVisibility(List<TrendState> states, TrendVisibility visibility);
+
+    /** 판정·재판정·VOID가 같은 항목을 동시에 건드리지 않게 행을 잠근다(SELECT … FOR UPDATE). */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select t from TrendItem t where t.id = :id")
+    Optional<TrendItem> findByIdForUpdate(@Param("id") UUID id);
 }

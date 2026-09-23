@@ -36,10 +36,24 @@ public interface SubmissionRepository extends JpaRepository<Submission, UUID> {
     /** 409 응답의 dupeRank(클러스터 내 현재 제보 수) 계산용. */
     long countByTrendItemIdAndResultNot(UUID trendItemId, SubmissionResult excluded);
 
+    /** ADM-110 목록의 '제보자수' — 판정 신호와 같은 기준(서로 다른 제보자, 시딩·VOID 제외). */
+    @Query("select count(distinct s.userId) from Submission s "
+            + "where s.trendItemId = :id and s.seed = false and s.result <> :excluded")
+    long countDistinctSubmitters(@Param("id") UUID trendItemId, @Param("excluded") SubmissionResult excluded);
+
     long countByCreatedAtAfter(Instant since);
 
     long countByCreatedAtAfterAndSeedTrue(Instant since);
 
-    /** 나 탭 제보권 표시용 — 이번 주(월요일 0시 KST 이후) 유효 제보 수. */
-    long countByUserIdAndCreatedAtAfterAndResultNot(UUID userId, Instant since, SubmissionResult excluded);
+    /** 제보권: 이번 주에 낸 제보 수(시딩 제외, VOID 여부 무관 — J4). */
+    long countByUserIdAndSeedFalseAndCreatedAtGreaterThanEqual(UUID userId, Instant since);
+
+    /** 제보권: 이번 주에 VOID로 반환된 제보 수(시딩 제외, 지난주에 낸 것 포함 — J4). */
+    long countByUserIdAndSeedFalseAndVoidedAtGreaterThanEqual(UUID userId, Instant since);
+
+    /** TI 창(최근 180일) — 처음 판정 시각 기준, 시딩 제외. */
+    long countByUserIdAndResultAndSeedFalseAndResolvedAtGreaterThanEqual(UUID userId, SubmissionResult result, Instant since);
+
+    /** 판정완료 건수(전 기간), 시딩 제외. */
+    long countByUserIdAndResultAndSeedFalse(UUID userId, SubmissionResult result);
 }

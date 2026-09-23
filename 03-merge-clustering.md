@@ -78,9 +78,8 @@ BEGIN TRANSACTION
   0. 멱등키 검사: merge_queue.decision_key = :Idempotency-Key 가 이미 있으면 이전 결과 반환
   1. SELECT ... FROM trend_items WHERE id IN (:target, :source) ORDER BY id FOR UPDATE   ← id 오름차순(데드락 회피)
   2. 상태 가드: 두 항목 모두 PENDING. JUDGING → 409(재시도), RESOLVED → 409(병합 불가, §3.2)   ← **미구현(SP2)**. 현행 가드는 MERGED뿐이라 RESOLVED도 병합된다
-     > 상태만으로는 부족하다 — SP1 전까지 배치 판정은 `trend_items.state`를 flush하지 못해 판정된 항목도
-     > `PENDING`으로 남는다(01 §4.3). 가드는 `verdicts.existsByTrendItemIdAndSupersedesIsNull(id)`를
-     > 함께 봐야 한다. SP1이 SP2에 선행하는 이유이기도 하다.
+     > SP1부터 배치 판정이 `trend_items.state`(JUDGING·RESOLVED·VOID)를 실제로 기록하므로 상태 가드로 충분하다
+     > (SP1 이전 DB는 초기화 대상 — V28). SP1이 SP2에 선행한 이유다.
      > 현재 `cluster_merge` 후보 스캔은 RESOLVED 항목을 포함하므로(`ClusterMergeCandidateService:72`)
      > 자동 병합 경로에서 실제로 발생한다.
   3. submissions.trend_item_id = :target
@@ -103,7 +102,7 @@ COMMIT
 ```sql
 SELECT id, RANK() OVER (ORDER BY created_at ASC) AS order_rank
 FROM submissions
-WHERE trend_item_id = :target AND result <> 'VOID'
+WHERE trend_item_id = :target AND result <> 'VOID' AND NOT is_seed   -- 시딩은 순위에서 빠진다(J3)
 ```
 
 파생값으로 두고 병합마다 재정렬 → **판정 시점(D+14)에 `verdicts.evidence_json`으로 스냅샷 동결.** 이후 병합이 더 일어나도 확정 점수는 흔들리지 않는다.
@@ -157,13 +156,13 @@ DELETE 금지 이유 셋:
 | 상태 | 처리 |
 |---|---|
 | 양쪽 모두 PENDING | 문제 없음. 판정 전이라 점수 미발생 |
-| 하나라도 JUDGING | 409. 판정 트랜잭션이 끝난 뒤 재시도 — **미구현(SP2)**. `JUDGING` 전이 자체가 SP1 대상이고(01 §4.3), 배치 판정은 self-invocation으로 트랜잭션이 걸리지 않는다 |
+| 하나라도 JUDGING | 409. 판정 트랜잭션이 끝난 뒤 재시도 — **미구현(SP2)**. `JUDGING` 전이는 SP1에서 구현됐고(관측 마감 후 `verdict_runner`가 설정, 01 §2.2), 병합 가드만 남았다 |
 | 하나라도 RESOLVED | **병합 거부(409)** (P4) — **미구현(SP2)**, 현행은 그대로 병합되어 이중 점수가 난다. 판정 후 병합(`ADJ` 상쇄 경로, R2)은 Phase 2(O9) |
 
 ADJ 경로를 도입할 때는 영향받은 유저에게 **자동 통보 필수.** 점수가 소리 없이 바뀌면 반드시 분쟁이 된다.
 
 ### 4.4 중복 제보자 dedup
-같은 유저가 A와 B에 각각 제보했다면 병합 후 자기 자신과 중복. 늦은 쪽을 VOID 처리하고 제보권 반환.
+같은 유저가 A와 B에 각각 제보했다면 병합 후 자기 자신과 중복. 늦은 쪽을 VOID 처리하고(`voided_at`) 그 주에 제보권 한 장이 반환된다(01 §3.3, 구현됨).
 그대로 두면 확신도를 두 번 걸어 리스크를 헤지한 셈이 되어 베팅 구조가 무너진다. endorsement도 유저 단위 dedup.
 
 ---

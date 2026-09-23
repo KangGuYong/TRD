@@ -1,12 +1,9 @@
 package kr.trendstage.apiadmin.trend;
 
 import kr.trendstage.apiadmin.auth.AdminValidationException;
-import kr.trendstage.domain.params.ParameterSet;
-import kr.trendstage.domain.score.SubmissionRef;
-import kr.trendstage.domain.score.VerdictComputation;
 import kr.trendstage.domain.score.VerdictPlan;
 import kr.trendstage.domain.verdict.DeadlineWindow;
-import kr.trendstage.domain.verdict.SubmissionSignal;
+import kr.trendstage.judge.JudgeService;
 import kr.trendstage.persistence.entity.Submission;
 import kr.trendstage.persistence.entity.SubmissionOrderRank;
 import kr.trendstage.persistence.entity.TrendItem;
@@ -33,14 +30,12 @@ import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
- * ADM-110/111. 목록은 전체 상태 조회, 상세는 VerdictComputation을 드라이런으로 돌려
- * 저장 없이 예상 판정만 계산한다(VerdictAdminService.applySupersede()와 동일한 조립 방식,
- * 다만 결과를 저장하지 않는다는 점만 다르다).
+ * ADM-110/111. 목록은 전체 상태 조회, 상세의 예상 판정은 JudgeService.preview()가 판정과 같은 신호·계산으로
+ * 만들고 저장하지 않는다(시딩 제외 — 판정과 같은 기준).
  */
 @Service
 public class TrendItemAdminService {
@@ -55,12 +50,13 @@ public class TrendItemAdminService {
     private final UserRepository users;
     private final UserGradeRepository userGrades;
     private final EndorsementRepository endorsements;
+    private final JudgeService judgeService;
     private final Clock clock;
 
     public TrendItemAdminService(TrendItemRepository trendItems, SubmissionRepository submissions,
                                   SubmissionOrderRankRepository orderRanks, VerdictRepository verdicts,
                                   UserRepository users, UserGradeRepository userGrades,
-                                  EndorsementRepository endorsements, Clock clock) {
+                                  EndorsementRepository endorsements, JudgeService judgeService, Clock clock) {
         this.trendItems = trendItems;
         this.submissions = submissions;
         this.orderRanks = orderRanks;
@@ -68,13 +64,14 @@ public class TrendItemAdminService {
         this.users = users;
         this.userGrades = userGrades;
         this.endorsements = endorsements;
+        this.judgeService = judgeService;
         this.clock = clock;
     }
 
     public record TrendItemSummary(String id, String canonicalName, String category, String state,
                                     String firstSeenAt, int submitterCount, String currentResult) {}
 
-    public record SubmissionRow(String submissionId, String userHandle, int orderRank,
+    public record SubmissionRow(String submissionId, String userHandle, Integer orderRank,
                                  int confidence, Double submitterTi, String createdAt,
                                  String platform, String oneLine, String evidenceUrl) {}
 
@@ -91,7 +88,8 @@ public class TrendItemAdminService {
         return trendItems.findAll().stream()
                 .sorted(Comparator.comparing(TrendItem::getFirstSeenAt).reversed())
                 .map(item -> {
-                    long submitterCount = submissions.countByTrendItemIdAndResultNot(item.getId(), SubmissionResult.VOID);
+                    // 상세(ADM-111)·판정과 같은 기준: 서로 다른 제보자, 시딩 제외
+                    long submitterCount = submissions.countDistinctSubmitters(item.getId(), SubmissionResult.VOID);
                     Verdict current = verdicts.findCurrentByTrendItemId(item.getId()).orElse(null);
                     return new TrendItemSummary(
                             item.getId().toString(), item.getCanonicalName(), item.getCategory().name(), item.getState().name(),
@@ -112,26 +110,18 @@ public class TrendItemAdminService {
         List<Submission> subs = submissions.findByTrendItemIdAndResultNot(trendItemId, SubmissionResult.VOID);
 
         Instant now = clock.instant();
-        List<SubmissionRef> refs = subs.stream().map(s -> new SubmissionRef(
-                s.getId(), s.getUserId(), s.getConfidence(),
-                rankById.getOrDefault(s.getId(), Integer.MAX_VALUE),
-                Duration.between(s.getCreatedAt(), now).toDays())).toList();
-        long distinctSubmitters = subs.stream().map(Submission::getUserId).distinct().count();
-        long distinctPlatforms = subs.stream().map(Submission::getSourcePlatform)
-                .filter(Objects::nonNull).distinct().count();
-        SubmissionSignal signal = new SubmissionSignal((int) distinctSubmitters, (int) distinctPlatforms);
-
+        JudgeService.Preview preview = judgeService.preview(trendItemId);
+        int distinctSubmitters = preview.signal().distinctSubmitters();   // 시딩 제외 — 판정과 같은 기준
+        int distinctPlatforms = preview.signal().distinctPlatforms();
         Verdict current = verdicts.findCurrentByTrendItemId(trendItemId).orElse(null);
-        VerdictPlan preview = current == null
-                ? VerdictComputation.run(signal, false, refs, ParameterSet.defaults())
-                : null;
+        VerdictPlan plan = current == null ? preview.plan() : null;
 
         List<SubmissionRow> rows = subs.stream()
                 .sorted(Comparator.comparingInt(s -> rankById.getOrDefault(s.getId(), Integer.MAX_VALUE)))
                 .map(s -> new SubmissionRow(
                         s.getId().toString(),
                         users.findById(s.getUserId()).map(UserAccount::getHandle).orElse("-"),
-                        rankById.getOrDefault(s.getId(), Integer.MAX_VALUE), s.getConfidence(),
+                        rankById.get(s.getId()), s.getConfidence(),
                         userGrades.findTopByUserIdOrderByComputedAtDesc(s.getUserId())
                                 .map(g -> g.getTrustIndex().doubleValue()).orElse(null),
                         DISPLAY_FORMAT.format(s.getCreatedAt()),
@@ -144,14 +134,14 @@ public class TrendItemAdminService {
                 item.getId().toString(), item.getCanonicalName(), item.getCategory().name(), item.getState().name(),
                 DISPLAY_FORMAT.format(item.getFirstSeenAt()), DISPLAY_FORMAT.format(deadline),
                 Duration.between(now, deadline).toDays(), item.getJudgmentDeadlineOverride() != null,
-                (int) distinctSubmitters, (int) distinctPlatforms, endorsements.countByTrendItemId(trendItemId),
+                distinctSubmitters, distinctPlatforms, endorsements.countByTrendItemId(trendItemId),
                 current == null ? null : current.getResult().name(),
                 current == null || current.getReachLevel() == null ? null : current.getReachLevel().name(),
                 current == null || current.getScoreT() == null ? null : current.getScoreT().toPlainString(),
                 current == null ? null : DISPLAY_FORMAT.format(current.getJudgedAt()),
-                preview == null ? null : preview.result().name(),
-                preview == null || preview.reach() == null ? null : preview.reach().name(),
-                preview == null ? null : BigDecimal.valueOf(preview.t()).setScale(4, RoundingMode.HALF_UP).toPlainString(),
+                plan == null ? null : plan.result().name(),
+                plan == null || plan.reach() == null ? null : plan.reach().name(),
+                plan == null ? null : BigDecimal.valueOf(plan.t()).setScale(4, RoundingMode.HALF_UP).toPlainString(),
                 rows);
     }
 }

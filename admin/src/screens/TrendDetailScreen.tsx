@@ -141,7 +141,7 @@ export default function TrendDetailScreen({ trendItemId, onBack }: { trendItemId
         </div>
         {detail.submissions.map((s) => (
           <div key={s.submissionId} style={{ display: "grid", gridTemplateColumns: "50px 110px 80px 1fr 130px 70px 60px 140px", minWidth: 900, alignItems: "center", padding: "12px 20px", borderBottom: `1px solid rgba(20,19,15,0.05)` }}>
-            <span style={{ font: "600 12px ui-monospace, monospace" }}>{s.orderRank}</span>
+            <span style={{ font: "600 12px ui-monospace, monospace" }}>{s.orderRank ?? "시딩"}</span>
             <span style={{ font: "600 12.5px Pretendard" }}>{s.userHandle}</span>
             <span style={{ font: "500 11.5px Pretendard", color: C.faint }}>{s.platform}</span>
             <span style={{ font: "500 12px Pretendard", paddingRight: 10 }}>{s.oneLine}</span>

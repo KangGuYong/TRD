@@ -29,6 +29,16 @@ public class FirebaseConfig {
     @Bean
     @Conditional(CredentialsPathConfigured.class)
     public FirebaseApp firebaseApp(org.springframework.core.env.Environment env) throws IOException {
+        // FirebaseApp 레지스트리는 JVM 전역이라 같은 JVM에서 컨텍스트가 두 번 뜨면(통합 테스트가
+        // 서로 다른 프로퍼티로 컨텍스트를 새로 만들 때) initializeApp이 "DEFAULT already exists"로 던진다.
+        // 이미 있으면 그대로 쓴다 — 초기화를 멱등하게.
+        for (FirebaseApp existing : FirebaseApp.getApps()) {
+            if (FirebaseApp.DEFAULT_APP_NAME.equals(existing.getName())) {
+                log.info("이미 초기화된 Firebase 기본 앱을 재사용한다");
+                return existing;
+            }
+        }
+
         String path = env.getRequiredProperty("firebase.credentials-path");
         GoogleCredentials credentials = GoogleCredentials.fromStream(new FileInputStream(path));
         FirebaseOptions options = FirebaseOptions.builder().setCredentials(credentials).build();

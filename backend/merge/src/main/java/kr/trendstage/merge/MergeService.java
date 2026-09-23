@@ -11,6 +11,7 @@ import kr.trendstage.persistence.type.TrendState;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.util.*;
 
@@ -24,12 +25,14 @@ public class MergeService {
     private final TrendItemRepository trendItems;
     private final SubmissionRepository submissions;
     private final AuditLogService auditLogService;
+    private final Clock clock;
 
     public MergeService(TrendItemRepository trendItems, SubmissionRepository submissions,
-                         AuditLogService auditLogService) {
+                         AuditLogService auditLogService, Clock clock) {
         this.trendItems = trendItems;
         this.submissions = submissions;
         this.auditLogService = auditLogService;
+        this.clock = clock;
     }
 
     /**
@@ -73,24 +76,6 @@ public class MergeService {
     public void recordSeparateDecision(UUID actorId, AdminRole actorRole, UUID newTrendItemId, UUID oldTrendItemId, String reason) {
         auditLogService.record(actorId, actorRole, "MERGE_SEPARATE", "TREND_ITEM", newTrendItemId, Map.of(
                 "comparedTo", oldTrendItemId.toString(),
-                "reason", reason == null ? "" : reason
-        ));
-    }
-
-    /** ADM-100 "VOID" — 신규 항목 자체를 무효 처리(허위·규정위반 등). 그 항목의 제보도 함께 VOID. */
-    @Transactional
-    public void voidTrendItem(UUID trendItemId, UUID actorId, AdminRole actorRole, String reason) {
-        TrendItem item = trendItems.findById(trendItemId)
-                .orElseThrow(() -> new IllegalStateException("항목이 없습니다: " + trendItemId));
-        if (item.getState() == TrendState.MERGED || item.getState() == TrendState.VOID) {
-            return;
-        }
-        for (Submission s : submissions.findByTrendItemIdAndResultNot(trendItemId, SubmissionResult.VOID)) {
-            s.voidOut();
-        }
-        item.transitionTo(TrendState.VOID);
-
-        auditLogService.record(actorId, actorRole, "MERGE_VOID", "TREND_ITEM", trendItemId, Map.of(
                 "reason", reason == null ? "" : reason
         ));
     }
@@ -147,7 +132,7 @@ public class MergeService {
         for (Submission s : b) byId.put(s.getId(), s);
 
         Set<UUID> voided = MergeComputation.computeDedup(toInputs(a), toInputs(b));
-        for (UUID id : voided) byId.get(id).voidOut();
+        for (UUID id : voided) byId.get(id).voidOut(clock.instant());
     }
 
     private void mergeAliases(TrendItem survivor, TrendItem loser) {

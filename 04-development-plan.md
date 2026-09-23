@@ -27,11 +27,11 @@
 
 | 원칙 | 구현 가드 (코드 레벨) |
 |---|---|
-| **R1** 유저 투표로 유행 결정 금지 | `verdicts` INSERT는 `verdict_runner` 배치와 `VerdictAdminService`(재판정·VOID, supersedes 행)뿐이며 둘 다 `VerdictComputation` 재계산 결과만 쓴다. 투표(`votes`)는 별도 테이블, 판정 입력에서 물리적으로 분리. 관리자 API에 "판정 결과 직접 변경" 엔드포인트 자체가 없음(§7). |
+| **R1** 유저 투표로 유행 결정 금지 | `verdicts` INSERT는 `JudgeService`(배치 판정·재판정·항목 VOID, 재판정·VOID는 supersedes 행)뿐이며 모두 `VerdictComputation` 계산 결과만 쓴다. 투표(`votes`)는 별도 테이블, 판정 입력에서 물리적으로 분리. 관리자 API에 "판정 결과 직접 변경" 엔드포인트 자체가 없음(§7). |
 | **R2** 원장 불변(append-only) | `score_ledger`·`verdicts`에 DB 트리거로 `UPDATE/DELETE` 거부(`V7`, 구현됨). 정정은 `ADJ`/`supersedes` INSERT만. ORM 레벨에서도 엔티티에 setter 미노출 + `@Immutable`(`ScoreLedgerEntry`·`Verdict` 둘 다). |
 | **R3** 등급 = 적중률 주축(AS AND TI) | 승급 판정은 순수함수 `GradePolicy.evaluate()` 하나로만. 제보 건수 단독 승급 경로 없음(타입상 불가하게 설계). |
 | **R4** 자동은 플래그와 가역적 보전 조치까지 | 제재·비공개 **확정**은 사람. 병합은 유사도 ≥0.85만 자동 확정(되돌리려면 분리), 0.75~0.85는 사람(관리자 큐). `abuse_scan`(`abuse_flags` INSERT만)·`sanctions` 2인 승인 상태머신은 **미구현(Phase 2)**. `sla_watch`가 적용할 `TEMP_HIDDEN`(가역, ADM-410)은 **미구현(SP3)** — 현재 자동 임시비공개 자체가 일어나지 않는다. |
-| **R5** 판정 입력은 제보뿐 | `VerdictEngine`은 `SubmissionSignal`(현행; SP1에서 `TrendSignal`로 확장)만 입력받는다. 외부 지표 테이블·수집기는 존재하지 않는다. VOID는 집계에서 제외(구현됨). 시딩 제외는 **미구현(SP1)** — 현행 `VerdictRunner`는 시딩을 `distinctSubmitters`에 포함한다. 시간 분포·플랫폼·독립성 축은 SP4. |
+| **R5** 판정 입력은 제보뿐 | `VerdictEngine`은 `TrendSignal`(관측 마감 전 비VOID 제보의 제보자·시각·플랫폼·시딩 여부·가입일)만 입력받는다. 외부 지표 테이블·수집기는 존재하지 않는다. VOID·시딩은 제보자 수와 선점 순위에서 제외(구현됨). 시간 분포·플랫폼·독립성 축은 SP4. |
 
 > 점수·등급·판정 계산은 전부 **파라미터 주입형 순수 함수**(`ScoreEngine`, `VerdictEngine`, `GradePolicy`)로 분리한다. 동일 함수를 `verdict_runner`(운영)와 ADM-600 파라미터 스튜디오(시뮬레이션)가 재사용해야 하기 때문(`CLAUDE.md` 규약).
 
@@ -116,7 +116,7 @@ trend-radar/
 backend/
 ├─ domain-core/        # 엔티티, 순수 계산 엔진, 정책. 프레임워크 의존 최소
 │   ├─ score/          ScoreEngine (HIT/MISS/VOID Δ, TI, AS)
-│   ├─ verdict/        VerdictEngine (SubmissionSignal → T, reach_level 판정. SP1에서 TrendSignal로 확장)
+│   ├─ verdict/        VerdictEngine (TrendSignal → T, reach_level 판정. 시딩 제외)
 │   ├─ grade/          GradePolicy (승급 AND 조건, L3까지. 강등 규칙은 **미구현**)
 │   ├─ trend/          NameNormalizer (NFC·공백 정리·소문자화. 조사 탈락·반복 축약·영한 혼용은 **미구현(SP2)**)
 │   ├─ vote/           투표 집계(판정 입력 아님 · R1)
@@ -125,6 +125,7 @@ backend/
 ├─ api-public/         # /v1/** 앱 API + JWT 필터체인
 ├─ api-admin/          # /admin/** 콘솔 API + 세션·RBAC · 2FA(**미구현(SP3)**) · ApprovalGate(**미구현(SP3)** — 현행 `ApprovalService`+`ParamApplyExecutor`)
 ├─ merge/              # 클러스터 병합·임베딩: `MergeService`·`ClusterMergeCandidateService`·`MergeComputation`·`EmbeddingClient` (배치·관리자 공용)
+├─ judge/              # 판정 실행: `JudgeService`(배치 판정·재판정·항목 VOID·ADM-111 미리보기의 유일한 경로) · `VerdictEvidence`(evidence_json 형식) — scheduler·api-admin 공용
 ├─ scheduler/          # 배치 잡 + ShedLock (목록 순회만, 트랜잭션은 서비스 빈)
 ├─ api-spec/           # OpenAPI (앱/콘솔 타입 코드생성 원본)
 ├─ audit/              # admin_audit_log (조회행위 포함), 해시체인
@@ -146,11 +147,11 @@ backend/
 |---|---|
 | `users` | status enum. 앱/콘솔 공용 |
 | `trend_items` | `canonical_name`, `aliases text[]`, `first_seen_at`, `state`, `version`(낙관적 락), `merged_into`(tombstone). `normalized_key` 전체 UNIQUE(`V24`, `watches`가 FK 참조) — MERGED 항목이 키를 점유하므로 완전일치 조회가 `merged_into`를 따라가야 한다(**미구현(SP2)**) |
-| `submissions` | `confidence`(10/30/50), `order_rank`는 **저장 안 함**(파생, §5.3), `disclosure` |
+| `submissions` | `confidence`(10/30/50), `order_rank`는 **저장 안 함**(파생, §5.3 — 뷰에서 VOID·시딩 제외), `disclosure`, `voided_at`(VOID 시각 = 제보권 반환 기준, result=VOID와 함께만 — CHECK), `resolved_at`(처음 HIT/MISS 판정 시각 = TI 180일 창 기준) — V28 |
 | `endorsements` | 유저 단위 dedup. 현행 저장만(점수·판정 미반영) |
 | `merge_queue` | **미구현(SP2)**: `assigned_to`·`claimed_at`(15분 클레임, 03 §6 M5), `hold_count`, `decision_key UNIQUE`(멱등키) — 현재 스키마(`V15`)는 `status`·`similarity`·`resolved_by`뿐이고 클레임 컬럼 자체가 없다 |
-| `verdicts` | **append-only**. `supersedes`, `evidence_json`(order_rank·`SubmissionSignal` 스냅샷 동결). `(trend_item_id) WHERE supersedes IS NULL` 부분 UNIQUE(`V4`, 구현됨 — `verdict_one_original_per_item`) |
-| `score_ledger` | **append-only**. `reason`, `kind`(HIT/MISS/VOID/ADJ). `delta`는 감쇠 없는 원값이어야 하나 **미구현(SP1)** — 현행 `ScoreEngine`이 감쇠를 곱해 기록한다(§5.2). `approved_by`는 `users(id)` FK뿐이라 관리자를 못 넣는다 — **미구현(SP3)**(승인자는 감사 로그에만 남음). `(verdict_id, submission_id)` UNIQUE는 **미구현(SP1에서 신설)** — 현재 없음 |
+| `verdicts` | **append-only**. `supersedes`, `evidence_json`(`VerdictEvidence` — 선점 순위·`TrendSignal`·판정 파라미터 동결). `(trend_item_id) WHERE supersedes IS NULL` 부분 UNIQUE(`V4` — `verdict_one_original_per_item`), `(supersedes) WHERE supersedes IS NOT NULL` 부분 UNIQUE(`V28` — `verdict_superseded_once`, 재판정 체인 분기 방지) |
+| `score_ledger` | **append-only**. `reason`, `kind`(HIT/MISS/VOID/ADJ). `delta`는 감쇠 없는 원값(§5.2). `halflife_days`·`decay_anchor_at`(행별 감쇠 기준, O11 = (b), V28). `(verdict_id, submission_id)` UNIQUE(`V28`, 판정 멱등). `approved_by`는 `users(id)` FK뿐이라 관리자를 못 넣는다 — **미구현(SP3)**(승인자는 감사 로그에만 남음) |
 | `user_grades` | 스냅샷(파생). 주간 재계산 |
 | `abuse_flags` | 플래그만. 제재 아님 |
 | `appeals`, `sanctions`, `votes`, `admin_audit_log`, `parameter_drafts` | §7·§8 참조 |
@@ -163,12 +164,12 @@ backend/
 HIT :  Δ = + c × w_order × (1 + m)
 MISS:  Δ = − c × 0.5              (실패=이득의 절반, 의도된 비대칭 — 변경 금지)
 VOID:  Δ = 0
-AS   = Σ Δ_i × 0.5^(원장 경과일_i/90)   ← 설계상 감쇠는 조회 시점에만, 원장은 원값이어야 함
-TI   = (HIT+2)/(HIT+MISS+5)  (180일, α2 β3, 초기 0.4)
+AS   = Σ Δ_i × 0.5^(decay_anchor_at_i 로부터 경과일 / halflife_days_i)   ← 감쇠는 조회 시점에만, 원장은 원값
+TI   = (HIT+2)/(HIT+MISS+5)  (최근 180일 — resolved_at 기준, 시딩 제외, α2 β3, 초기 0.4)
 ```
 `ScoreEngine.compute(submission, verdict, params)` → `ScoreResult`. `w_order`·`m` 테이블(01 §5.1, §4.3)은 `ParameterSet`에서 주입. 단위 테스트에 docs의 예시값(짭쪼롬 +60 등)을 골든 케이스로 고정.
 
-> **미구현(SP1)** — 현행 `ScoreEngine.compute()`는 Δ 산출 시 이미 감쇠(`d = 0.5^(경과일/반감기)`)를 곱해 `score_ledger`에 기록하고, `grade_recalc`의 `ActiveScore.compute()`가 원장 경과일 기준으로 감쇠를 또 곱한다. **이중 적용** 상태(§6 참조, 01 §5.1과 동일 문제).
+> 원장에는 `ScoreEngine`의 원값 Δ를 소수 4자리로 기록하고, 감쇠는 `ActiveScore`가 원장 행마다 기록된 반감기·기준 시각으로 조회 때만 적용한다(O11 = (b)) — 반감기를 바꿔도 과거 AS는 그대로다. 재판정·VOID 차액(ADJ)은 원 판정과 같은 기준으로 기록해 정확히 상쇄된다. `grade_recalc`와 `/v1/me/grade`는 같은 입력(`GradeInputsReader`)을 읽는다.
 
 ### 5.3 order_rank — 저장 컬럼 아님 (03 §3.1)
 
@@ -187,7 +188,7 @@ FROM submissions WHERE trend_item_id = :target AND result <> 'VOID'
 1. `first_seen_at` 변경 → **order_rank 재계산**이 같은 트랜잭션에서 일어남(03 §3.2).
 2. 같은 유저 A·B 제보 병합 → 늦은 쪽 **VOID + 제보권 반환**(03 §4.4).
 3. RESOLVED 상태 병합 시도 → **409**(03 §4.3, P4). ADJ 상쇄 경로는 Phase 2(O9).
-4. 판정 배치 1회 실행 후 `submissions.result`·`trend_items.state`가 **DB에 반영**되어 있음(self-invocation 회귀, SP1).
+4. 판정 배치 1회 실행 후 `submissions.result`·`trend_items.state`가 **DB에 반영**되어 있음(self-invocation 회귀 — `JudgePipelineTest`).
 
 병합 트랜잭션(목표 설계, 03 §6): 단일 트랜잭션 + 두 항목 id 오름차순 `FOR UPDATE` + `version` 낙관적 락. `Idempotency-Key`→`decision_key UNIQUE`·큐 클레임은 **미구현(SP2)**(§5.1 `merge_queue` 참조).
 
@@ -198,9 +199,9 @@ FROM submissions WHERE trend_item_id = :target AND result <> 'VOID'
 | 주기 | 잡 | 멱등 보장 방식 |
 |---|---|---|
 | 일 1회 | `cluster_merge` | `trend_items.merge_checked_at`로 처리 완료 마킹 + `merge_queue_one_open_per_new` UNIQUE로 중복 적재 방지(구현됨). 회색지대는 큐 적재만. ADM-900 수동 실행(같은 ShedLock 이름, 실행 중 409) |
-| 일 1회 | `verdict_runner` | 현재는 `VerdictComputation`(순수)을 직접 호출 — `JudgeService`로 통합은 **미구현(SP1)**. 원본 판정 재생성 방지는 `verdicts` 부분 UNIQUE(`V4`, 구현됨)가 보장. `score_ledger(verdict_id, submission_id)` UNIQUE는 **미구현(SP1에서 신설)** — 현재 없음. `run()`이 같은 빈의 `@Transactional judgeOne()`을 self-invocation으로 호출해 트랜잭션이 걸리지 않아 `submissions.result`·`trend_items.state`가 flush되지 않는 문제는 §5.4 회귀 케이스 4 참고 |
+| 일 1회 | `verdict_runner` | 관측 마감 지난 PENDING → JUDGING, 이어서 JUDGING 항목마다 `JudgeService.judge()`(별도 빈, 항목 행 잠금 + 항목별 트랜잭션). 실패한 항목은 JUDGING으로 남아 다음 실행에서 재시도. 원본 판정 재생성 방지는 `verdicts` 부분 UNIQUE(`V4`), 원장 중복 방지는 `score_ledger(verdict_id, submission_id)` UNIQUE(`V28`) |
 | 1시간 | `sla_watch` | **미구현(SP3)**. 신고 4h→`TEMP_HIDDEN`+에스컬레이션 / 병합 24h→판정 유예 자동 연장 / 90일 미접속 관리자 비활성화. 유예 연장은 실제로는 `trend_items.judgment_deadline_override`(수동 `VerdictAdminService.extendGrace`, 1~7일 단위·D+21 상한)이며 `grace_until` 컬럼은 존재하지 않는다. 통보는 `SlaNotifier`(Phase 1 로그) |
-| 주 1회(월 00:00) | `grade_recalc` | AS 재계산 — `ScoreEngine`이 이미 곱한 감쇠에 `ActiveScore`가 다시 곱하는 **이중 적용** 상태(§5.2 참조, SP1에서 전환). **TI·판정완료 건수는 배치 경로에서 `submissions.result`가 갱신되지 않아 사실상 0.4·0에 머물고(`VerdictRunner` self-invocation, 위 참조), `GradePolicy` L1 조건(판정완료 ≥5)이 막혀 실질적으로 승급이 일어나지 않는다(SP1에서 수정)**. 제보권 리필(이월 없음)은 **미구현(SP1에서 신설)** |
+| 주 1회(월 00:00 KST) | `grade_recalc` | 공식 등급 스냅샷 — AS(행별 감쇠)·TI(180일)·판정완료 건수(전 기간)로 `GradePolicy` 평가. 강등 규칙(Phase 2) 전까지 직전 등급 아래로 내리지 않음(J8). `@Scheduled`에 `zone = Asia/Seoul` 명시(컨테이너 JVM은 UTC). 제보권 리필(이월 없음)은 주 경계 자체라 배치가 없다 |
 | 일 1회 | `abuse_scan` | **미구현(Phase 2)**. 플래그 INSERT만(R4) |
 | 월 1회 | `l4_quota` | **미구현(Phase 3)**. 정원 재산정, 초과분 L3 이동(페널티 아님 표기) |
 
@@ -212,7 +213,7 @@ FROM submissions WHERE trend_item_id = :target AND result <> 'VOID'
 
 ### 7.1 앱 (api-public, 01 §9)
 ```
-POST /v1/submissions            제보 등록·중복검사(구현). 제보권 차감은 미구현(SP1) — QuotaService 없음
+POST /v1/submissions            제보 등록·중복검사·제보권 집행(QuotaService, 유저 행 잠금)·관측 마감 후 거부(구현). 422 type = quota-exhausted | item-closed
 GET  /v1/submissions/me         내 제보+판정상태
 POST /v1/trends/{id}/endorse    동의(중복→endorsement)
 GET  /v1/trends                 목록 — 현재는 daily 파라미터만 처리. 필터·정렬·q 검색은 미구현(SP2)
@@ -226,7 +227,7 @@ GET  /v1/leaderboard            상위 10(동의자 한정) — 미구현: 컨�
 디자인 매핑: 온보딩 → 프로필/관심분야/알림시간, 홈(오늘의 5개) → `GET /v1/trends?daily`, 검색 판정 → `GET /v1/trends?q=`(**미구현(SP2)**), 제보 폼 → `POST /v1/submissions`.
 
 ### 7.2 콘솔 (api-admin)
-큐(병합/어뷰징/이의/신고), 트렌드 상세·판정관리(예외만), 유저원장(ADJ 추가), 파라미터 스튜디오(드래프트→시뮬→2인승인), 배치 관리(ADM-900), 감사로그. **판정결과 직접변경·T 수동입력·verdict 삭제 엔드포인트는 존재하지 않음**(ADM-200 금지기능). **재판정은 설계(JudgeService가 승인된 파라미터로 재실행)와 다르게 동작한다 — 미구현(SP1·SP3)**: `JudgeService`가 없어 `VerdictAdminService`가 판정 로직을 중복 보유하고, 승인된 파라미터가 아니라 `ParameterSet.defaults()`로 고정 실행하며, `reconcileLedger`가 만드는 ADJ 차액에는 승인·100점 상한 검사가 전혀 없다 — `ApprovalGate` 자체가 없다(§8 참조).
+큐(병합/어뷰징/이의/신고), 트렌드 상세·판정관리(예외만), 유저원장(ADJ 추가), 파라미터 스튜디오(드래프트→시뮬→2인승인), 배치 관리(ADM-900), 감사로그. **판정결과 직접변경·T 수동입력·verdict 삭제 엔드포인트는 존재하지 않음**(ADM-200 금지기능). **재판정은 `JudgeService`가 원 판정 때 동결한 파라미터로 재실행한다(J2)** — 새 파라미터를 소급하지 않고, 원장은 제보 단위 차액만 ADJ로 남긴다. VOID(ADM-100·ADM-200)도 같은 서비스의 항목 VOID 경로다. **미구현(SP3)**: 재판정 ADJ 차액에는 승인·100점 상한 검사가 없다 — `ApprovalGate` 자체가 없다(§8 참조).
 
 ### 7.3 공통 응답 규약
 등급·판정 관련 응답은 **산정 근거를 동봉**: `"TI 0.42 / 요구치 0.45 / 부족분 0.03"`. OpenAPI 스키마에 `breakdown` 필수 필드로 강제.
@@ -280,7 +281,7 @@ GET  /v1/leaderboard            상위 10(동의자 한정) — 미구현: 컨�
 - 앱: 미개발(스켈레톤만).
 
 ### Phase 1 (4~12주) — 클로즈드 베타
-- 백엔드: 제보 파이프라인·cluster_merge·endorsement·**제보권 쿼터(선행 조건, SP1)**·`sla_watch`(SP3).
+- 백엔드: 제보 파이프라인·cluster_merge·endorsement·**제보권 쿼터(선행 조건, SP1에서 구현)**·`sla_watch`(SP3).
 - 선행 서브프로젝트: SP0.5(보안 즉시 수정) → SP1(판정 파이프라인) → SP2(병합 무결성) → SP3(콘솔 통제·SLA). 상세는 `docs/superpowers/specs/2026-09-17-design-review-design.md` §3.
 - 콘솔 추가: ADM-100(병합검수), 110/111, 311(원장 — 이의 대응 근거), 410(신고 콘텐츠 큐, 구현됨), 500(시딩, `is_seed=true` 원장 미반영).
 - 앱: 온보딩·홈·상세·제보·검색 (등급 노출은 최소).
