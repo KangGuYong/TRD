@@ -29,6 +29,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -64,6 +65,12 @@ public class ParamStudioService {
         this.clock = clock;
         this.entityManager = entityManager;
         this.currentParameterSetResolver = currentParameterSetResolver;
+    }
+
+    /** 활성 드래프트 조회만(생성 없음) — AUDITOR 읽기 경로. */
+    @Transactional(readOnly = true)
+    public Optional<ParameterDraft> findActiveDraft() {
+        return drafts.findFirstByStatusInOrderByCreatedAtDesc(ACTIVE_STATUSES);
     }
 
     @Transactional

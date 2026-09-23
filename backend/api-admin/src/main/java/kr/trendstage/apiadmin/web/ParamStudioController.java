@@ -4,6 +4,7 @@ import kr.trendstage.apiadmin.auth.AdminPrincipal;
 import kr.trendstage.apiadmin.params.ParamStudioService;
 import kr.trendstage.domain.params.ParameterSet;
 import kr.trendstage.persistence.entity.ParameterDraft;
+import kr.trendstage.persistence.type.AdminRole;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -32,9 +33,19 @@ public class ParamStudioController {
                                           SimulationSummaryResponse simResult) {}
 
     @GetMapping("/draft")
-    @PreAuthorize("hasAnyRole('OPERATOR', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('OPERATOR', 'ADMIN', 'AUDITOR')")
     public ParameterDraftResponse getDraft(@AuthenticationPrincipal AdminPrincipal actor) {
+        if (actor.role() == AdminRole.AUDITOR) {
+            // 조회는 쓰지 않는다 — 활성 드래프트가 없으면 운영값만 보여 준다(status NONE)
+            return service.findActiveDraft().map(this::toResponse).orElseGet(this::operationalView);
+        }
         return toResponse(service.getOrCreateActiveDraft(actor.id()));
+    }
+
+    private ParameterDraftResponse operationalView() {
+        ParameterSet current = service.currentOperationalParams();
+        return new ParameterDraftResponse(null, "NONE", current.submitterTarget, current.submitterTarget,
+                current.hitThreshold, current.hitThreshold, null);
     }
 
     @PutMapping("/draft")

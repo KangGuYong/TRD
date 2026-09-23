@@ -45,19 +45,19 @@ public class ReportAdminController {
     public record DecideRequest(ReportDecision decision, String note, String newCanonicalName) {}
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('REVIEWER', 'OPERATOR', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('REVIEWER', 'OPERATOR', 'ADMIN', 'AUDITOR')")
     public List<ReportResponse> queue() {
         return service.queue().stream().map(this::toResponse).toList();
     }
 
     @GetMapping("/{id}/submissions")
-    @PreAuthorize("hasAnyRole('REVIEWER', 'OPERATOR', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('REVIEWER', 'OPERATOR', 'ADMIN', 'AUDITOR')")
     public List<SubmissionCandidate> submissions(@PathVariable UUID id) {
         return service.candidateSubmissions(id).stream().map(this::toCandidate).toList();
     }
 
     @PostMapping("/{id}/hide")
-    @PreAuthorize("hasAnyRole('REVIEWER', 'OPERATOR', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('OPERATOR', 'ADMIN')")
     public ReportResponse hide(@PathVariable UUID id, @RequestBody TriageRequest req,
                                 @AuthenticationPrincipal AdminPrincipal actor) {
         requireSubmissionId(req);
