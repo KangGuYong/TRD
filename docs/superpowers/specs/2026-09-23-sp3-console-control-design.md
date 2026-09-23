@@ -85,7 +85,7 @@ boolean exceeds(BigDecimal amount);   // amount.abs() > THRESHOLD
 | `VERDICT_REJUDGE` | 항목 | reason, expectedAdjTotal, expectedResult | `JudgeService.rejudge(item, reason, now, approved(requestId, approverId))` | 없음 |
 | `ITEM_VOID` | 항목 | reason, expectedAdjTotal | `JudgeService.voidItem(item, reason, now, approved(...))` | 없음 |
 | `LEDGER_ADJ` | 유저 | amount, reason | 수동 ADJ 행 INSERT(§4.2) | 없음 |
-| `ACCOUNT_CREATE` | 계정 | loginId, displayName, role | `activated_at = now` | 없음(미활성으로 남음) |
+| `ACCOUNT_CREATE` | 계정 | loginId, displayName, role | `activated_at = now` | `disabled_at = now`(미활성 그대로 — 대기로 남지 않음, 최종 리뷰 #4) |
 | `ACCOUNT_ROLE_CHANGE` | 계정 | from, to | 현재 역할이 `from`이 아니면 409 · 역할 = `to` · `to == ADMIN`이면 `approver_since = now + 7일` | 없음 |
 
 - 판정 실행기는 실행 직전 감사 `APPROVAL_EXECUTE`의 `detail`에 `expectedAdjTotal`과 실제 `adjTotal`을 함께 남긴다(K4).
@@ -209,7 +209,7 @@ voidVerdict / requestRejudge:
 ## 7. `sla_watch`
 
 - `SlaWatchJob`(scheduler): `@Scheduled(cron = "${jobs.sla-watch.cron:0 0 * * * *}")`, `@SchedulerLock(name = "sla_watch", lockAtMostFor = "PT10M", lockAtLeastFor = "PT1M")`. 목록 순회·로그만 한다. 처리는 별도 빈 `SlaWatchService`(scheduler)의 `@Transactional` 메서드 세 개 — 같은 빈 self-invocation 금지(CLAUDE.md).
-- 세 단계는 서로 독립이다. 한 단계가 실패해도 나머지는 돈다(단계별 try/catch, 실패는 로그).
+- 세 단계는 서로 독립이다. 단계 안에서도 행 하나가 한 트랜잭션이라(후보 id 조회 → 단위별 잠금·재확인·처리) 한 행이 실패해도 나머지는 돈다(단위별 try/catch, 실패는 로그 — 최종 리뷰 R11).
 - 감사 로그 액터는 NULL(시스템), 역할 NULL.
 
 ### 7.1 신고 4h → 자동 임시 비공개 (K9)
@@ -217,7 +217,7 @@ voidVerdict / requestRejudge:
 - 대상: `status = OPEN AND auto_hidden_at IS NULL AND created_at ≤ now − 4h`.
 - 신고마다: 항목 행 잠금 → `visibility = PUBLIC`이면 `TEMP_HIDDEN`(이미 숨김·영구 비공개면 그대로) → `reports.auto_hidden_at = now` → 감사 `SLA_AUTO_HIDE`(`detail`: reportId, trendItemId, 이전 visibility, 경과 시간).
 - 신고 상태는 `OPEN` 그대로. 사람이 `hide`(소명 대상 지목) 또는 `request-explanation`으로 이어가거나, 오신고면 `OPEN`에서 `RESTORE`.
-- `ReportAdminService.decide`: `RESTORE`는 `OPEN`·`EXPLAINING` 둘 다 허용, `HIDE_PERMANENT`·`EDIT_RESTORE`는 `EXPLAINING`에서만(지금과 같음).
+- `ReportAdminService.decide`: `RESTORE`는 `OPEN`·`EXPLAINING` 둘 다 허용, `HIDE_PERMANENT`·`EDIT_RESTORE`는 `EXPLAINING`에서만(지금과 같음). 단 `OPEN`에서의 `RESTORE`는 항목이 `PERMANENT_HIDDEN`이거나 같은 항목의 다른 신고가 `EXPLAINING`이면 409 `report-restore-blocked`(최종 리뷰 R9 — 다른 신고의 결정·소명을 뒤집지 않게).
 - 멱등: `auto_hidden_at`이 있으면 다시 처리하지 않는다.
 
 ### 7.2 병합 24h → 판정 마감 연장 (K10)
@@ -231,7 +231,7 @@ voidVerdict / requestRejudge:
 
 ### 7.3 90일 미접속 관리자 → 비활성화 (K11)
 
-- 대상: `disabled_at IS NULL AND activated_at IS NOT NULL AND coalesce(last_login_at, created_at) ≤ now − 90일`.
+- 대상: `disabled_at IS NULL AND activated_at IS NOT NULL AND greatest(last_login_at, activated_at, last_enabled_at, created_at) ≤ now − 90일`(NULL은 건너뜀). `last_enabled_at`은 수동 재활성화 시각 — 재활성화·늦은 승인 직후 다시 꺼지지 않게(최종 리뷰 R10).
 - 대상이 활성 ADMIN이고 그를 비활성화하면 활성 ADMIN이 0명이 되면 건너뛰고 WARN 로그.
 - 비활성화 → 감사 `SLA_ADMIN_DISABLE`(`detail`: 마지막 로그인). 세션은 K7이 다음 요청에서 끊는다.
 
@@ -330,7 +330,7 @@ CREATE UNIQUE INDEX approval_one_pending_verdict_change
 
 - **첫 7일 승인 공백(K6)**: 부트스트랩 뒤 만든 ADMIN은 7일 동안 승인할 수 없어 파라미터 적용·100점 초과 정정이 막힌다. 그 사이에는 부트스트랩 예외로 계정을 더 만들 수 있다 — 부트스트랩 기간의 단독 권한은 감사 로그(`ACCOUNT_CREATE_BOOTSTRAP`)로만 추적된다.
 - **ADM-100 VOID 제한(K8)**: 판정된 항목을 큐에서 VOID할 수 없게 된다. 운영자는 ADM-200으로 가야 한다.
-- **자동 숨김 뒤 복원과 다른 신고**: 한 항목에 신고가 여럿이면 한 신고의 `RESTORE`가 항목을 공개로 돌린다. 이미 자동 처리된 다른 신고는 다시 숨기지 않는다 — 사람이 큐에서 이어 처리한다.
+- **자동 숨김 뒤 복원과 다른 신고**: 한 항목에 신고가 여럿이면 한 신고의 `RESTORE`가 항목을 공개로 돌린다(단 `OPEN` 신고의 `RESTORE`는 영구 비공개 항목·다른 신고 소명 중이면 409, R9). 이미 자동 처리된 다른 신고는 다시 숨기지 않는다 — 사람이 큐에서 이어 처리한다.
 - **세션 재검증 비용**: 관리자 요청마다 PK 조회 1회. 콘솔 사용량에서 문제없다.
 - **`sanctions.requested_by`가 `users`를 참조**하는 스키마 오류는 제재 실행기(Phase 2)와 함께 고친다.
 - 2FA·PII_VIEW·SLA 통보 채널·이의 제기는 비범위(§0) — CLAUDE.md·02에 남은 "미구현" 표기를 이 스펙 기준으로 정리한다.

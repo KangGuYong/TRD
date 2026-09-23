@@ -304,7 +304,7 @@
          → 결정(복원 / 영구 비공개 / 수정 후 복원) → 양측 통보
 ```
 
-- **정책 확정(2026-09-17, P1)**: 4h 자동 임시 비공개는 `sla_watch` 잡이 수행한다(**구현됨, SP3**) — `OPEN` 상태이고 아직 자동 숨김되지 않은 공개(`PUBLIC`) 항목을 `TEMP_HIDDEN`으로 바꾸고 `reports.auto_hidden_at`을 기록한다. 신고 자체는 `OPEN`으로 남아 사람이 이어 처리한다 — 오신고면 `OPEN`에서 바로 `RESTORE`, 그 외 확정(`HIDE_PERMANENT`·`EDIT_RESTORE`)은 소명(`EXPLAINING`) 이후에만. 임시 비공개는 가역적 보전 조치라 R4와 양립(R4 개정). 목표대로 수동 임시 비공개도 **O/A만**(REVIEWER 불가)으로 좁혔다(**구현됨, SP3** — `ReportAdminController.hide()`).
+- **정책 확정(2026-09-17, P1)**: 4h 자동 임시 비공개는 `sla_watch` 잡이 수행한다(**구현됨, SP3**) — `OPEN` 상태이고 아직 자동 숨김되지 않은 공개(`PUBLIC`) 항목을 `TEMP_HIDDEN`으로 바꾸고 `reports.auto_hidden_at`을 기록한다. 신고 자체는 `OPEN`으로 남아 사람이 이어 처리한다 — 오신고면 `OPEN`에서 바로 `RESTORE`(단 항목이 영구 비공개됐거나 같은 항목의 다른 신고가 소명 중이면 409 — 그 소명 절차에서 결정), 그 외 확정(`HIDE_PERMANENT`·`EDIT_RESTORE`)은 소명(`EXPLAINING`) 이후에만. 임시 비공개는 가역적 보전 조치라 R4와 양립(R4 개정). 목표대로 수동 임시 비공개도 **O/A만**(REVIEWER 불가)으로 좁혔다(**구현됨, SP3** — `ReportAdminController.hide()`).
 - 화면엔 자동 숨김 배지(`auto_hidden_at` 있음)를 표시한다.
 - 신고자 정보는 처리자에게도 **비식별 처리** (보복 방지)
 - **미구현**: 동일 항목 3회 이상 신고 시 자동 상위 역할 배정 로직이 `ReportAdminService`에 없다. 지금은 몇 번을 신고해도 배정이 바뀌지 않는다
@@ -396,7 +396,7 @@ SP4에서 `submitterTarget`은 절대값이 아니라 **상대값 파라미터(�
 - 2FA는 **여전히 미구현**(SP3 §0 비범위) — `AdminAccount`에 컬럼은 있지만 검사하지 않는다. 세션 타임아웃 30분은 구현됨(`server.servlet.session.timeout: 30m`). 관리자 세션은 요청마다 재검증한다(**구현됨, SP3**) — 계정이 비활성·승인 대기이거나 DB 역할이 로그인 시점 세션 역할과 달라지면 그 즉시 401(`session-revoked`)로 끊긴다(로그인·로그아웃·CSRF 엔드포인트는 제외).
 - 계정 생성의 2인 승인(요청자+1명)과 신규 계정 7일 승인권 유예(P8)는 **구현됨(SP3)** — `POST /admin/accounts`는 승인 자격자(요청자 제외)가 있으면 202(2인 승인 대기), 없으면 부트스트랩 예외로 201(즉시 활성, 감사 `ACCOUNT_CREATE_BOOTSTRAP`). 권한 부여/회수도 `POST /admin/accounts/{id}/role {role, reason}`(ADMIN 상신 → 2인 승인, 본인 역할 변경은 403, 사유 누락·동일 역할은 422)로 구현됐다.
 - 부트스트랩 계정의 첫 로그인 비밀번호 변경 **강제**는 여전히 **미구현** — `AdminAccountBootstrapRunner`는 경고 로그만 남긴다. 다만 본인이 `POST /admin/me/password {current, next}`로 직접 바꿀 수는 있다(**구현됨, SP3** — 현재 비밀번호 불일치·8자 미만·현재와 동일은 422).
-- 90일 미접속 자동 비활성화는 **구현됨(SP3)** — `sla_watch`가 매시 `disabled_at IS NULL AND coalesce(last_login_at, created_at) ≤ now − 90일` 계정을 비활성화하고 감사 `SLA_ADMIN_DISABLE`을 남긴다. 단 그 대상이 마지막 활성 ADMIN이면 건너뛴다(WARN 로그). 수동 `POST /admin/accounts/{id}/disable`·`…/enable`도 그대로 있다(승인 대기 계정은 활성화 불가, 422).
+- 90일 미접속 자동 비활성화는 **구현됨(SP3)** — `sla_watch`가 매시 마지막 활동(`last_login_at`·`activated_at`·`last_enabled_at`(재활성화)·`created_at` 중 가장 늦은 것)이 90일을 넘긴 활성 계정을 비활성화하고 감사 `SLA_ADMIN_DISABLE`을 남긴다. 단 그 대상이 마지막 활성 ADMIN이면 건너뛴다(WARN 로그). 수동 `POST /admin/accounts/{id}/disable`·`…/enable`도 그대로 있다(승인 대기 계정은 활성화 불가, 422).
 - 퇴사자 즉시 회수 체크리스트 (운영 절차 — 코드로 검증할 대상이 아님)
 
 ---
