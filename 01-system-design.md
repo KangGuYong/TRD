@@ -303,7 +303,7 @@ GET    /v1/leaderboard              상위 10 (동의자 한정)
 |---|---|---|
 | 일 1회 | `cluster_merge` | 신규 제보 임베딩 병합, 운영자 큐 적재. ADM-900 수동 실행 가능 |
 | 일 1회 | `verdict_runner` | 관측 마감 지난 PENDING → JUDGING, 이어서 JUDGING 항목마다 `JudgeService`가 판정 → `verdicts` + `score_ledger` + 제보 result + 항목 RESOLVED/VOID를 한 트랜잭션으로. 실패한 항목은 JUDGING으로 남아 다음 실행에서 재시도 |
-| 1시간 | `sla_watch` | **미구현(SP3)**. 신고 4h → 자동 임시 비공개 / 병합 24h → 판정 유예 연장 / 90일 미접속 관리자 비활성화 |
+| 1시간 | `sla_watch` | **구현됨(SP3)**. 신고 4h(OPEN·공개 중) → 임시 비공개 + `auto_hidden_at`(신고는 `OPEN` 유지) / 병합 대기 24h → 두 항목 마감을 `max(현재 마감, now+24h)`(상한 최초 제보+21일)까지 연장 / 90일 미접속 관리자 비활성화(마지막 활성 ADMIN 제외). 코드 기본 매시 정각 |
 | 주 1회(월 00:00 KST) | `grade_recalc` | 공식 등급 스냅샷(6장) — AS(원장 행별 감쇠)·TI(최근 180일)·판정완료 건수로 `GradePolicy` 평가, 강등 규칙 전까지 직전 등급 아래로 내리지 않음(J8). 타임존은 코드에 명시. 제보권 리필은 주 경계 자체라 이 잡이 하지 않는다 |
 | 일 1회 | `abuse_scan` | **미구현(Phase 2)**. 어뷰징 룰 실행 → `abuse_flags` |
 | 월 1회 | `l4_quota` | **미구현(Phase 3)**. L4 정원 재산정 |

@@ -3,6 +3,7 @@ package kr.trendstage.apiadmin.web;
 import kr.trendstage.apiadmin.approval.ApprovalConflictException;
 import kr.trendstage.apiadmin.auth.AccountDisabledException;
 import kr.trendstage.apiadmin.auth.AccountLockedException;
+import kr.trendstage.apiadmin.auth.AccountPendingException;
 import kr.trendstage.apiadmin.auth.AdminValidationException;
 import kr.trendstage.apiadmin.auth.DraftLockedException;
 import kr.trendstage.apiadmin.auth.DuplicateLoginIdException;
@@ -38,6 +39,11 @@ public class AdminApiExceptionHandler {
     @ExceptionHandler(AccountLockedException.class)
     public ResponseEntity<Map<String, Object>> handle(AccountLockedException e) {
         return ResponseEntity.status(HttpStatus.LOCKED).body(problem(423, e.getMessage()));
+    }
+
+    @ExceptionHandler(AccountPendingException.class)
+    public ResponseEntity<Map<String, Object>> handle(AccountPendingException e) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(problem(403, e.getMessage()));
     }
 
     /** @PreAuthorize 거부(예: REVIEWER가 ADM-700 조회 시도) — 콘솔이 일관된 JSON으로 받도록 매핑. */
@@ -82,6 +88,11 @@ public class AdminApiExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(problem(409, e.getMessage()));
     }
 
+    @ExceptionHandler(AdminConflictException.class)
+    public ResponseEntity<Map<String, Object>> handle(AdminConflictException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(Problems.of(409, e.type(), e.getMessage()));
+    }
+
     @ExceptionHandler(DraftLockedException.class)
     public ResponseEntity<Map<String, Object>> handle(DraftLockedException e) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(problem(409, e.getMessage()));
@@ -95,6 +106,11 @@ public class AdminApiExceptionHandler {
     @ExceptionHandler(AdminValidationException.class)
     public ResponseEntity<Map<String, Object>> handle(AdminValidationException e) {
         return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(problem(422, e.getMessage()));
+    }
+
+    @ExceptionHandler(AdminNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handle(AdminNotFoundException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(problem(404, e.getMessage()));
     }
 
     @ExceptionHandler(BatchJobAlreadyRunningException.class)

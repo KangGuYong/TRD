@@ -65,6 +65,10 @@ public class Report {
     @Column(name = "decided_at")
     private Instant decidedAt;
 
+    /** sla_watch가 4h SLA 초과로 자동 처리한 시각(SP3 K9). 상태는 OPEN 그대로. */
+    @Column(name = "auto_hidden_at")
+    private Instant autoHiddenAt;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt = Instant.now();
 
@@ -96,6 +100,9 @@ public class Report {
         this.decidedAt = now;
         this.status = ReportStatus.DECIDED;
     }
+
+    public void markAutoHidden(Instant at) { this.autoHiddenAt = at; }
+    public Instant getAutoHiddenAt() { return autoHiddenAt; }
 
     public UUID getId() { return id; }
     public UUID getTrendItemId() { return trendItemId; }

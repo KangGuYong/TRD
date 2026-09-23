@@ -1,7 +1,11 @@
 package kr.trendstage.apiadmin.merge;
 
+import kr.trendstage.apiadmin.approval.ApprovalGate;
 import kr.trendstage.apiadmin.auth.AdminValidationException;
+import kr.trendstage.apiadmin.web.AdminConflictException;
 import kr.trendstage.audit.AuditLogService;
+import kr.trendstage.judge.AdjustmentPolicy;
+import kr.trendstage.judge.JudgeOutcome;
 import kr.trendstage.judge.JudgeService;
 import kr.trendstage.merge.MergeConflictException;
 import kr.trendstage.merge.MergeService;
@@ -42,16 +46,18 @@ public class MergeDecisionService {
     private final MergeService mergeService;
     private final JudgeService judgeService;
     private final AuditLogService auditLogService;
+    private final ApprovalGate gate;
     private final Clock clock;
 
     public MergeDecisionService(MergeQueueRepository mergeQueue, TrendItemRepository trendItems,
                                 MergeService mergeService, JudgeService judgeService,
-                                AuditLogService auditLogService, Clock clock) {
+                                AuditLogService auditLogService, ApprovalGate gate, Clock clock) {
         this.mergeQueue = mergeQueue;
         this.trendItems = trendItems;
         this.mergeService = mergeService;
         this.judgeService = judgeService;
         this.auditLogService = auditLogService;
+        this.gate = gate;
         this.clock = clock;
     }
 
@@ -106,7 +112,16 @@ public class MergeDecisionService {
             }
             case VOID -> {
                 // 항목 VOID는 판정 사건이다(P5) — 판정된 항목이면 원장 상쇄까지 JudgeService가 한다
-                judgeService.voidItem(newId, reason, now);
+                if (gate.hasPendingVerdictChange(newId)) {
+                    throw new AdminConflictException("approval-pending", "이 항목에 대기 중인 승인 요청이 있습니다 — 승인·반려 후 다시 시도하세요");
+                }
+                JudgeOutcome outcome = judgeService.voidItem(newId, reason, now, AdjustmentPolicy.limitedTo(ApprovalGate.THRESHOLD));
+                if (outcome instanceof JudgeOutcome.NeedsApproval n) {
+                    // 큐 결정은 멱등키로 즉시 확정되는 흐름이라 승인 대기를 끼우지 않는다(K8) — 큐 항목은 PENDING으로 남는다
+                    throw new AdminConflictException("void-needs-approval",
+                            "판정된 항목이라 차액 %s점 — ADM-200 판정 관리에서 VOID하세요(2인 승인)"
+                                    .formatted(n.adjTotal().stripTrailingZeros().toPlainString()));
+                }
                 auditLogService.record(actorId, actorRole, "MERGE_VOID", "TREND_ITEM", newId,
                         Map.of("reason", reason == null ? "" : reason));
                 entry.resolve(MergeQueueStatus.VOIDED, actorId, now, key);

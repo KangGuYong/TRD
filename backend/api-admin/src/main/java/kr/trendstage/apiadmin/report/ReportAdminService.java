@@ -2,6 +2,7 @@ package kr.trendstage.apiadmin.report;
 
 import kr.trendstage.apiadmin.auth.AdminPrincipal;
 import kr.trendstage.apiadmin.auth.AdminValidationException;
+import kr.trendstage.apiadmin.web.AdminConflictException;
 import kr.trendstage.audit.AuditLogService;
 import kr.trendstage.persistence.entity.Report;
 import kr.trendstage.persistence.entity.Submission;
@@ -25,7 +26,7 @@ import java.util.UUID;
 
 /**
  * ADM-410 신고 콘텐츠 큐. 4h SLA 초과 시 자동 임시비공개(TEMP_HIDDEN)는 정책으로 확정됐고(R4 개정, 2026-09-17,
- * P1) SP3의 sla_watch 잡이 수행한다 — 이 서비스는 사람의 결정(수동 임시비공개/복원/영구 비공개)만 다룬다.
+ * P1) sla_watch(scheduler)가 수행한다 — 이 서비스는 사람의 결정만 다룬다.
  * visibility는 순수 표시 계층 — 판정/점수와 분리(R2).
  */
 @Service
@@ -67,7 +68,7 @@ public class ReportAdminService {
         Report report = requireOpen(reportId);
         requireSubmissionBelongsToReport(report, submissionId);
 
-        TrendItem item = trends.findById(report.getTrendItemId())
+        TrendItem item = trends.findByIdForUpdate(report.getTrendItemId())
                 .orElseThrow(() -> new AdminValidationException("트렌드 항목을 찾을 수 없습니다: " + report.getTrendItemId()));
         item.applyVisibility(TrendVisibility.TEMP_HIDDEN);
 
@@ -92,13 +93,22 @@ public class ReportAdminService {
 
     @Transactional
     public Report decide(UUID reportId, ReportDecision decision, String note, String newCanonicalName, AdminPrincipal actor) {
-        Report report = requireExplaining(reportId);
+        // 오신고는 1차 처리 없이 바로 복원할 수 있다(K9). 영구 비공개·수정 후 복원은 소명(EXPLAINING) 뒤에만.
+        Report report = decision == ReportDecision.RESTORE ? requireUndecided(reportId) : requireExplaining(reportId);
         if (decision == ReportDecision.EDIT_RESTORE && (newCanonicalName == null || newCanonicalName.isBlank())) {
             throw new AdminValidationException("EDIT_RESTORE는 newCanonicalName이 필수입니다");
         }
 
-        TrendItem item = trends.findById(report.getTrendItemId())
+        TrendItem item = trends.findByIdForUpdate(report.getTrendItemId())
                 .orElseThrow(() -> new AdminValidationException("트렌드 항목을 찾을 수 없습니다: " + report.getTrendItemId()));
+        // OPEN에서 바로 복원(오신고)은 다른 신고의 결정을 뒤집으면 안 된다: 영구 비공개된 항목이거나
+        // 같은 항목의 다른 신고가 소명 중이면 거부 — 그 소명 절차에서 결정한다.
+        if (decision == ReportDecision.RESTORE && report.getStatus() == ReportStatus.OPEN
+                && (item.getVisibility() == TrendVisibility.PERMANENT_HIDDEN
+                    || reports.existsByTrendItemIdAndStatusAndIdNot(item.getId(), ReportStatus.EXPLAINING, reportId))) {
+            throw new AdminConflictException("report-restore-blocked",
+                    "이 항목은 영구 비공개됐거나 다른 신고의 소명이 진행 중입니다 — 소명 절차를 거쳐 결정하세요");
+        }
         switch (decision) {
             case RESTORE -> item.applyVisibility(TrendVisibility.PUBLIC);
             case HIDE_PERMANENT -> item.applyVisibility(TrendVisibility.PERMANENT_HIDDEN);
@@ -119,8 +129,13 @@ public class ReportAdminService {
         return reports.findById(id).orElseThrow(() -> new AdminValidationException("존재하지 않는 신고입니다"));
     }
 
+    /** 쓰기 경로는 신고 행을 잠근다 — sla_watch 자동 숨김과 순서가 같다(신고 → 항목). */
+    private Report lockReport(UUID id) {
+        return reports.findByIdForUpdate(id).orElseThrow(() -> new AdminValidationException("존재하지 않는 신고입니다"));
+    }
+
     private Report requireOpen(UUID id) {
-        Report report = requireReport(id);
+        Report report = lockReport(id);
         if (report.getStatus() != ReportStatus.OPEN) {
             throw new AdminValidationException("이미 1차 처리된 신고입니다: " + report.getStatus());
         }
@@ -128,9 +143,17 @@ public class ReportAdminService {
     }
 
     private Report requireExplaining(UUID id) {
-        Report report = requireReport(id);
+        Report report = lockReport(id);
         if (report.getStatus() != ReportStatus.EXPLAINING) {
             throw new AdminValidationException("소명 대기 상태가 아닙니다: " + report.getStatus());
+        }
+        return report;
+    }
+
+    private Report requireUndecided(UUID id) {
+        Report report = lockReport(id);
+        if (report.getStatus() == ReportStatus.DECIDED) {
+            throw new AdminValidationException("이미 결정된 신고입니다");
         }
         return report;
     }

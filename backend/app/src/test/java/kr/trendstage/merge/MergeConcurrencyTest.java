@@ -1,11 +1,13 @@
 package kr.trendstage.merge;
 
+import kr.trendstage.judge.AdjustmentPolicy;
 import kr.trendstage.judge.JudgeConflictException;
 import kr.trendstage.judge.JudgeService;
 import kr.trendstage.support.AbstractIntegrationTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -55,7 +57,7 @@ class MergeConcurrencyTest extends AbstractIntegrationTest {
 
         List<Throwable> outcomes = runConcurrently(
                 () -> merge.merge(s, l, null, null, "병합"),
-                () -> judge.voidItem(l, "VOID", now));
+                () -> judge.voidItem(l, "VOID", now, AdjustmentPolicy.limitedTo(new BigDecimal("999999"))));
 
         assertThat(outcomes).filteredOn(Objects::isNull).hasSize(1);
         if (fx.itemState(l).equals("MERGED")) {          // 병합이 먼저 → VOID는 409

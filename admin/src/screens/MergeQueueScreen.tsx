@@ -15,6 +15,8 @@ const DECISION_MESSAGES: Record<string, string> = {
   "merge-queue-decided": "이미 처리된 후보입니다 — 목록을 새로 고칩니다",
   "merge-target-merged": "대상 항목이 이미 다른 항목으로 병합됐습니다 — 목록을 새로 고칩니다",
   "idempotency-key-mismatch": "요청이 꼬였습니다. 새로고침 후 다시 시도하세요",
+  "void-needs-approval": "판정된 항목이라 되돌릴 점수가 100점을 넘습니다 — 판정 관리(ADM-200)에서 VOID하세요(2인 승인)",
+  "approval-pending": "이 항목에 대기 중인 승인 요청이 있습니다",
 };
 
 export default function MergeQueueScreen() {

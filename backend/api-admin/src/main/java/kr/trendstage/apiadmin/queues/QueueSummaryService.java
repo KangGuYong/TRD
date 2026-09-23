@@ -20,6 +20,7 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * ADM-010 오늘의 작업. 병합 검수(ADM-100)와 신고 콘텐츠(ADM-410)는 실데이터.
@@ -101,11 +102,23 @@ public class QueueSummaryService {
         List<Alert> alerts = new ArrayList<>();
         if (mergeOverdue > 0) {
             alerts.add(new Alert("병합 검수 큐 SLA 초과 " + mergeOverdue + "건",
-                    "24시간 기준 초과 — 판정 유예 연장은 ADM-200에서 수동 처리"));
+                    "24시간 기준 초과 — 판정 마감은 sla_watch가 자동 연장 중(상한 최초 제보 + 21일)"));
+        }
+        long atCeiling = pending.stream()
+                .filter(e -> Duration.between(e.getCreatedAt(), now).toHours() >= MERGE_SLA_HOURS)
+                .flatMap(e -> java.util.stream.Stream.of(e.getNewTrendItemId(), e.getOldTrendItemId()))
+                .distinct()
+                .map(trendItems::findById).flatMap(Optional::stream)
+                .filter(i -> i.getState() == TrendState.PENDING || i.getState() == TrendState.JUDGING)
+                .filter(i -> DeadlineWindow.ceilingReached(i.getFirstSeenAt(), i.getJudgmentDeadlineOverride()))
+                .count();
+        if (atCeiling > 0) {
+            alerts.add(new Alert("병합 대기로 판정 마감 상한 도달 " + atCeiling + "건",
+                    "최초 제보 + 21일 — 더 연장할 수 없습니다. 병합 결정을 서두르세요"));
         }
         if (reportOverdue > 0) {
             alerts.add(new Alert("신고 콘텐츠 SLA 초과 " + reportOverdue + "건",
-                    "4시간 기준 초과 — 자동 임시 비공개는 미구현, 수동 처리 필요"));
+                    "4시간 기준 초과 — sla_watch가 임시 비공개함, 1차 처리 필요"));
         }
 
         return new QueueSummaryResponse((int) (mergeOverdue + reportOverdue), queues, alerts,

@@ -34,6 +34,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .catch(() => setState({ status: "unauthenticated" }));
   }, []);
 
+  useEffect(() => {
+    const onUnauthorized = (e: Event) =>
+      setState({ status: "unauthenticated", error: (e as CustomEvent<string>).detail });
+    window.addEventListener("admin:unauthorized", onUnauthorized);
+    return () => window.removeEventListener("admin:unauthorized", onUnauthorized);
+  }, []);
+
   const login = async (loginId: string, password: string) => {
     try {
       await ensureCsrf();

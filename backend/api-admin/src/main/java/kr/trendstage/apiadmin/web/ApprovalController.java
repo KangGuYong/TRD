@@ -15,7 +15,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.UUID;
 
-/** ADM-620 승인 대기함. 권한(02 §1.1): 파라미터 적용 등 2인 승인 확정은 ADMIN, 조회는 ADMIN/AUDITOR. */
+/** ADM-620 승인 대기함. 2인 승인 = 요청자 + 승인자 1명(SP3 K1). 확정은 ADMIN, 조회는 ADMIN/AUDITOR. */
 @RestController
 @RequestMapping("/admin/approvals")
 public class ApprovalController {
@@ -34,8 +34,8 @@ public class ApprovalController {
     }
 
     public record ApprovalRequestResponse(String id, String actionType, String targetRef,
-                                           String requestedBy, String requestedByName, int approvals, String status,
-                                           String reason, String createdAt, String resolvedAt) {}
+                                          String requestedBy, String requestedByName, int approvals, int requiredApprovals,
+                                          String status, String reason, String summary, String createdAt, String resolvedAt) {}
     public record RejectRequest(String reason) {}
 
     @GetMapping
@@ -61,10 +61,11 @@ public class ApprovalController {
         String requestedByName = accounts.findById(req.getRequestedBy())
                 .map(AdminAccount::getDisplayName)
                 .orElse(req.getRequestedBy().toString());
-        int approvalCount = (req.getApprover1() != null ? 1 : 0) + (req.getApprover2() != null ? 1 : 0);
+        int approvalCount = req.getApprover1() != null ? 1 : 0;
         return new ApprovalRequestResponse(
                 req.getId().toString(), req.getActionType(), req.getTargetRef().toString(),
-                req.getRequestedBy().toString(), requestedByName, approvalCount, req.getStatus().name(), extractReason(req.getPayload()),
+                req.getRequestedBy().toString(), requestedByName, approvalCount, 1, req.getStatus().name(),
+                extractReason(req.getPayload()), service.describe(req),
                 DISPLAY_FORMAT.format(req.getCreatedAt()),
                 req.getResolvedAt() == null ? null : DISPLAY_FORMAT.format(req.getResolvedAt()));
     }

@@ -57,20 +57,14 @@ public class ApprovalRequest {
         this.payload = payload;
     }
 
-    /** 1차 승인. */
-    public void approveFirst(UUID approverId) {
+    /** 승인(SP3 K1 — 요청자 + 승인자 1명). 자격 검사는 ApprovalService가 먼저 한다. */
+    public void approve(UUID approverId, Instant now) {
         this.approver1 = approverId;
-        this.status = ApprovalStatus.PARTIAL;
-    }
-
-    /** 2차 승인 — 승인자가 1차 승인자와 달라야 한다는 검증은 ApprovalService가 먼저 한다. */
-    public void approveSecond(UUID approverId, Instant now) {
-        this.approver2 = approverId;
         this.status = ApprovalStatus.APPROVED;
         this.resolvedAt = now;
     }
 
-    /** 2/2 승인 후 대상 작업 실행까지 성공했을 때. */
+    /** 승인 후 대상 작업 실행까지 성공했을 때. */
     public void markExecuted() {
         this.status = ApprovalStatus.EXECUTED;
     }

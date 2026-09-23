@@ -38,6 +38,10 @@ async function request<T>(method: string, path: string, body?: unknown, extraHea
     } catch {
       /* non-json */
     }
+    if (res.status === 401 && path !== "/admin/auth/login") {
+      // 세션 재검증(SP3 K7)이 세션을 끊었거나 만료 — 로그인 화면으로
+      window.dispatchEvent(new CustomEvent("admin:unauthorized", { detail }));
+    }
     throw new ApiError(res.status, detail, type);
   }
   // void 컨트롤러 메서드는 200 + 빈 본문을 준다(204가 아님) — 상태코드로만 판단하면 JSON.parse가 깨진다.

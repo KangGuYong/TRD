@@ -27,9 +27,10 @@ export const CAN = {
   seedRegister: (r: Role) => r === "OPERATOR" || r === "ADMIN",
   batchTrigger: (r: Role) => r === "OPERATOR" || r === "ADMIN",
   paramApply: (r: Role) => r === "ADMIN",
-  ledgerAdj: (r: Role) => r === "ADMIN",
+  ledgerAdj: (r: Role) => r === "OPERATOR" || r === "ADMIN",   // OPERATOR는 상신(항상 승인 요청)
   approvalConfirm: (r: Role) => r === "ADMIN",
-  reportTriage: (r: Role) => r === "REVIEWER" || r === "OPERATOR" || r === "ADMIN",
+  reportTriage: (r: Role) => r === "REVIEWER" || r === "OPERATOR" || r === "ADMIN",   // 소명 요청
+  reportHide: (r: Role) => r === "OPERATOR" || r === "ADMIN",   // 임시 비공개(02 §1.1)
   reportDecide: (r: Role) => r === "OPERATOR" || r === "ADMIN",
   sanctionRequest: (r: Role) => r === "OPERATOR" || r === "ADMIN",
   accountView: (r: Role) => r === "ADMIN" || r === "AUDITOR",

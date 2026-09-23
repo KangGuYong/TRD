@@ -1,5 +1,5 @@
 /** dev 시연용 데이터. 관리자 콘솔.dc.html 예시를 반영. 실 API로 대체됨. */
-import type { AdminAccountSummary, ApprovalRequestView, AdminUserDetail, AuditEntry, ClusterMergeResult, ImminentItem, JudgedItem, MergeCandidate, MergePreview, ParameterDraftView, QueueSummary, ReportQueueItem, ReportSubmissionCandidate, SeedAccuracyRow, SimulationSummary, TrendItemDetail, TrendItemSummary, VerdictListResponse } from "./api/types";
+import type { AdminAccountSummary, ApprovalRequestView, AdminUserDetail, AuditPage, ClusterMergeResult, ImminentItem, JudgedItem, MergeCandidate, MergePreview, ParameterDraftView, QueueSummary, ReportQueueItem, ReportSubmissionCandidate, SeedAccuracyRow, SimulationSummary, TrendItemDetail, TrendItemSummary, VerdictListResponse } from "./api/types";
 
 export const fxQueueSummary: QueueSummary = {
   slaBreaches: 1,
@@ -80,45 +80,49 @@ export const fxClusterMergeResult: ClusterMergeResult = {
 };
 
 export const fxUser: AdminUserDetail = {
-  userId: "user_4410",
+  id: "user_4410",
+  handle: "user_4410",
+  status: "ACTIVE",
+  joinedAt: "2026-02-11",
   grade: "L3 분석가",
+  gradeComputedAt: "2026-08-04 00:00",
   activeScore: 512,
   trustIndex: 0.63,
   judgedCount: 47,
-  hit: 29,
-  miss: 18,
-  flags: 0,
-  joinedAt: "2026-02-11",
+  hitInWindow: 29,
+  missInWindow: 18,
+  basis: ["TI = (29 + 2) / (29 + 18 + 5) = 0.63 (180일 기준)", "AS = 최근 원장 행 감쇠합"],
+  abuseFlagCount: 0,
   ledger: [
-    { date: "08-05", kind: "HIT", delta: "+75.0", reason: "#1204 order1 c50 m1.0" },
-    { date: "08-01", kind: "MISS", delta: "−15.0", reason: "#1188 c30" },
-    { date: "07-28", kind: "ADJ", delta: "+12.0", reason: "판정 재계산 보정 (승인:박관리)" },
-    { date: "07-21", kind: "HIT", delta: "+60.0", reason: "#1150 order1 c30 m2.0" },
+    { id: "l1", createdAt: "2026-08-05", kind: "HIT", delta: 75.0, reason: "#1204 order1 c50 m1.0", trendItemName: "새싹 챌린지", verdictId: "v-1204", approvedBy: null, approvalId: null },
+    { id: "l2", createdAt: "2026-08-01", kind: "MISS", delta: -15.0, reason: "#1188 c30", trendItemName: "제로슈거 밀키트", verdictId: "v-1188", approvedBy: null, approvalId: null },
+    { id: "l3", createdAt: "2026-07-28", kind: "ADJ", delta: 12.0, reason: "판정 재계산 보정", trendItemName: null, verdictId: null, approvedBy: "박관리", approvalId: "ap-9" },
+    { id: "l4", createdAt: "2026-07-21", kind: "HIT", delta: 60.0, reason: "#1150 order1 c30 m2.0", trendItemName: "가을 캠퍼스룩", verdictId: "v-1150", approvedBy: null, approvalId: null },
   ],
 };
 
 export const fxAdminAccounts: AdminAccountSummary[] = [
-  { id: "a1", loginId: "admin", displayName: "박관리", role: "ADMIN", lastLoginAt: "2026-08-07 09:12", disabledAt: null, createdAt: "2026-07-01 10:00" },
-  { id: "a2", loginId: "op_kim", displayName: "김운영", role: "OPERATOR", lastLoginAt: "2026-08-07 16:41", disabledAt: null, createdAt: "2026-07-05 11:30" },
-  { id: "a3", loginId: "auditor_lee", displayName: "이감사", role: "AUDITOR", lastLoginAt: "2026-08-06 14:03", disabledAt: null, createdAt: "2026-07-10 09:00" },
-  { id: "a4", loginId: "reviewer_old", displayName: "퇴사자", role: "REVIEWER", lastLoginAt: "2026-06-01 09:00", disabledAt: "2026-06-15 00:00", createdAt: "2026-05-01 09:00" },
+  { id: "a1", loginId: "admin", displayName: "박관리", role: "ADMIN", lastLoginAt: "2026-08-07 09:12", disabledAt: null, createdAt: "2026-07-01 10:00", activatedAt: "2026-07-01 10:00", approverSince: "2026-07-01 10:00", pendingApproval: false },
+  { id: "a2", loginId: "op_kim", displayName: "김운영", role: "OPERATOR", lastLoginAt: "2026-08-07 16:41", disabledAt: null, createdAt: "2026-07-05 11:30", activatedAt: "2026-07-05 11:30", approverSince: "2026-07-05 11:30", pendingApproval: false },
+  { id: "a3", loginId: "auditor_lee", displayName: "이감사", role: "AUDITOR", lastLoginAt: "2026-08-06 14:03", disabledAt: null, createdAt: "2026-07-10 09:00", activatedAt: "2026-07-10 09:00", approverSince: "2026-07-10 09:00", pendingApproval: false },
+  { id: "a4", loginId: "reviewer_old", displayName: "퇴사자", role: "REVIEWER", lastLoginAt: "2026-06-01 09:00", disabledAt: "2026-06-15 00:00", createdAt: "2026-05-01 09:00", activatedAt: "2026-05-01 09:00", approverSince: "2026-05-01 09:00", pendingApproval: false },
 ];
 
 export const fxApprovals: ApprovalRequestView[] = [
-  { id: "ap1", actionType: "PARAM_APPLY", targetRef: "pd-17", requestedBy: "admin-fx-1", requestedByName: "김운영", approvals: 0, status: "PENDING", reason: "O1 백테스트 결과 반영 — submitterTarget 20→18", createdAt: "2026-08-07 11:20", resolvedAt: null },
-  { id: "ap2", actionType: "PARAM_APPLY", targetRef: "pd-12", requestedBy: "admin-fx-2", requestedByName: "박관리", approvals: 1, status: "PARTIAL", reason: "hitThreshold 0.20→0.22 보정", createdAt: "2026-08-05 09:40", resolvedAt: null },
+  { id: "ap1", actionType: "PARAM_APPLY", targetRef: "pd-17", requestedBy: "admin-fx-1", requestedByName: "김운영", approvals: 0, requiredApprovals: 1, status: "PENDING", reason: "O1 백테스트 결과 반영 — submitterTarget 20→18", summary: "파라미터 적용: submitterTarget 20→18", createdAt: "2026-08-07 11:20", resolvedAt: null },
+  { id: "ap2", actionType: "LEDGER_ADJ", targetRef: "user_4410", requestedBy: "admin-fx-2", requestedByName: "박관리", approvals: 0, requiredApprovals: 1, status: "PENDING", reason: "hitThreshold 0.20→0.22 보정", summary: "원장 조정: user_4410 +150.0", createdAt: "2026-08-05 09:40", resolvedAt: null },
 ];
 
 export const fxReportQueue: ReportQueueItem[] = [
   {
     id: "rp-1", trendItemId: "ti-1", reason: "DEFAMATION", detail: "특정 인물을 비하하는 표현이 포함돼 있습니다",
     status: "OPEN", submissionId: null, explanationDeadline: null, explanationText: null,
-    decision: null, decisionNote: null, createdAt: "2026-08-19 14:20",
+    decision: null, decisionNote: null, autoHiddenAt: null, createdAt: "2026-08-19 14:20",
   },
   {
     id: "rp-2", trendItemId: "ti-3", reason: "BUSINESS_INTERFERENCE", detail: "경쟁사 비방성 제보로 의심됩니다",
     status: "EXPLAINING", submissionId: "sub-1", explanationDeadline: "2026-08-21 09:12", explanationText: null,
-    decision: null, decisionNote: null, createdAt: "2026-08-18 09:00",
+    decision: null, decisionNote: null, autoHiddenAt: "2026-08-18 13:00", createdAt: "2026-08-18 09:00",
   },
 ];
 
@@ -134,13 +138,16 @@ const fxImminent: ImminentItem[] = [
 ];
 export const fxVerdicts: VerdictListResponse = { judged: fxJudged, imminent: fxImminent };
 
-export const fxAudit: AuditEntry[] = [
-  { id: 5012, actor: "김운영", role: "OPERATOR", action: "MERGE", targetType: "TREND", targetId: "#1204", createdAt: "2026-08-07 16:41" },
-  { id: 5011, actor: "박관리", role: "ADMIN", action: "LEDGER_ADJ", targetType: "USER", targetId: "user_4410", createdAt: "2026-08-07 15:20" },
-  { id: 5010, actor: "이감사", role: "AUDITOR", action: "PII_VIEW", targetType: "USER", targetId: "user_7731", createdAt: "2026-08-07 14:03" },
-  { id: 5009, actor: "김운영", role: "OPERATOR", action: "VOID", targetType: "TREND", targetId: "#1188", createdAt: "2026-08-07 11:47" },
-  { id: 5008, actor: "박관리", role: "ADMIN", action: "PARAM_APPLY", targetType: "DRAFT", targetId: "#16", createdAt: "2026-08-06 09:00" },
-];
+export const fxAudit: AuditPage = {
+  items: [
+    { id: 5012, actor: "김운영", role: "OPERATOR", action: "MERGE", targetType: "TREND", targetId: "#1204", detail: {}, createdAt: "2026-08-07 16:41" },
+    { id: 5011, actor: "박관리", role: "ADMIN", action: "LEDGER_ADJ", targetType: "USER", targetId: "user_4410", detail: {}, createdAt: "2026-08-07 15:20" },
+    { id: 5010, actor: "박관리", role: "ADMIN", action: "LEDGER_ADJ", targetType: "USER", targetId: "user_7731", detail: {}, createdAt: "2026-08-07 14:03" },
+    { id: 5009, actor: "김운영", role: "OPERATOR", action: "VOID", targetType: "TREND", targetId: "#1188", detail: {}, createdAt: "2026-08-07 11:47" },
+    { id: 5008, actor: "박관리", role: "ADMIN", action: "PARAM_APPLY", targetType: "DRAFT", targetId: "#16", detail: {}, createdAt: "2026-08-06 09:00" },
+  ],
+  nextBeforeId: null,
+};
 
 export const fxSeedAccuracy: SeedAccuracyRow[] = [
   { operatorName: "김운영", hit: 14, miss: 3, judged: 17, trustIndex: 0.7273 },

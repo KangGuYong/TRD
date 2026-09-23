@@ -64,6 +64,8 @@ services:
       ADMIN_BOOTSTRAP_PASSWORD: ${ADMIN_BOOTSTRAP_PASSWORD:-}
       # Firebase 서비스 계정 키(컨테이너 안 경로). 비어 있으면 앱은 뜨고, 인증이 필요한 /v1 요청만 401.
       FIREBASE_CREDENTIALS_PATH: ${FIREBASE_CREDENTIALS_PATH:-}
+      # sla_watch 주기(스프링 cron, 초 분 시 일 월 요일 — jobs.sla-watch.cron). 기본 매시 정각.
+      JOBS_SLA_WATCH_CRON: "${JOBS_SLA_WATCH_CRON:-0 0 * * * *}"
     volumes:
       # Firebase 키 같은 시크릿 파일은 infra/secrets/ 에 둔다(gitignore 대상 — secrets/README.md).
       - ./secrets:/run/secrets/trd:ro

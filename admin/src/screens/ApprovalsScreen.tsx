@@ -10,14 +10,15 @@ import type { ApprovalRequestView } from "../api/types";
 
 const ACTION_LABEL: Record<ApprovalRequestView["actionType"], string> = {
   PARAM_APPLY: "파라미터 적용",
-  SANCTION: "유저 제재",
-  GRADE_ADJUST: "등급 조정",
-  LEDGER_ADJ_OVER100: "원장 상쇄(100+)",
+  VERDICT_REJUDGE: "재판정(100+)",
+  ITEM_VOID: "판정 VOID(100+)",
+  LEDGER_ADJ: "원장 조정",
+  ACCOUNT_CREATE: "계정 생성",
+  ACCOUNT_ROLE_CHANGE: "역할 변경",
 };
 
 const STATUS_LABEL: Record<ApprovalRequestView["status"], string> = {
   PENDING: "대기",
-  PARTIAL: "1/2 승인",
   APPROVED: "승인됨",
   REJECTED: "반려됨",
   EXECUTED: "실행됨",
@@ -76,7 +77,7 @@ export default function ApprovalsScreen() {
 
       <Card style={{ padding: 0, overflow: "hidden" }}>
         <div style={{ display: "grid", gridTemplateColumns: "140px 90px 110px 1fr 90px 130px 170px", padding: "13px 20px", borderBottom: `1px solid ${C.line}`, background: "rgba(20,19,15,0.02)" }}>
-          {["액션", "대상", "요청자", "사유", "승인현황", "생성시각", ""].map((h) => (
+          {["액션", "대상", "요청자", "요약", "승인현황", "생성시각", ""].map((h) => (
             <span key={h} style={{ font: "600 10.5px Pretendard", letterSpacing: ".06em", color: C.faint }}>{h}</span>
           ))}
         </div>
@@ -96,9 +97,9 @@ export default function ApprovalsScreen() {
                     </span>
                     <span style={{ font: "500 11.5px ui-monospace, monospace", color: C.faint }}>{row.targetRef.slice(0, 8)}</span>
                     <span style={{ font: "600 12.5px Pretendard" }}>{row.requestedByName}</span>
-                    <span style={{ font: "500 12px Pretendard", color: C.sub }}>{row.reason ?? "-"}</span>
-                    <span style={{ font: "700 12px ui-monospace, monospace", color: row.approvals > 0 ? C.peak : C.faint }}>
-                      {STATUS_LABEL[row.status]}
+                    <span style={{ font: "500 12px Pretendard", color: C.sub }}>{row.summary}</span>
+                    <span style={{ font: "700 12px ui-monospace, monospace", color: row.approvals > 0 ? C.peak : C.faint }} title={STATUS_LABEL[row.status]}>
+                      {row.approvals}/{row.requiredApprovals}
                     </span>
                     <span style={{ font: "500 11.5px ui-monospace, monospace", color: C.faint }}>{row.createdAt}</span>
                     <div style={{ display: "flex", gap: 6, justifySelf: "end" }}>

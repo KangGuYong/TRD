@@ -67,9 +67,45 @@ public class Fixtures {
                 Integer.class, itemId);
     }
 
+    /** 승인권이 있는(유예가 끝난) 활성 ADMIN. */
     public UUID admin() {
-        return jdbc.queryForObject("INSERT INTO admin_accounts (login_id, display_name, role, password_hash) "
-                + "VALUES (?, '테스트 관리자', 'ADMIN', 'x') RETURNING id", UUID.class, "a_" + rand());
+        return admin("ADMIN");
+    }
+
+    /** 승인권 유예가 끝난 활성 계정. role = REVIEWER|OPERATOR|ADMIN|AUDITOR. */
+    public UUID admin(String role) {
+        return jdbc.queryForObject("INSERT INTO admin_accounts (login_id, display_name, role, password_hash, "
+                + "approver_since, activated_at) VALUES (?, '테스트 관리자', ?::admin_role, 'x', "
+                + "TIMESTAMPTZ '2000-01-01 00:00:00+00', now()) RETURNING id", UUID.class, "a_" + rand(), role);
+    }
+
+    /** 승인권 유예 중인 활성 ADMIN — until까지 승인할 수 없다. */
+    public UUID adminInGrace(Instant until) {
+        return jdbc.queryForObject("INSERT INTO admin_accounts (login_id, display_name, role, password_hash, "
+                + "approver_since, activated_at) VALUES (?, '유예 관리자', 'ADMIN', 'x', ?, now()) RETURNING id",
+                UUID.class, "g_" + rand(), Timestamp.from(until));
+    }
+
+    /** 승인 대기(activated_at NULL) 계정. */
+    public UUID pendingAdmin(String role) {
+        return jdbc.queryForObject("INSERT INTO admin_accounts (login_id, display_name, role, password_hash, "
+                + "approver_since) VALUES (?, '대기 관리자', ?::admin_role, 'x', now()) RETURNING id",
+                UUID.class, "p_" + rand(), role);
+    }
+
+    /** 신고 한 건(신고자는 새 유저). status = OPEN|EXPLAINING|DECIDED. */
+    public UUID report(UUID itemId, String status, Instant createdAt) {
+        return jdbc.queryForObject("INSERT INTO reports (trend_item_id, reporter_id, reason, status, created_at) "
+                + "VALUES (?, ?, 'OTHER', ?::report_status, ?) RETURNING id",
+                UUID.class, itemId, user(), status, Timestamp.from(createdAt));
+    }
+
+    public String visibility(UUID itemId) {
+        return jdbc.queryForObject("SELECT visibility::text FROM trend_items WHERE id = ?", String.class, itemId);
+    }
+
+    public void setVisibility(UUID itemId, String visibility) {
+        jdbc.update("UPDATE trend_items SET visibility = ?::trend_visibility WHERE id = ?", visibility, itemId);
     }
 
     /** 적용된 파라미터 드래프트(가장 최근 APPLIED가 현재값). 테스트 끝에 반드시 {@link #deleteDraft}로 지운다 — 공유 DB. */
@@ -80,6 +116,21 @@ public class Fixtures {
 
     public void deleteDraft(UUID draftId) {
         jdbc.update("DELETE FROM parameter_drafts WHERE id = ?", draftId);
+    }
+
+    /** 승인 대기 중인 파라미터 드래프트(값은 기본값과 같다 — 적용돼도 판정에 영향 없음). {draftId, approvalId}. 끝나면 deleteDraft. */
+    public UUID[] paramDraftInReview(UUID requesterId) {
+        UUID draft = jdbc.queryForObject("INSERT INTO parameter_drafts (author_id, status, payload, sim_result) VALUES "
+                + "(?, 'REVIEW', '{\"submitterTarget\":20,\"hitThreshold\":0.2}'::jsonb, '{}'::jsonb) RETURNING id",
+                UUID.class, requesterId);
+        UUID approval = jdbc.queryForObject("INSERT INTO approval_requests (action_type, target_ref, requested_by, payload) "
+                + "VALUES ('PARAM_APPLY', ?, ?, '{\"reason\":\"테스트\"}'::jsonb) RETURNING id", UUID.class, draft, requesterId);
+        jdbc.update("UPDATE parameter_drafts SET approval_id = ? WHERE id = ?", approval, draft);
+        return new UUID[]{draft, approval};
+    }
+
+    public String approvalStatus(UUID approvalId) {
+        return jdbc.queryForObject("SELECT status::text FROM approval_requests WHERE id = ?", String.class, approvalId);
     }
 
     /** 이미 판정된 제보(항목 포함, 항목은 RESOLVED — 다른 테스트의 배치가 다시 판정하지 않게). TI·판정완료 건수 테스트용. */

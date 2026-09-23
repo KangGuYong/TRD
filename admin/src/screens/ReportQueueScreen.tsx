@@ -92,6 +92,20 @@ function ReportCard({ report }: { report: ReportQueueItem }) {
     }
   };
 
+  const restoreOpen = async () => {
+    if (USE_FIXTURES) { flash("(데모) 오신고 — 복원 처리됨"); return; }
+    setBusy(true);
+    try {
+      await decideReport(report.id, "RESTORE", note || "오신고");
+      await refresh();
+      flash("오신고 — 복원 처리됐습니다 (감사 로그 기록)");
+    } catch (e) {
+      flash(e instanceof ApiError ? e.message : "복원에 실패했습니다");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const decide = async () => {
     if (decision === "EDIT_RESTORE" && !newName.trim()) { flash("수정 후 복원은 새 대표명이 필요합니다"); return; }
     if (!note.trim()) { flash("결정 사유는 필수입니다"); return; }
@@ -116,6 +130,11 @@ function ReportCard({ report }: { report: ReportQueueItem }) {
           <span style={{ font: "600 10.5px ui-monospace, monospace", padding: "4px 8px", borderRadius: 6, background: "rgba(20,19,15,0.06)", color: C.sub }}>
             {STATUS_LABEL[report.status] ?? report.status}
           </span>
+          {report.autoHiddenAt && (
+            <span style={{ font: "600 10.5px ui-monospace, monospace", padding: "4px 8px", borderRadius: 6, background: "rgba(223,164,0,0.12)", color: C.peak }}>
+              자동 숨김 {report.autoHiddenAt}
+            </span>
+          )}
           {report.explanationDeadline && (
             <span style={{ font: "500 11.5px Pretendard", color: C.faint }}>소명 기한 {report.explanationDeadline}</span>
           )}
@@ -166,10 +185,11 @@ function ReportCard({ report }: { report: ReportQueueItem }) {
           <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="처리 근거 (선택 · 감사 로그에 기록됩니다)"
             style={{ width: "100%", boxSizing: "border-box", padding: "12px 14px", borderRadius: 10, border: "1px solid rgba(20,19,15,0.1)", background: "#FBFAF7", outline: "none", font: "500 12.5px Pretendard" }} />
           <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-            <Btn tone="danger" disabled={!CAN.reportTriage(role) || busy} onClick={() => triage("hide")}>즉시비공개 + 소명요청</Btn>
+            <Btn tone="danger" disabled={!CAN.reportHide(role) || busy} onClick={() => triage("hide")}>즉시비공개 + 소명요청</Btn>
             <Btn disabled={!CAN.reportTriage(role) || busy} onClick={() => triage("request-explanation")}>공개 유지 + 소명요청</Btn>
+            <Btn disabled={!CAN.reportDecide(role) || busy} onClick={restoreOpen}>오신고 — 복원</Btn>
           </div>
-          {!CAN.reportTriage(role) && <div style={{ marginTop: 11, font: "500 11.5px Pretendard", color: C.fading }}>현재 역할({role})에는 처리 권한이 없습니다. REVIEWER 이상 필요.</div>}
+          {!CAN.reportHide(role) && <div style={{ marginTop: 11, font: "500 11.5px Pretendard", color: C.fading }}>임시 비공개는 OPERATOR 이상, 소명 요청은 REVIEWER 이상</div>}
         </div>
       )}
 

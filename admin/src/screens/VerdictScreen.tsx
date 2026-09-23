@@ -53,14 +53,23 @@ export default function VerdictScreen() {
     setSubmitting(true);
     setError(null);
     try {
-      if (dialog.kind === "void") await voidVerdict(id, reason);
-      else if (dialog.kind === "rejudge") await rejudgeVerdict(id, reason);
-      else await extendVerdictGrace(id, days, reason);
+      if (dialog.kind === "void" || dialog.kind === "rejudge") {
+        const r = dialog.kind === "void" ? await voidVerdict(id, reason) : await rejudgeVerdict(id, reason);
+        flash(r.status === "PENDING_APPROVAL"
+          ? `${label} — 차액 ${r.adjTotal}점, 승인 대기로 올렸습니다`
+          : `${label} ${actionLabel(dialog.kind)} 처리됨 (차액 ${r.adjTotal}점)`);
+      } else {
+        await extendVerdictGrace(id, days, reason);
+        flash(`${label} ${actionLabel(dialog.kind)} 처리됨`);
+      }
       await qc.invalidateQueries({ queryKey: ["admin", "verdicts"] });
-      flash(`${label} ${actionLabel(dialog.kind)} 처리됨`);
       setDialog(null);
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "처리에 실패했습니다");
+      if (e instanceof ApiError && e.type === "approval-pending") {
+        setError("이 항목에 대기 중인 승인 요청이 있습니다 — 승인 대기함(ADM-620)에서 처리하세요");
+      } else {
+        setError(e instanceof ApiError ? e.message : "처리에 실패했습니다");
+      }
     } finally {
       setSubmitting(false);
     }
@@ -161,6 +170,8 @@ export default function VerdictScreen() {
               <p style={{ margin: "10px 0 0", color: C.sub, fontSize: 12.5, lineHeight: 1.5 }}>
                 원 판정 때의 파라미터로, 그사이 VOID된 제보를 뺀 지금의 제보를 다시 계산합니다.
                 새 파라미터를 과거 판정에 소급하지 않습니다.
+                <br />
+                되돌리는 점수가 100점을 넘으면 다른 ADMIN의 승인 후 반영됩니다.
               </p>
             )}
             {dialog.kind === "grace" && (

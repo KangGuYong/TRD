@@ -58,14 +58,15 @@ export default function ParamStudioScreen() {
 
   if (isLoading || !draft) return <div style={{ padding: 24, font: "500 13px Pretendard", color: C.faint }}>불러오는 중...</div>;
 
-  const canEdit = CAN.paramDraft(role) && !locked;
+  const hasDraft = draft.draftId !== null;
+  const canEdit = hasDraft && CAN.paramDraft(role) && !locked;
 
   return (
     <div style={{ maxWidth: 1000 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 18px", borderRadius: 12, background: "rgba(223,164,0,0.1)", border: "1px solid rgba(223,164,0,0.28)", marginBottom: 16 }}>
         <span style={{ font: "600 12.5px Pretendard" }}>파라미터는 즉시 반영되지 않습니다 — 드래프트 → 시뮬레이션 → 2인 승인 → 예약 적용.</span>
         <span style={{ marginLeft: "auto", font: "500 11.5px ui-monospace, monospace", color: C.faint }}>
-          드래프트 #{draft.draftId.slice(0, 8)} · {draft.status === "REVIEW" ? "승인 대기중" : "작성중"}
+          {hasDraft ? `드래프트 #${draft.draftId!.slice(0, 8)} · ${draft.status === "REVIEW" ? "승인 대기중" : "작성중"}` : "진행 중인 드래프트 없음 — 운영값"}
         </span>
       </div>
 
@@ -80,8 +81,12 @@ export default function ParamStudioScreen() {
             <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ font: "500 11.5px ui-monospace, monospace", color: C.faint }}>{draft.currentSubmitterTarget} →</span>
               <span style={{ font: "700 13px ui-monospace, monospace", color: target !== draft.currentSubmitterTarget ? C.peak : C.ink }}>{target}</span>
-              <MiniBtn disabled={!canEdit} onClick={() => setTarget((v) => Math.max(1, v - 1))}>−</MiniBtn>
-              <MiniBtn disabled={!canEdit} onClick={() => setTarget((v) => v + 1)}>+</MiniBtn>
+              {hasDraft && (
+                <>
+                  <MiniBtn disabled={!canEdit} onClick={() => setTarget((v) => Math.max(1, v - 1))}>−</MiniBtn>
+                  <MiniBtn disabled={!canEdit} onClick={() => setTarget((v) => v + 1)}>+</MiniBtn>
+                </>
+              )}
             </span>
           </div>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 14 }}>
@@ -89,13 +94,19 @@ export default function ParamStudioScreen() {
             <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ font: "500 11.5px ui-monospace, monospace", color: C.faint }}>{draft.currentHitThreshold.toFixed(2)} →</span>
               <span style={{ font: "700 13px ui-monospace, monospace", color: hit !== draft.currentHitThreshold ? C.peak : C.ink }}>{hit.toFixed(2)}</span>
-              <MiniBtn disabled={!canEdit} onClick={() => setHit((v) => Math.max(0, Math.round((v - 0.01) * 100) / 100))}>−</MiniBtn>
-              <MiniBtn disabled={!canEdit} onClick={() => setHit((v) => Math.round((v + 0.01) * 100) / 100)}>+</MiniBtn>
+              {hasDraft && (
+                <>
+                  <MiniBtn disabled={!canEdit} onClick={() => setHit((v) => Math.max(0, Math.round((v - 0.01) * 100) / 100))}>−</MiniBtn>
+                  <MiniBtn disabled={!canEdit} onClick={() => setHit((v) => Math.round((v + 0.01) * 100) / 100)}>+</MiniBtn>
+                </>
+              )}
             </span>
           </div>
-          <div style={{ marginTop: 14 }}>
-            <Btn disabled={!canEdit || !dirty || busy} onClick={apply}>적용</Btn>
-          </div>
+          {hasDraft && (
+            <div style={{ marginTop: 14 }}>
+              <Btn disabled={!canEdit || !dirty || busy} onClick={apply}>적용</Btn>
+            </div>
+          )}
         </Card>
 
         <Card>
@@ -123,19 +134,23 @@ export default function ParamStudioScreen() {
       </div>
 
       <div style={{ display: "flex", gap: 8, marginTop: 12, alignItems: "center" }}>
-        <Btn disabled={!CAN.paramDraft(role) || locked || dirty || busy} title={dirty ? "먼저 적용하세요" : undefined} onClick={runSimulation}>시뮬레이션 실행</Btn>
-        <input
-          placeholder="승인 요청 사유"
-          value={reason}
-          onChange={(e) => setReason(e.target.value)}
-          disabled={!CAN.paramDraft(role) || locked}
-          style={{ padding: "8px 10px", borderRadius: 8, border: `1px solid ${C.line}`, font: "500 12px Pretendard", width: 220 }}
-        />
-        <Btn tone="primary" disabled={!draft.simResult || locked || !CAN.paramDraft(role) || busy} title={!draft.simResult ? "시뮬레이션 먼저" : undefined} onClick={requestApproval}>
-          승인 요청 (예약·비소급)
-        </Btn>
+        {hasDraft && (
+          <>
+            <Btn disabled={!CAN.paramDraft(role) || locked || dirty || busy} title={dirty ? "먼저 적용하세요" : undefined} onClick={runSimulation}>시뮬레이션 실행</Btn>
+            <input
+              placeholder="승인 요청 사유"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              disabled={!CAN.paramDraft(role) || locked}
+              style={{ padding: "8px 10px", borderRadius: 8, border: `1px solid ${C.line}`, font: "500 12px Pretendard", width: 220 }}
+            />
+            <Btn tone="primary" disabled={!draft.simResult || locked || !CAN.paramDraft(role) || busy} title={!draft.simResult ? "시뮬레이션 먼저" : undefined} onClick={requestApproval}>
+              승인 요청 (예약·비소급)
+            </Btn>
+          </>
+        )}
         <span style={{ marginLeft: "auto", font: "500 11.5px Pretendard", color: C.faint }}>
-          적용 승인은 {CAN.paramApply(role) ? "가능(ADMIN 2인)" : "ADMIN 2인 필요"}
+          적용 승인은 {CAN.paramApply(role) ? "가능(다른 ADMIN 1명의 승인)" : "다른 ADMIN 1명의 승인 필요"}
         </span>
       </div>
 

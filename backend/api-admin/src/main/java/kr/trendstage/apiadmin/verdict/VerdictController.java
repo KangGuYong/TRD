@@ -6,6 +6,8 @@ import kr.trendstage.persistence.entity.Verdict;
 import kr.trendstage.persistence.repo.TrendItemRepository;
 import kr.trendstage.persistence.repo.VerdictRepository;
 import kr.trendstage.persistence.type.TrendState;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -71,16 +73,20 @@ public class VerdictController {
 
     @PostMapping("/{trendItemId}/void")
     @PreAuthorize("hasAnyRole('OPERATOR', 'ADMIN')")
-    public void voidVerdict(@PathVariable UUID trendItemId, @RequestBody ReasonRequest req,
-                             @AuthenticationPrincipal AdminPrincipal actor) {
-        verdictAdminService.voidVerdict(trendItemId, actor.id(), actor.role(), req.reason());
+    public ResponseEntity<VerdictAdminService.VerdictActionResult> voidVerdict(@PathVariable UUID trendItemId,
+            @RequestBody ReasonRequest req, @AuthenticationPrincipal AdminPrincipal actor) {
+        return respond(verdictAdminService.voidVerdict(trendItemId, actor.id(), actor.role(), req.reason()));
     }
 
     @PostMapping("/{trendItemId}/rejudge")
     @PreAuthorize("hasAnyRole('OPERATOR', 'ADMIN')")
-    public void rejudge(@PathVariable UUID trendItemId, @RequestBody ReasonRequest req,
-                         @AuthenticationPrincipal AdminPrincipal actor) {
-        verdictAdminService.requestRejudge(trendItemId, actor.id(), actor.role(), req.reason());
+    public ResponseEntity<VerdictAdminService.VerdictActionResult> rejudge(@PathVariable UUID trendItemId,
+            @RequestBody ReasonRequest req, @AuthenticationPrincipal AdminPrincipal actor) {
+        return respond(verdictAdminService.requestRejudge(trendItemId, actor.id(), actor.role(), req.reason()));
+    }
+
+    private static ResponseEntity<VerdictAdminService.VerdictActionResult> respond(VerdictAdminService.VerdictActionResult r) {
+        return ResponseEntity.status(r.pending() ? HttpStatus.ACCEPTED : HttpStatus.OK).body(r);
     }
 
     @PostMapping("/{trendItemId}/extend-grace")

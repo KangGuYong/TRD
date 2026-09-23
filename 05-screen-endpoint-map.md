@@ -68,6 +68,8 @@
 
 역할 표기: R=REVIEWER, O=OPERATOR, A=ADMIN, Au=AUDITOR(읽기전용). 근거 02 §1.1. 아래 권한/비고는 각 컨트롤러의 실제 `@PreAuthorize`를 확인해 표기했다(컨트롤러 자체가 없는 항목은 스펙 설명 기반 목표 권한).
 
+**세션 재검증(SP3 K7, 구현됨)**: `/admin/auth/login`·`/admin/auth/logout`·`/admin/auth/csrf`를 제외한 모든 `/admin/**` 요청마다 계정을 다시 읽는다. 비활성·승인 대기이거나 DB 역할이 로그인 시점 세션 역할과 다르면 세션을 폐기하고 401 `{type: session-revoked}`.
+
 ### ADM-010 · 오늘의 작업
 | 상호작용 | API | 스펙 | 구현 | 권한 | 비고 |
 |---|---|:--:|:--:|:--:|---|
@@ -77,7 +79,8 @@
 | 상호작용 | API | 스펙 | 구현 | 권한 | 비고 |
 |---|---|:--:|:--:|:--:|---|
 | CSRF 쿠키 발급(SPA 부팅용) | `GET /admin/auth/csrf` | ✅ | ✅ | 전체 | 응답에 XSRF-TOKEN 쿠키 |
-| 로그인 | `POST /admin/auth/login` | ✅ | ✅ | 전체 | X-XSRF-TOKEN 헤더 필수, 5회 실패 15분 잠금(423) |
+| 로그인 | `POST /admin/auth/login` | ✅ | ✅ | 전체 | X-XSRF-TOKEN 헤더 필수, 5회 실패 15분 잠금(423). 승인 대기 계정(`activatedAt=null`)은 403 |
+| (전 `/admin/**`, 로그인·로그아웃·CSRF 제외) 세션 재검증 | — | — | ✅ | 전체 | 요청마다 계정 재조회 — 비활성·승인대기·역할변경이면 401 `session-revoked`(SP3) |
 
 ### ADM-100 · 병합 검수 큐 ★
 | 상호작용 | API | 스펙 | 구현 | 권한 |
@@ -99,7 +102,7 @@
 | 상호작용 | API | 스펙 | 구현 | 비고 |
 |---|---|:--:|:--:|---|
 | 큐 로드(판정 완료 목록 + D+14 임박 30건) | `GET /admin/verdicts` | 🔶 | ✅ | R 불가 · O/A/Au · 스펙엔 이 목록 조회 자체가 없음(추가 필요) |
-| VOID / 재판정 | `POST /admin/verdicts/{id}/void` · `…/rejudge` | 🔶 | ✅ | **O/A** · 사유 **서버 필수**(`VerdictAdminService.requireReason`, 없으면 예외) · `JudgeService` 경유 — 재판정은 원 판정 파라미터·제보 단위 ADJ, VOID는 항목 VOID(원장 전액 상쇄). 이미 VOID된 항목은 409 · 재판정 ADJ 합계 >100 → `ApprovalGate` **미구현(SP3)** · 스펙은 여전히 구경로 `POST /admin/trends/{id}/exceptions`(type 파라미터로 VOID/EXTEND/REJUDGE 분기) 하나만 정의 — 치환 필요 |
+| VOID / 재판정 | `POST /admin/verdicts/{id}/void` · `…/rejudge` | 🔶 | ✅ | **O/A** · 사유 **서버 필수**(`VerdictAdminService.requireReason`, 없으면 예외) · `JudgeService` 경유 — 재판정은 원 판정 파라미터·제보 단위 ADJ, VOID는 항목 VOID(원장 전액 상쇄). 이미 VOID된 항목은 409 · 재판정·VOID의 ADJ 합계(제보별 변동 절댓값 합) >100 → `ApprovalGate`가 쓰기 전에 막아 202(`PENDING_APPROVAL`, action `VERDICT_REJUDGE`/`ITEM_VOID`, **구현됨, SP3**), ≤100은 200 즉시 반영. 같은 항목에 이미 대기 중인 요청이 있으면 금액과 무관하게 409(`approval-pending`) · 스펙은 여전히 구경로 `POST /admin/trends/{id}/exceptions`(type 파라미터로 VOID/EXTEND/REJUDGE 분기) 하나만 정의 — 치환 필요 |
 | 유예연장 | `POST /admin/verdicts/{id}/extend-grace` | 🔶 | ✅ | **O/A** · 사유는 **서버가 요구하지 않는다** — `VerdictAdminService.extendGrace`는 `requireReason`을 호출하지 않고, `reason`이 null이면 빈 문자열로 감사 로그에만 남긴다. 1~90일(`MAX_GRACE_DAYS`) 범위·최대 유예 도달 여부만 검증. 위와 동일한 스펙 불일치 |
 | ~~HIT/MISS 변경·T 수동입력·verdict 삭제~~ | **엔드포인트 없음** | — | — | 금지기능(R1) |
 
@@ -113,12 +116,12 @@
 ### ADM-310 / 311 · 유저 목록 / 상세·원장
 | 상호작용 | API | 스펙 | 구현 | 권한 |
 |---|---|:--:|:--:|---|
-| 유저 목록 | `GET /admin/users` | ✅ | 🔶 | R/O/A/Au · **미구현(SP3)** — 컨트롤러 없음 |
-| 유저 상세·원장(마스킹) | `GET /admin/users/{id}` | ✅ | 🔶 | 마스킹 R/O · 사유후 A/Au · **미구현(SP3)** — 컨트롤러 없음, 현재 화면은 픽스처 |
-| 마스킹 해제(사유 → `PII_VIEW` 기록) | `POST /admin/users/{id}/unmask` | 🔶 | 🔶 | A/Au · **미구현(SP3)** — 이 경로는 스펙에도 없음(스펙은 `?unmask=true` 쿼리파라미터 방식, §C 참조) |
-| 상쇄원장(ADJ) 추가 | `POST /admin/users/{id}/ledger-adjust` | ✅ | 🔶 | **A**(100점↑ 2인) · **미구현(SP3)** — `/admin/users/**`는 전부 컨트롤러가 없다 |
-| 제재 상신 | `POST /admin/sanctions` | ✅ | 🔶 | O 상신 · **미구현** — 컨트롤러 없음 |
-| 등급 수동 조정 | `POST /admin/users/{id}/grade-adjust` | ✅ | 🔶 | **A(2인)** · **미구현(SP3)** — 컨트롤러 없음. 2인 승인 executor도 없음(`ApprovalService`에 등록된 executor는 `ParamApplyExecutor` 하나뿐) |
+| 유저 검색(핸들 접두, ADM-311 진입 수단) | `GET /admin/users?handle=` | ✅ | ✅ | R/O/A/Au(조회) · **구현됨(SP3)** — 최대 20건, 대소문자 무시, 빈 값 422. ADM-310 자체의 정식 목록 화면(필터·정렬)은 여전히 Phase 2 |
+| 유저 상세·원장(산정 근거 동봉) | `GET /admin/users/{id}` | ✅ | ✅ | R/O/A/Au(조회) · **구현됨(SP3)** — TI·AS·판정완료/HIT/MISS·원장 전건(`verdictId`·`approvalId` 포함) 반환, 대상 없으면 404 |
+| 마스킹 해제(사유 → `PII_VIEW` 기록) | `POST /admin/users/{id}/unmask` | 🔶 | 🔶 | A/Au · **여전히 미구현**(SP3 §0 비범위) — `users`에 가릴 개인정보 컬럼 자체가 없다(핸들·가입일·Firebase UID뿐). 본인인증 도입 시 함께 구현 |
+| 상쇄원장(ADJ) 추가 | `POST /admin/users/{id}/ledger-adjustments` | ✅ | ✅ | **O 상신·A**(100점↑ 2인) · **구현됨(SP3)** — 사유 필수·금액 ±9999. ADMIN이 100점 이하면 201 즉시(`APPLIED`), OPERATOR이거나 100점 초과면 202(`PENDING_APPROVAL`, action `LEDGER_ADJ`). 대상 유저 없으면 404 |
+| 제재 상신 | `POST /admin/sanctions` | ✅ | 🔶 | O 상신 · **미구현**(Phase 2, SP3 §0 비범위 — 제재 효과 미정의) — 컨트롤러 없음 |
+| 등급 수동 조정 | `POST /admin/users/{id}/grade-adjust` | ✅ | 🔶 | **A(2인)** · **미구현**(Phase 2, SP3 §0 비범위) — 컨트롤러 없음. 실행기도 없음(`ApprovalGate`의 실행기 6종에 미포함) |
 
 ### ADM-320 · 제재 관리
 | 상호작용 | API | 스펙 | 구현 | 권한 |
@@ -135,9 +138,9 @@
 ### ADM-410 · 신고 콘텐츠 큐 (공개 전 필수)
 | 상호작용 | API | 스펙 | 구현 | 권한 |
 |---|---|:--:|:--:|---|
-| 신고 목록(신고자 비식별) / 제보 원문 후보 | `GET /admin/reports` · `GET /admin/reports/{id}/submissions` | ✅ | ✅ | **R/O/A**(Au 없음 — 컨트롤러 `@PreAuthorize`에 AUDITOR 미포함) |
-| 임시비공개 / 소명 요청(48h) | `POST /admin/reports/{id}/hide` · `…/request-explanation` | ✅ | ✅ | **R/O/A**(Au 없음) · 두 엔드포인트 모두 REVIEWER 허용(**미구현(SP3)**에서 축소 예정) · 4h 미처리 자동 비공개는 `sla_watch`가 담당하며 **미구현(SP3)** |
-| 결정(복원·영구비공개) | `POST /admin/reports/{id}/decide` | ✅ | ✅ | **O/A**(R·Au 불가) |
+| 신고 목록(신고자 비식별) / 제보 원문 후보 | `GET /admin/reports` · `GET /admin/reports/{id}/submissions` | ✅ | ✅ | **R/O/A/Au(조회)** · AUDITOR 조회 추가됨(**구현됨, SP3**) |
+| 임시비공개 / 소명 요청(48h) | `POST /admin/reports/{id}/hide` · `…/request-explanation` | ✅ | ✅ | `hide`는 **O/A**(REVIEWER 403, **구현됨, SP3**) · `request-explanation`은 R/O/A 유지 · 4h 미처리 자동 비공개는 `sla_watch`가 담당하며 **구현됨(SP3)** — `PUBLIC`이면 `TEMP_HIDDEN` + `auto_hidden_at` 기록, 신고는 `OPEN` 유지 |
+| 결정(복원·영구비공개) | `POST /admin/reports/{id}/decide` | ✅ | ✅ | **O/A**(R·Au 불가) · `RESTORE`는 `OPEN`·`EXPLAINING` 모두 허용(**구현됨, SP3** — 자동 숨김 후 오신고 대응), `HIDE_PERMANENT`·`EDIT_RESTORE`는 `EXPLAINING`에서만(`OPEN`이면 422) |
 
 ### ADM-500 · 시딩 관리 (Phase 1)
 | 상호작용 | API | 스펙 | 구현 | 권한 |
@@ -159,27 +162,27 @@
 | 승급요구치·제보권·L4정원 드래프트 | `GET·POST /admin/grade-policy` | ✅ | 🔶 | O/A(적용 2인) · **미구현** — 컨트롤러 없음 |
 
 ### ADM-620 · 승인 대기함
-승인이 필요한 모든 흐름(현재는 파라미터 적용뿐, 향후 제재 확정·등급 수동조정·계정 권한 변경도 여기로 모인다)의 공용 큐. `ApprovalController` 코드 주석에 화면 ID가 명시돼 있다.
+승인이 필요한 모든 흐름의 공용 큐. **실행기 6종**(`PARAM_APPLY`·`VERDICT_REJUDGE`·`ITEM_VOID`·`LEDGER_ADJ`·`ACCOUNT_CREATE`·`ACCOUNT_ROLE_CHANGE`, **구현됨, SP3**) — 제재 확정·등급 수동조정은 아직 이 목록에 없다(Phase 2, SP3 §0 비범위). `ApprovalController` 코드 주석에 화면 ID가 명시돼 있다.
 
 | 상호작용 | API | 스펙 | 구현 | 권한 |
 |---|---|:--:|:--:|---|
 | 승인 대기 목록 | `GET /admin/approvals` | ✅ | ✅ | A/Au(조회) |
-| 승인(요청자·직전 승인자와 달라야 함) | `POST /admin/approvals/{id}/approve` | ✅ | ✅ | **A**(2/2면 즉시 실행) |
+| 승인(**요청자 + 승인자 1명**, K1) | `POST /admin/approvals/{id}/approve` | ✅ | ✅ | **A**(요청자 본인·유예 중·비활성이면 409, 승인 1회로 실행기까지 실행 — **구현됨, SP3**. 옛 2/2·`PARTIAL` 체계는 폐기) |
 | 반려(사유 필수, 대상은 재수정 가능 상태로 복귀) | `POST /admin/approvals/{id}/reject` | ✅ | ✅ | **A** |
 
 ### ADM-700 · 감사 로그
 | 상호작용 | API | 스펙 | 구현 | 권한 |
 |---|---|:--:|:--:|---|
-| 로그 검색(최신 200건, 필터·페이지네이션 없음) | `GET /admin/audit-log` | ✅ | ✅ | **O 본인분 · A/Au 전건**(최신 200, 검색 없음) — REVIEWER는 403. 열람 행위 자체를 감사 로그에 남기는 기능(조회 기록)은 컨트롤러에 없다 — **미구현(SP3)** |
+| 로그 검색(필터·커서 페이지네이션, `detail` 포함) | `GET /admin/audit-log?action=&actorId=&targetId=&from=&to=&beforeId=` | ✅ | ✅ | **O 본인분(필터 무관) · A/Au 전건** — REVIEWER는 403. 최신순 100건 + `nextBeforeId` 커서(**구현됨, SP3** — 옛 필터 없는 200건 고정에서 변경). `from`/`to`가 ISO-8601이 아니면 422. 열람 행위 자체를 감사 로그에 남기는 기능(조회 기록)은 여전히 없다 — **미구현**(SP3 §0 비범위) |
 
 ### ADM-800 · 관리자 계정
 | 상호작용 | API | 스펙 | 구현 | 권한 |
 |---|---|:--:|:--:|---|
 | 계정 목록·2FA·세션 | `GET /admin/accounts` | ✅ | ✅ | **A/Au** · 응답에 2FA·세션 필드가 없다 — 화면 문구를 실제 응답 필드에 맞게 수정 필요 |
-| 계정 생성 | `POST /admin/accounts` | 🔶 | ✅ | **A**(2인 승인은 **미구현(SP3)**, 현행 ADMIN 단독) · 신규 계정 7일 승인권 유예 · `openapi.yaml`은 `/admin/accounts`에 GET만 정의, POST 없음 — 스펙 갱신 필요 |
-| 계정 비활성화 / 재활성화 | `POST /admin/accounts/{id}/disable` · `…/enable` | 🔶 | ✅ | **A**(본인 계정 비활성화는 409) · `openapi.yaml`엔 없음 — 스펙 추가 필요. 실제 구현은 이것뿐이며 "권한 부여/회수"는 이 컨트롤러에 없다 |
-| 권한 부여/회수 | `POST /admin/accounts/{id}/role` | ✅ | 🔶 | **A(2인)** · **미구현** — `openapi.yaml`엔 있으나 컨트롤러가 없다. role 변경 엔드포인트 자체가 존재하지 않는다(disable/enable만 존재) |
-| 비밀번호 변경(부트스트랩 강제) | `POST /admin/accounts/me/password` | 🔶 | 🔶 | 본인 · **미구현(SP3)** |
+| 계정 생성 | `POST /admin/accounts` | ✅ | ✅ | **A**(2인 승인 = 요청자 + 승인자 1명, **구현됨, SP3**) · 승인 자격자(요청자 제외) ≥1이면 202(승인 대기), 0이면 부트스트랩 예외로 201(즉시 활성, 감사 `ACCOUNT_CREATE_BOOTSTRAP`) · 신규 계정·역할 변경 7일 승인권 유예 |
+| 계정 비활성화 / 재활성화 | `POST /admin/accounts/{id}/disable` · `…/enable` | ✅ | ✅ | **A**(본인 계정 비활성화는 403) · 승인 대기 계정(`activatedAt=null`)의 `enable`은 422 |
+| 권한 부여/회수 | `POST /admin/accounts/{id}/role {role, reason}` | ✅ | ✅ | **A 상신 → 2인 승인**(요청자+1명, **구현됨, SP3**) — 본인 역할 변경은 403, 사유 누락·이미 같은 역할·알 수 없는 역할은 422, 그 외 202(승인 대기, action `ACCOUNT_ROLE_CHANGE`) |
+| 비밀번호 변경 | `POST /admin/me/password {current, next}` | ✅ | ✅ | 본인(전 역할) · **구현됨(SP3)** — 현재 비밀번호 불일치·새 비밀번호 8자 미만·현재와 동일은 422, 성공 시 감사 `ACCOUNT_PASSWORD_CHANGE`. 부트스트랩 첫 로그인 강제 변경은 여전히 **미구현**(경고 로그만) |
 
 ### ADM-900 · 배치 관리
 | 상호작용 | API | 스펙 | 구현 | 권한 |
@@ -194,7 +197,7 @@
 
 | 제안 경로 | 용도 | 화면 | 비고 |
 |---|---|---|---|
-| `POST /admin/users/{id}/unmask` | PII 마스킹 해제(사유 기록) | ADM-311 | 스펙은 `GET …?unmask=true`+사유 헤더로 모델링 — 별도 POST 경로 자체가 스펙에도 없고 컨트롤러도 없음(SP3) |
+| `POST /admin/users/{id}/unmask` | PII 마스킹 해제(사유 기록) | ADM-311 | 스펙·컨트롤러 둘 다 여전히 없음 — `users`에 가릴 개인정보 컬럼 자체가 없어 SP3에서 만들지 않았다(§0 비범위, 본인인증 도입 시 함께) |
 | ~~`GET /admin/merge-queue/{id}/preview`~~ | 병합 미리보기(dry-run) | ADM-100 | 해소됨 — `openapi.yaml`에 반영 완료(SP2) |
 | ~~`POST /admin/merge-queue/{id}/merge`·`separate`·`void`~~ | 병합/분리/VOID | ADM-100 | 해소됨 — `openapi.yaml`이 실제 경로 3종으로 갱신됨(SP2), 구식 단일 `POST …/action` 정의는 제거 |
 | `POST /admin/merge-queue/{id}/claim`·`release`·`hold` | 클레임/해제/보류 | ADM-100 | 구현·스펙 둘 다 없음(SP2b) |
@@ -202,8 +205,8 @@
 | `GET /admin/verdicts`, `POST …/{id}/void`·`rejudge`·`extend-grace` | 판정 관리 목록/예외처리 | ADM-200 | 구현은 이미 있음 — 스펙 옛 경로 `/admin/trends/{id}` + `/admin/trends/{id}/exceptions`(단일 엔드포인트, type 파라미터 분기)를 치환 |
 | `GET·PUT /admin/params/draft`, `POST …/draft/simulate`, `…/draft/request-approval` | 파라미터 드래프트(액터당 1개, ID 없음) | ADM-600 | 구현은 이미 있음 — 스펙 옛 모델 `/admin/parameter-drafts`(다건·ID기반)를 치환. 스펙 요약문의 "가중치 합계 1.0"(~`GET·POST /admin/parameter-drafts` summary/422)은 폐기된 외부지표 다축 가중치(S1~S5) 모델의 잔재 — 삭제 대상(스펙 정리는 **SP3**로 이관 — SP0.5 스펙 범위에서 빠짐). 현재 구현은 `submitterTarget`+`hitThreshold` 2필드뿐이고 합계 제약 자체가 없다 |
 | `POST /admin/seed/submissions`, `GET /admin/seed/accuracy` | 시딩 등록/적중률 | ADM-500 | 구현은 이미 있음 — 스펙 옛 경로 `/admin/seeding`, `/admin/seeding/stats`를 치환 |
-| `POST /admin/accounts/{id}/disable`, `…/enable` | 관리자 계정 비활성화/재활성화 | ADM-800 | 구현은 이미 있음 — 스펙엔 대신 미구현 상태인 `POST …/{id}/role`만 있음. role 변경 자체가 필요하면 이 스펙 항목은 구현부터 필요(SP3), disable/enable은 스펙 추가만 필요 |
-| `POST /admin/accounts/me/password` | 비밀번호 변경(부트스트랩 강제) | ADM-800 | 구현·스펙 둘 다 없음(SP3) |
+| ~~`POST /admin/accounts/{id}/disable`, `…/enable`~~ | 관리자 계정 비활성화/재활성화 | ADM-800 | 해소됨 — `openapi.yaml`에 반영 완료(SP3). `…/{id}/role`도 SP3에서 구현됨(부트스트랩 첫 로그인 강제 비밀번호 변경만 여전히 미구현) |
+| ~~`POST /admin/me/password`~~ | 비밀번호 변경(본인) | ADM-800 | 해소됨 — 구현·스펙 모두 완료(SP3). 옛 제안 경로 `/admin/accounts/me/password`는 실제 경로 `/admin/me/password`로 정정 |
 | `GET /v1/me/preferences`, `GET /v1/me/reads` | 설정 조회, 읽음 목록(재로그인 시 복원) | A-7, A-2 | 구현은 이미 있음 — 스펙은 각각 PUT/POST만 정의(GET 없음) |
 | `GET /v1/trends?q=`, `?category=`, `?sort=`, `?cursor=` | 검색·필터·정렬·페이지네이션 | A-4, A-5 | 스펙엔 이미 있으나 컨트롤러가 `daily` 외 파라미터를 전혀 읽지 않는다 — 이건 "스펙 확장 대상"이 아니라 "스펙은 있는데 구현이 없는" 역방향 문제. 스펙을 늘릴 게 아니라 `TrendController.list()`를 구현해야 한다 |
 | `POST /v1/appeals`, `GET /v1/leaderboard` | 이의 제기, 명예의 전당 | A-7 | 둘 다 스펙엔 있으나 컨트롤러 자체가 없다(`AppealController`·leaderboard 컨트롤러 부재) — 위와 동일한 역방향 문제 |
@@ -212,25 +215,25 @@
 
 ## D. 콘솔 액션 → 역할 매트릭스 (요약, 02 §1.1)
 
-> 아래는 **목표 권한**이다(02 §1.1). 현행 코드와 다른 칸은 각 화면 표의 권한 열을 따른다 — 차이는 **미구현(SP3)**. 예: 임시 비공개(`hide`)는 코드상 REVIEWER도 허용되지만 이 표는 목표대로 O만 표시하고, AUDITOR는 신고 큐·파라미터 드래프트 조회 권한이 코드엔 전혀 없는데도 이 표는 목표값인 "조회"로 표시한다. 실제 동작은 ADM-410·ADM-600 표를 참조.
+> 아래는 **목표 권한**이다(02 §1.1). SP3에서 대부분 목표대로 맞춰졌다 — 임시 비공개(`hide`)는 REVIEWER 403, AUDITOR는 신고 큐·파라미터 드래프트·유저 원장을 조회할 수 있다(전부 **구현됨, SP3**). 남은 차이는 유저 제재·등급 수동 조정(Phase 2, 실행기 자체가 없음)과 개인정보 열람(가릴 컬럼이 없어 미구현)뿐이다 — 각 화면 표의 권한 열 참조.
 
 | 액션(엔드포인트) | R | O | A | Au |
 |---|:--:|:--:|:--:|:--:|
 | 병합/분리 `POST /admin/merge-queue/{id}/merge`·`separate` | ✔ | ✔ | ✔ | 조회 |
 | 병합 VOID `POST /admin/merge-queue/{id}/void` | — | ✔ | ✔ | 조회 |
 | 판정 VOID/유예연장/재판정 `POST /admin/verdicts/{id}/void`·`extend-grace`·`rejudge` | — | ✔ | ✔ | 조회 |
-| 상쇄원장 `…/ledger-adjust` | — | 상신 | ✔ | 조회 |
-| 유저 제재 `/admin/sanctions` | — | 상신 | ✔ | 조회 |
-| 등급 수동 조정 `…/grade-adjust` | — | — | ✔(2인) | 조회 |
+| 상쇄원장 `POST /admin/users/{id}/ledger-adjustments` | — | 상신(항상 202) | ✔(100점↑ 승인 대기) | 조회 |
+| 유저 제재 `/admin/sanctions` | — | 상신 | ✔ | 조회 — **미구현(Phase 2)** |
+| 등급 수동 조정 `…/grade-adjust` | — | — | ✔(2인) | 조회 — **미구현(Phase 2)** |
 | 파라미터 드래프트 `/admin/params/draft` | — | ✔ | ✔ | 조회 |
-| 파라미터 적용 `/approvals/*/approve` | — | — | ✔(2인) | 조회 |
-| 개인정보 열람 `POST /admin/users/{id}/unmask` | 마스킹 | 마스킹 | 사유후(기록) | 사유후(기록) |
+| 파라미터 적용 `/approvals/*/approve` | — | — | ✔(요청자+1명) | 조회 |
+| 개인정보 열람 `POST /admin/users/{id}/unmask` | 마스킹 | 마스킹 | 사유후(기록) | 사유후(기록) — **미구현**(가릴 컬럼 없음) |
 | 임시 비공개 `/admin/reports/{id}/hide` | — | ✔ | ✔ | 조회 |
 | 배치 수동 실행 `/admin/batch-jobs/*/run` | — | ✔ | ✔ | 조회 |
-| 관리자 계정 생성·권한 `/admin/accounts` | — | — | ✔(2인) | 조회 |
-| 감사 로그 `/admin/audit-log` | — | 본인분 | ✔ | ✔ (Au 전 영역 읽기 — 신고·드래프트 포함) |
+| 관리자 계정 생성·권한 `/admin/accounts` · `…/{id}/role` | — | — | ✔(요청자+1명, 0명이면 생성만 부트스트랩 예외) | 조회 |
+| 감사 로그 `/admin/audit-log` | — | 본인분(필터 무관) | ✔ | ✔ (Au 전 영역 읽기 — 신고·드래프트·유저 원장 포함) |
 
-> **2인 승인(4-eyes)**: 유저제재 확정 · 등급 수동조정 · 파라미터 적용 · 상쇄원장 100점 초과(재판정 ADJ 포함) · 관리자 계정 생성·권한 변경. 요청자≠승인자·승인자1≠승인자2는 `approval_requests` CHECK로 DB 강제(V6) — 단 이는 *계정* 수준이라 신규 계정 7일 승인권 유예(P8)로 *사람* 수준을 보강한다. 서버 게이트 `ApprovalGate` 하나가 전 대상을 강제(SP3). 현행 executor는 `PARAM_APPLY`만 존재.
+> **2인 승인(4-eyes) = 요청자 + 승인자 1명**(K1): 파라미터 적용 · 상쇄원장 100점 초과(재판정·항목 VOID ADJ 포함) · 관리자 계정 생성·권한 변경. 유저제재 확정·등급 수동조정은 대상에 있으나 실행기가 없어 Phase 2. 요청자≠승인자는 `approval_requests` CHECK로 DB 강제(V6) — 승인권 유예 7일(P8)로 *사람* 수준을 보강한다. 서버 게이트 `ApprovalGate` 하나가 실행기 6종(`PARAM_APPLY`·`VERDICT_REJUDGE`·`ITEM_VOID`·`LEDGER_ADJ`·`ACCOUNT_CREATE`·`ACCOUNT_ROLE_CHANGE`)을 강제한다(**구현됨, SP3**).
 
 ---
 

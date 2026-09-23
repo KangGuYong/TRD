@@ -1,8 +1,11 @@
-import React from "react";
+import React, { useState } from "react";
 import { C, ROLE_LABEL, type Role } from "../theme";
 import { useRole } from "../state/role";
 import { useAuth } from "../state/auth";
 import { useQueueSummary } from "../api/hooks";
+import { USE_FIXTURES } from "../api/client";
+import PasswordDialog from "./PasswordDialog";
+import { Btn } from "./ui";
 
 export type ScreenId = "ADM-010" | "ADM-100" | "ADM-110" | "ADM-111" | "ADM-200" | "ADM-410" | "ADM-500" | "ADM-600" | "ADM-620" | "ADM-311" | "ADM-700" | "ADM-800" | "ADM-900" | "stub";
 
@@ -58,6 +61,7 @@ export function Layout({ screen, setScreen, title, children }: {
   const { state: authState, logout } = useAuth();
   const principal = authState.status === "authenticated" ? authState.principal : null;
   const summary = useQueueSummary();
+  const [pwOpen, setPwOpen] = useState(false);
   const tiles = new Map((summary.data?.queues ?? []).map((t) => [t.id, t] as const));
   return (
     <div style={{ display: "flex", height: "100vh", fontFamily: "Pretendard, system-ui, sans-serif", color: C.ink }}>
@@ -120,12 +124,14 @@ export function Layout({ screen, setScreen, title, children }: {
             <span style={{ font: "700 16px Pretendard" }}>{title}</span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-            <span style={{ font: "500 11.5px Pretendard", color: C.faint }}>모든 조회·개입은 감사 로그에 기록됩니다</span>
+            <span style={{ font: "500 11.5px Pretendard", color: C.faint }}>모든 개입(변경)은 감사 로그에 기록됩니다</span>
+            {!USE_FIXTURES && <Btn onClick={() => setPwOpen(true)}>비밀번호 변경</Btn>}
             <span style={{ padding: "6px 11px", borderRadius: 100, background: "rgba(20,19,15,0.06)", font: "600 11px ui-monospace, monospace" }}>{role}</span>
           </div>
         </div>
         <div style={{ flex: 1, overflow: "auto", padding: 26, background: C.bg }}>{children}</div>
       </div>
+      {pwOpen && <PasswordDialog onClose={() => setPwOpen(false)} />}
     </div>
   );
 }

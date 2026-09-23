@@ -47,6 +47,10 @@ public class ScoreLedgerEntry {
     @Column(name = "approval_id")
     private UUID approvalId;
 
+    /** 승인된 ADJ의 승인 관리자(SP3). approval_id와 함께만 존재(DB CHECK ledger_approval_pair). */
+    @Column(name = "approved_by_admin_id")
+    private UUID approvedByAdminId;
+
     /** 이 행을 기록할 때의 반감기(일). AS 조회 감쇠에 쓴다 — 파라미터가 바뀌어도 과거 행은 그대로(J1). */
     @Column(name = "halflife_days", nullable = false)
     private int halflifeDays;
@@ -70,18 +74,25 @@ public class ScoreLedgerEntry {
         return e;
     }
 
-    /** 재판정·항목 VOID의 제보 단위 차액(ADJ). 원 판정과 같은 감쇠 기준이어야 AS에서 정확히 상쇄된다. */
+    /**
+     * 재판정·항목 VOID의 제보 단위 차액(ADJ). 원 판정과 같은 감쇠 기준이어야 AS에서 정확히 상쇄된다.
+     * 승인을 거쳐 실행됐으면 approvalId·approvedByAdminId를 채운다(둘 다 null이거나 둘 다 값).
+     */
     public static ScoreLedgerEntry verdictAdjustment(UUID userId, UUID submissionId, UUID verdictId, BigDecimal delta,
-                                                     String reason, int halflifeDays, Instant decayAnchorAt) {
-        return ofVerdict(userId, submissionId, verdictId, LedgerKind.ADJ, delta, reason, halflifeDays, decayAnchorAt);
+                                                     String reason, int halflifeDays, Instant decayAnchorAt,
+                                                     UUID approvalId, UUID approvedByAdminId) {
+        ScoreLedgerEntry e = ofVerdict(userId, submissionId, verdictId, LedgerKind.ADJ, delta, reason, halflifeDays, decayAnchorAt);
+        e.approvalId = approvalId;
+        e.approvedByAdminId = approvedByAdminId;
+        return e;
     }
 
-    /** 수동 상쇄 원장(ADJ, ADM-311 — SP3). 사유 필수, 승인자 표시. */
+    /** 수동 상쇄 원장(ADJ, ADM-311). 사유 필수. 승인을 거쳤으면 승인 정보, 단독 기록이면 둘 다 null. */
     public static ScoreLedgerEntry adjustment(UUID userId, BigDecimal delta, String reason,
-                                              UUID approvedBy, UUID approvalId, int halflifeDays, Instant decayAnchorAt) {
+                                              UUID approvalId, UUID approvedByAdminId, int halflifeDays, Instant decayAnchorAt) {
         ScoreLedgerEntry e = new ScoreLedgerEntry();
         e.userId = userId; e.kind = LedgerKind.ADJ; e.delta = delta; e.reason = reason;
-        e.approvedBy = approvedBy; e.approvalId = approvalId;
+        e.approvalId = approvalId; e.approvedByAdminId = approvedByAdminId;
         e.halflifeDays = halflifeDays; e.decayAnchorAt = decayAnchorAt;
         return e;
     }
@@ -95,5 +106,7 @@ public class ScoreLedgerEntry {
     public LedgerKind getKind() { return kind; }
     public BigDecimal getDelta() { return delta; }
     public String getReason() { return reason; }
+    public UUID getApprovalId() { return approvalId; }
+    public UUID getApprovedByAdminId() { return approvedByAdminId; }
     public Instant getCreatedAt() { return createdAt; }
 }

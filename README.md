@@ -132,29 +132,33 @@ docker compose up -d --build
 | `http://localhost:8080` | 백엔드 — 앱 API `/v1`, 헬스체크 `/actuator/health`                          |
 
 - 첫 관리자 계정은 `admin_accounts`가 비어 있을 때 한 번만 만들어진다.
+- 첫 ADMIN이 두 번째 ADMIN을 만들면 7일 동안은 승인할 사람이 없다(부트스트랩 예외로 계정은 계속 만들 수 있다).
 - 최초 기동 때 임베딩 모델(KURE-v1, 수 GB)을 내려받는다. 받는 동안은 `cluster_merge` 배치만 실패하고 나머지는 정상 동작한다.
 - Firebase 키(앱 로그인 검증)는 `infra/secrets/`에 두고 `.env`의 `FIREBASE_CREDENTIALS_PATH` 주석을 푼다. 없으면 인증이 필요한 `/v1` 요청만 401.
 - 코드 수정 후 다시 올리기: `docker compose up -d --build backend admin`
 - 중지: `docker compose down`(데이터 유지) · 완전 초기화: `docker compose down -v`(DB·모델 캐시 삭제)
 - 서버에 올릴 때: `.env`의 `DB_PUBLISH`·`EMBEDDINGS_PUBLISH`는 `127.0.0.1:`을 붙인 채로 둬 바깥에 열지 않고, HTTPS는 앞단 리버스 프록시에서 처리한다.
-- 컨테이너 JVM은 UTC다. 배치 시각은 `cluster_merge` 02:00, `verdict_runner` 03:00, `grade_recalc` 월 00:00(모두 KST).
+- 컨테이너 JVM은 UTC다. 배치 시각은 `cluster_merge` 02:00, `verdict_runner` 03:00, `grade_recalc` 월 00:00(모두 KST). `sla_watch`는 코드 기본 매시 정각.
 
 ## 현재 구현 상태
 
 | 영역                                                   | 상태                                                                                  |
 | ------------------------------------------------------ | -------------------------------------------------------------------------------------- |
 | 백엔드 전체 빌드                                       | ✅ `./gradlew build` 전 모듈 컴파일 + 테스트 성공                                      |
-| DB 스키마 V1~V28                                       | ✅ append-only 트리거·2인승인 CHECK·컬럼 코멘트까지 반영. V28(SP1)은 기존 판정·원장이 있으면 기동을 멈춘다 — 개발 DB 초기화 필요 |
+| DB 스키마 V1~V30                                       | ✅ append-only 트리거·2인승인 CHECK·컬럼 코멘트까지 반영. V28(SP1)은 기존 판정·원장이 있으면 기동을 멈춘다 — 개발 DB 초기화 필요. V30(SP3)은 기존 행을 채우는 방식이라 초기화 불필요 |
 | 도메인 엔진(점수·판정·등급·정규화·시딩·병합계산)    | ✅ 골든 테스트 9종 통과 (순수 함수, ADM-600 시뮬레이션과 동일 코드 재사용)              |
 | 배치 — verdict_runner · grade_recalc · cluster_merge    | ✅ 구현 — 판정은 `JudgeService`(항목별 트랜잭션)가 결과·상태·원장을 실제로 기록, 시딩은 신호·선점 순위에서 제외, 멱등은 DB 제약. grade_recalc는 공식 등급 스냅샷(TI 180일, 강등 규칙 전까지 등급 유지). cluster_merge는 KURE-v1 임베딩 유사도 연동 |
+| 배치 — sla_watch                                        | ✅ 신규 구현(SP3) — 신고 4h 자동 임시비공개(`TEMP_HIDDEN`+`auto_hidden_at`, 신고는 `OPEN` 유지) · 병합 대기 24h 판정 마감 연장(상한 최초 제보+21일) · 90일 미접속 관리자 비활성화(마지막 활성 ADMIN 제외). 세 단계 서로 독립, 코드 기본 매시 정각 |
 | 배치 — abuse_scan · l4_quota                            | 🔴 미착수 (엔티티·서비스 없음)                                                      |
 | api-public `/v1` — 트렌드·제보·투표·나(등급/원장/워치) | ✅ 대부분 구현 (trends, submissions, vote, endorse, me/\*, reads)                     |
 | 제보권(주간 한도·VOID 반환·월요일 리필)                | ✅ 집행 — 제보 행에서 파생, 소진·관측 마감 시 422(`quota-exhausted`·`item-closed`), 앱 제보 탭에 남은 장수 표시 |
 | api-public `/v1/appeals` · `/v1/leaderboard`            | 🔶 OpenAPI 계약만 (엔티티부터 없음)                                                  |
 | **푸시 알림 발송**                                | 🔴 미구현 (`expo-notifications` 의존성만 설치, 발송 코드 0줄 — 워치해도 알림 안 감) |
 | api-admin — 큐 요약·병합검수·판정관리·시딩·계정·감사로그·파라미터스튜디오 | ✅ 구현 + 콘솔 연동                                                    |
-| api-admin — **2인 승인 실행 경로**(approve/reject)  | ✅ 신규 구현 — `ApprovalExecutor` 레지스트리, 파라미터 적용 실행기 포함             |
-| api-admin — 신고 큐 · 이의제기 · 어뷰징/제재 · 유저관리·등급정책 | 🔴 미구현 (DB 테이블만 있거나 그마저 없음 — `reports` 테이블 자체가 없음)     |
+| api-admin — **2인 승인 실행 경로**(approve/reject)  | ✅ 구현 — **요청자 + 승인자 1명**(K1), `ApprovalExecutor` 레지스트리 실행기 6종(`PARAM_APPLY`·`VERDICT_REJUDGE`·`ITEM_VOID`·`LEDGER_ADJ`·`ACCOUNT_CREATE`·`ACCOUNT_ROLE_CHANGE`) |
+| api-admin — 신고 큐(ADM-410)                            | ✅ 구현(4h SLA 자동 임시비공개는 SP3 `sla_watch`)                                    |
+| api-admin — 유저 원장(ADM-311)·계정 통제·감사 로그 필터 | ✅(SP3) — `/admin/users/**`(검색·상세·원장·수동 ADJ), 계정 생성/역할변경/비밀번호 변경, 감사 로그 필터·커서·`detail`, 세션 재검증 |
+| api-admin — 이의제기·어뷰징/제재·등급정책               | 🔴 Phase 2 (DB 테이블만 있거나 그마저 없음 — 제재 효과·이의 제기 엔드포인트 미정의) |
 | 앱 9화면(홈·상세·검색·워치·제보·로그인·설정·나·온보딩) | ✅ tsc 통과 · Metro 번들 성공                                                          |
 | 콘솔 메뉴 15개 중 10개(010·100·110·111·200·311·500·600·620·700·800) | ✅ tsc·vite 빌드 + 브라우저 렌더 (일부 dev 픽스처 병행, 111은 110 하위 화면) |
 | 콘솔 그 외 화면(300·310·400·410·610)                     | 🔶 사이드바 스텁                                                                    |
