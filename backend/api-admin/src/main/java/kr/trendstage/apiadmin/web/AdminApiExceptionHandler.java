@@ -102,6 +102,11 @@ public class AdminApiExceptionHandler {
         return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(problem(422, e.getMessage()));
     }
 
+    @ExceptionHandler(AdminNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handle(AdminNotFoundException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(problem(404, e.getMessage()));
+    }
+
     @ExceptionHandler(BatchJobAlreadyRunningException.class)
     public ResponseEntity<Map<String, Object>> handle(BatchJobAlreadyRunningException e) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(problem(409, e.getMessage()));
