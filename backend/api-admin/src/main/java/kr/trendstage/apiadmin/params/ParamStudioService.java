@@ -123,9 +123,6 @@ public class ParamStudioService {
         ApprovalRequest approval = gate.request(ActionType.PARAM_APPLY, draft.getId(),
                 Map.of("reason", reason), actorId, actorRole);
         draft.moveToReview(approval.getId());
-
-        auditLogService.record(actorId, actorRole, "PARAM_APPROVAL_REQUEST", "PARAMETER_DRAFT", draft.getId(), Map.of(
-                "reason", reason == null ? "" : reason, "approvalRequestId", approval.getId().toString()));
         return draft;
     }
 

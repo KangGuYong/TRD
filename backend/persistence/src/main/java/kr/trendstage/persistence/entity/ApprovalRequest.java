@@ -64,7 +64,7 @@ public class ApprovalRequest {
         this.resolvedAt = now;
     }
 
-    /** 2/2 승인 후 대상 작업 실행까지 성공했을 때. */
+    /** 승인 후 대상 작업 실행까지 성공했을 때. */
     public void markExecuted() {
         this.status = ApprovalStatus.EXECUTED;
     }
