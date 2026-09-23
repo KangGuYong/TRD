@@ -3,6 +3,7 @@ package kr.trendstage.apiadmin.user;
 import kr.trendstage.apiadmin.approval.ActionType;
 import kr.trendstage.apiadmin.approval.ApprovalGate;
 import kr.trendstage.apiadmin.auth.AdminValidationException;
+import kr.trendstage.apiadmin.web.AdminNotFoundException;
 import kr.trendstage.audit.AuditLogService;
 import kr.trendstage.persistence.entity.ApprovalRequest;
 import kr.trendstage.persistence.entity.ScoreLedgerEntry;
@@ -53,7 +54,7 @@ public class LedgerAdjustService {
         if (amount == null || amount.signum() == 0) throw new AdminValidationException("금액은 0이 아니어야 합니다");
         BigDecimal amt = amount.setScale(4, RoundingMode.HALF_UP);
         if (amt.abs().compareTo(MAX_ABS) > 0) throw new AdminValidationException("금액은 ±9999 이내여야 합니다");
-        if (!users.existsById(userId)) throw new AdminValidationException("존재하지 않는 유저입니다");
+        if (!users.existsById(userId)) throw new AdminNotFoundException("존재하지 않는 유저입니다");
 
         if (actorRole == AdminRole.ADMIN && !gate.exceeds(amt)) {
             ScoreLedgerEntry saved = record(userId, amt, reason, null, null);

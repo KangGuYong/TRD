@@ -1,6 +1,5 @@
 package kr.trendstage.apiadmin.user;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
 import kr.trendstage.apiadmin.auth.AdminValidationException;
 import kr.trendstage.apiadmin.web.AdminNotFoundException;
 import kr.trendstage.domain.grade.Grade;
@@ -61,9 +60,8 @@ public class AdminUserService {
     }
 
     public record UserHit(String id, String handle, String grade, String joinedAt) {}
-    @JsonInclude(JsonInclude.Include.NON_NULL)
     public record LedgerRow(String id, String createdAt, String kind, double delta, String reason,
-                            String trendItemName, String approvedBy) {}
+                            String trendItemName, String verdictId, String approvedBy, String approvalId) {}
     public record AdminUserDetail(String id, String handle, String status, String joinedAt, String grade,
                                   String gradeComputedAt, double trustIndex, double activeScore, int judgedCount,
                                   int hitInWindow, int missInWindow, List<String> basis, long abuseFlagCount,
@@ -94,8 +92,9 @@ public class AdminUserService {
                 .collect(Collectors.toMap(AdminAccount::getId, AdminAccount::getDisplayName));
         List<LedgerRow> ledgerRows = rows.stream().map(e -> new LedgerRow(
                 e.getId().toString(), DISPLAY.format(e.getCreatedAt()), e.getKind().name(), e.getDelta().doubleValue(),
-                e.getReason(), itemNameOf(e.getVerdictId()),
-                e.getApprovedByAdminId() == null ? null : approverNames.getOrDefault(e.getApprovedByAdminId(), e.getApprovedByAdminId().toString())))
+                e.getReason(), itemNameOf(e.getVerdictId()), e.getVerdictId() == null ? null : e.getVerdictId().toString(),
+                e.getApprovedByAdminId() == null ? null : approverNames.getOrDefault(e.getApprovedByAdminId(), e.getApprovedByAdminId().toString()),
+                e.getApprovalId() == null ? null : e.getApprovalId().toString()))
                 .toList();
 
         List<String> basis = List.of(

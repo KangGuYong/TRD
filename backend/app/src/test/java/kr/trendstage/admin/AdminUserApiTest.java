@@ -80,7 +80,13 @@ class AdminUserApiTest extends AbstractIntegrationTest {
                 Integer.class, u, approvalId, approver)).isEqualTo(1);
 
         mvc.perform(get("/admin/users/{id}", u).with(asAdmin(admin, AdminRole.ADMIN)))
-                .andExpect(jsonPath("$.ledger[?(@.approvedBy)]", hasSize(1)));
+                .andExpect(jsonPath("$.ledger[?(@.approvedBy != null)]", hasSize(1)))
+                .andExpect(jsonPath("$.ledger[?(@.approvedBy != null)].approvalId", org.hamcrest.Matchers.hasItem(approvalId.toString())));
+    }
+
+    @Test
+    void unknownUserOnAdjustmentIs404() throws Exception {
+        adjust(UUID.randomUUID(), fx.admin(), AdminRole.ADMIN, "10").andExpect(status().isNotFound());
     }
 
     @Test
