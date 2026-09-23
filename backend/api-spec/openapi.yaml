@@ -1403,14 +1403,15 @@ components:
     AdminLedgerRow:
       description: >
         AdminUserDetail.ledger[] 1행. R2(원장 불변)의 근거 화면이라 verdictId·approvedBy·approvalId까지 보여준다.
-        delta 외 전 필드는 null일 수 있다(예 ADJ 행은 verdictId null, 자동 판정 행은 approvedBy·approvalId null).
+        id·createdAt·kind·delta·reason은 항상 값이 있다. trendItemName·verdictId·approvedBy·approvalId만 null일 수 있다
+        (예 ADJ 행은 verdictId null, 자동 판정 행은 approvedBy·approvalId null).
       type: object
       properties:
-        id: { type: [string, 'null'] }
-        createdAt: { type: [string, 'null'] }
-        kind: { type: [string, 'null'], description: "HIT | MISS | VOID | ADJ" }
+        id: { type: string }
+        createdAt: { type: string }
+        kind: { type: string, description: "HIT | MISS | VOID | ADJ" }
         delta: { type: number }
-        reason: { type: [string, 'null'] }
+        reason: { type: string }
         trendItemName: { type: [string, 'null'], description: ADJ 행처럼 판정과 연결되지 않으면 null }
         verdictId: { type: [string, 'null'], format: uuid }
         approvedBy: { type: [string, 'null'], description: 승인 실행으로 기록된 행만 존재(관리자 표시 이름) }

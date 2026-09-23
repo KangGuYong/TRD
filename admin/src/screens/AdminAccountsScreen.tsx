@@ -155,7 +155,8 @@ export default function AdminAccountsScreen() {
             <>
               {rows.map((a) => {
                 const isSelf = principal != null && a.id === principal.id;
-                const approverPending = a.role === "ADMIN" && !!a.approverSince && new Date(a.approverSince) > new Date();
+                const approverSinceAt = parseKst(a.approverSince);
+                const approverPending = a.role === "ADMIN" && approverSinceAt !== null && approverSinceAt > new Date();
                 return (
                   <div key={a.id} style={{ display: "grid", gridTemplateColumns: "110px 100px 80px 120px 150px 90px 100px", alignItems: "center", padding: "14px 20px", borderBottom: `1px solid rgba(20,19,15,0.05)` }}>
                     <span style={{ font: "600 12.5px Pretendard" }}>{a.loginId}</span>
@@ -219,3 +220,10 @@ export default function AdminAccountsScreen() {
 }
 
 const inp: React.CSSProperties = { width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: 9, border: "1px solid rgba(20,19,15,0.12)", background: "#FBFAF7", outline: "none", font: "500 12.5px Pretendard" };
+
+/** 서버가 "yyyy-MM-dd HH:mm"(KST, 오프셋 없음)로 주는 표시용 문자열을 KST로 명시 파싱한다.
+ * new Date(문자열)에 그대로 넘기면 브라우저 로컬 타임존으로 해석돼 KST가 아닌 환경에서 틀어진다. */
+function parseKst(s: string | null): Date | null {
+  if (!s) return null;
+  return new Date(s.replace(" ", "T") + ":00+09:00");
+}

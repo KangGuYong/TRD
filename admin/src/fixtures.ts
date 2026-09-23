@@ -142,7 +142,7 @@ export const fxAudit: AuditPage = {
   items: [
     { id: 5012, actor: "김운영", role: "OPERATOR", action: "MERGE", targetType: "TREND", targetId: "#1204", detail: {}, createdAt: "2026-08-07 16:41" },
     { id: 5011, actor: "박관리", role: "ADMIN", action: "LEDGER_ADJ", targetType: "USER", targetId: "user_4410", detail: {}, createdAt: "2026-08-07 15:20" },
-    { id: 5010, actor: "이감사", role: "AUDITOR", action: "PII_VIEW", targetType: "USER", targetId: "user_7731", detail: {}, createdAt: "2026-08-07 14:03" },
+    { id: 5010, actor: "박관리", role: "ADMIN", action: "LEDGER_ADJ", targetType: "USER", targetId: "user_7731", detail: {}, createdAt: "2026-08-07 14:03" },
     { id: 5009, actor: "김운영", role: "OPERATOR", action: "VOID", targetType: "TREND", targetId: "#1188", detail: {}, createdAt: "2026-08-07 11:47" },
     { id: 5008, actor: "박관리", role: "ADMIN", action: "PARAM_APPLY", targetType: "DRAFT", targetId: "#16", detail: {}, createdAt: "2026-08-06 09:00" },
   ],
