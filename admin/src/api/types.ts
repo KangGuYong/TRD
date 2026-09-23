@@ -71,8 +71,8 @@ export interface SimulationSummary {
   reachChanged: number;
 }
 export interface ParameterDraftView {
-  draftId: string;
-  status: "DRAFT" | "REVIEW";
+  draftId: string | null;
+  status: "DRAFT" | "REVIEW" | "NONE";
   submitterTarget: number;
   currentSubmitterTarget: number;
   hitThreshold: number;
@@ -80,23 +80,41 @@ export interface ParameterDraftView {
   simResult: SimulationSummary | null;
 }
 
-export interface LedgerEntry {
-  date: string;
+export interface LedgerRow {
+  id: string;
+  createdAt: string;
   kind: "HIT" | "MISS" | "VOID" | "ADJ";
-  delta: string;
+  delta: number;
   reason: string;
+  trendItemName: string | null;
+  verdictId: string | null;
+  approvedBy: string | null;
+  approvalId: string | null;
 }
 export interface AdminUserDetail {
-  userId: string;
-  grade: string;
-  activeScore: number;
-  trustIndex: number;
-  judgedCount: number;
-  hit: number;
-  miss: number;
-  flags: number;
+  id: string;
+  handle: string;
+  status: string;
   joinedAt: string;
-  ledger: LedgerEntry[];
+  grade: string;
+  gradeComputedAt: string | null;
+  trustIndex: number;
+  activeScore: number;
+  judgedCount: number;
+  hitInWindow: number;
+  missInWindow: number;
+  basis: string[];
+  abuseFlagCount: number;
+  ledger: LedgerRow[];
+}
+export interface UserHit { id: string; handle: string; grade: string; joinedAt: string }
+
+/** 승인 게이트를 지나는 작업의 결과 — 200/201 APPLIED, 202 PENDING_APPROVAL. */
+export interface ActionResult {
+  status: "APPLIED" | "PENDING_APPROVAL";
+  approvalRequestId: string | null;
+  adjTotal?: number | null;
+  amount?: number | null;
 }
 
 export interface AuditEntry {
@@ -106,8 +124,11 @@ export interface AuditEntry {
   action: string;
   targetType: string | null;
   targetId: string | null;
+  detail: Record<string, unknown>;
   createdAt: string;
 }
+export interface AuditPage { items: AuditEntry[]; nextBeforeId: number | null }
+export interface AuditFilter { action?: string; targetId?: string; from?: string; to?: string }
 
 export interface AdminAccountSummary {
   id: string;
@@ -117,6 +138,14 @@ export interface AdminAccountSummary {
   lastLoginAt: string | null;
   disabledAt: string | null;
   createdAt: string;
+  activatedAt: string | null;
+  approverSince: string | null;
+  pendingApproval: boolean;
+}
+export interface CreateAccountResponse {
+  status: "CREATED_BOOTSTRAP" | "PENDING_APPROVAL";
+  account: AdminAccountSummary;
+  approvalRequestId: string | null;
 }
 
 export interface JudgedItem {
@@ -194,13 +223,15 @@ export interface TrendItemDetail {
 
 export interface ApprovalRequestView {
   id: string;
-  actionType: "SANCTION" | "GRADE_ADJUST" | "PARAM_APPLY" | "LEDGER_ADJ_OVER100";
+  actionType: "PARAM_APPLY" | "VERDICT_REJUDGE" | "ITEM_VOID" | "LEDGER_ADJ" | "ACCOUNT_CREATE" | "ACCOUNT_ROLE_CHANGE";
   targetRef: string;
   requestedBy: string;
   requestedByName: string;
   approvals: number;
-  status: "PENDING" | "PARTIAL" | "APPROVED" | "REJECTED" | "EXECUTED";
+  requiredApprovals: number;
+  status: "PENDING" | "APPROVED" | "REJECTED" | "EXECUTED";
   reason: string | null;
+  summary: string;
   createdAt: string;
   resolvedAt: string | null;
 }
@@ -224,5 +255,6 @@ export interface ReportQueueItem {
   explanationText: string | null;
   decision: "RESTORE" | "HIDE_PERMANENT" | "EDIT_RESTORE" | null;
   decisionNote: string | null;
+  autoHiddenAt: string | null;
   createdAt: string;
 }
