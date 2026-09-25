@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 
+import java.nio.charset.StandardCharsets;
 import java.util.StringJoiner;
 import java.util.UUID;
 
@@ -55,7 +56,7 @@ class BacktestApiTest extends AbstractIntegrationTest {
         return mvc.perform(post("/admin/params/backtest-datasets").with(asAdmin(actor, role))
                         .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().is(expectedStatus))
-                .andReturn().getResponse().getContentAsString();
+                .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
     }
 
     @Test
@@ -140,9 +141,9 @@ class BacktestApiTest extends AbstractIntegrationTest {
         mvc.perform(put("/admin/params/draft").with(asAdmin(op, AdminRole.OPERATOR))
                 .contentType(MediaType.APPLICATION_JSON).content(ParamStudioDraftTest.EXAMPLE)).andExpect(status().isOk());
         String example = mvc.perform(get("/admin/params/backtest-datasets/example").with(asAdmin(op, AdminRole.OPERATOR)))
-                .andReturn().getResponse().getContentAsString();
+                .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
         String res = mvc.perform(post("/admin/params/backtest-datasets").with(asAdmin(op, AdminRole.OPERATOR))
-                .contentType(MediaType.APPLICATION_JSON).content(example)).andReturn().getResponse().getContentAsString();
+                .contentType(MediaType.APPLICATION_JSON).content(example)).andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
         String id = JsonPath.read(res, "$.id");   // 이미 올라가 있으면 200 + 같은 id
         mvc.perform(post("/admin/params/draft/backtest").with(asAdmin(op, AdminRole.OPERATOR))
                 .contentType(MediaType.APPLICATION_JSON).content("{\"datasetId\":\"" + id + "\"}")).andExpect(status().isOk());

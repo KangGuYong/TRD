@@ -89,7 +89,7 @@ class TombstoneJoinTest extends AbstractIntegrationTest {
         UUID s = fx.item(now.minus(Duration.ofDays(1)));
         UUID sub1 = fx.submission(fx.user(), s, 30, now.minus(Duration.ofHours(2)));
         fx.submission(fx.user(), s, 30, now.minus(Duration.ofHours(1)));
-        jdbc.update("UPDATE submissions SET source_platform = '인스타' WHERE id = ?", sub1);   // 플랫폼 2곳 → RISING
+        jdbc.update("UPDATE submissions SET platform = 'INSTAGRAM' WHERE id = ?", sub1);   // 플랫폼 2곳 → RISING
         UUID l = fx.item(now.minus(Duration.ofDays(1)));
         UUID l2 = fx.item(now.minus(Duration.ofDays(1)));
         fx.merged(l, s);

@@ -202,10 +202,14 @@ public class Fixtures {
         jdbc.update("UPDATE trend_items SET state = ?::trend_state WHERE id = ?", state, itemId);
     }
 
-    /** 상태는 그대로 두고 현행 판정 행만 만든다(상태·판정 행 불일치 가드 테스트용). */
+    /**
+     * 상태는 그대로 두고 현행 판정 행만 만든다(상태·판정 행 불일치 가드 테스트용). evidence_json이 '{}'라
+     * ParamStudioService.simulate()가 파싱하면 신호가 없어 NPE가 난다 — judged_at을 180일 시뮬레이션 창
+     * 밖(2000년)으로 둬서 다른 패키지의 params 테스트가 이 행을 줍지 않게 한다.
+     */
     public void verdictRow(UUID itemId) {
         jdbc.update("INSERT INTO verdicts (trend_item_id, result, score_t, judged_at, evidence_json) "
-                + "VALUES (?, 'MISS', 0.1, now(), '{}'::jsonb)", itemId);
+                + "VALUES (?, 'MISS', 0.1, TIMESTAMPTZ '2000-01-01 00:00:00+00', '{}'::jsonb)", itemId);
     }
 
     public String key(UUID itemId) {

@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
@@ -45,12 +46,12 @@ class ParamApplyEndToEndTest extends AbstractIntegrationTest {
         try {
             String draft = mvc.perform(put("/admin/params/draft").with(asAdmin(op, AdminRole.OPERATOR))
                             .contentType(MediaType.APPLICATION_JSON).content(ParamStudioDraftTest.EXAMPLE))
-                    .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+                    .andExpect(status().isOk()).andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
             draftId = UUID.fromString(JsonPath.read(draft, "$.draftId"));
             String example = mvc.perform(get("/admin/params/backtest-datasets/example").with(asAdmin(op, AdminRole.OPERATOR)))
-                    .andReturn().getResponse().getContentAsString();
+                    .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
             String dataset = mvc.perform(post("/admin/params/backtest-datasets").with(asAdmin(op, AdminRole.OPERATOR))
-                    .contentType(MediaType.APPLICATION_JSON).content(example)).andReturn().getResponse().getContentAsString();
+                    .contentType(MediaType.APPLICATION_JSON).content(example)).andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
             mvc.perform(post("/admin/params/draft/backtest").with(asAdmin(op, AdminRole.OPERATOR))
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("{\"datasetId\":\"" + JsonPath.read(dataset, "$.id") + "\"}")).andExpect(status().isOk());
