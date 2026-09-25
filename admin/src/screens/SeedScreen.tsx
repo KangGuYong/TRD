@@ -6,12 +6,13 @@ import type { SeedSubmissionRequest } from "../api/types";
 import { Card, Btn, StateView } from "../components/ui";
 import { C } from "../theme";
 import { useRole, CAN } from "../state/role";
+import { platformLabel } from "../platform";
 
 const CATEGORIES: SeedSubmissionRequest["category"][] = ["MEME", "PRODUCT", "PERSON_CHANNEL", "CHALLENGE", "SLANG", "ETC"];
 const CONFIDENCE_OPTIONS: SeedSubmissionRequest["confidence"][] = [10, 30, 50];
 
 const EMPTY: SeedSubmissionRequest = {
-  name: "", category: "MEME", platform: "", evidenceUrl: "", confidence: 10, oneLine: "",
+  name: "", category: "MEME", evidenceUrl: "", confidence: 10, oneLine: "",
 };
 
 export default function SeedScreen() {
@@ -25,7 +26,7 @@ export default function SeedScreen() {
 
   const flash = (m: string) => { setToast(m); setTimeout(() => setToast(null), 2600); };
   const canRegister = CAN.seedRegister(role);
-  const canSubmit = canRegister && form.name.trim() !== "" && form.platform.trim() !== ""
+  const canSubmit = canRegister && form.name.trim() !== ""
     && form.evidenceUrl.trim() !== "" && form.oneLine.trim() !== "" && !busy;
 
   const submit = async () => {
@@ -68,15 +69,15 @@ export default function SeedScreen() {
               {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </Field>
-          <Field label="플랫폼">
-            <input value={form.platform} disabled={!canRegister}
-              onChange={(e) => setForm({ ...form, platform: e.target.value })}
-              style={inputStyle} />
-          </Field>
           <Field label="근거 URL">
             <input value={form.evidenceUrl} disabled={!canRegister}
               onChange={(e) => setForm({ ...form, evidenceUrl: e.target.value })}
               style={inputStyle} />
+            {form.evidenceUrl.trim() !== "" && (
+              <div style={{ font: "500 11px Pretendard", color: C.faint, marginTop: 4 }}>
+                {platformLabel(form.evidenceUrl)} 제보로 기록됩니다(링크로 판별)
+              </div>
+            )}
           </Field>
           <Field label="확신도">
             <div style={{ display: "flex", gap: 8 }}>

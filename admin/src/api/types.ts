@@ -70,14 +70,40 @@ export interface SimulationSummary {
   hitToMiss: number;
   reachChanged: number;
 }
+export type IndependenceMode = "OFF" | "DEVICE" | "DEVICE_OR_IP";
+export interface DraftValues {
+  targetFloor: number; targetRatio: number; activeWindowDays: number; hitThreshold: number;
+  persistenceFloor: number; persistenceFullDays: number; diversityFloor: number; diversityFullPlatforms: number;
+  independenceMode: IndependenceMode;
+}
+export interface TBreakdown {
+  accounts: number; independent: number; target: number; activeSubmitters: number | null; ratio: number;
+  activeDays: number; persistenceFullDays: number; persistence: number;
+  platforms: number; diversityFullPlatforms: number; diversityApplied: boolean; diversity: number; t: number;
+}
+export interface BacktestOutcome { result: "HIT" | "MISS"; reach: string | null; breakdown: TBreakdown; explain: string }
+export interface BacktestSide {
+  confusion: { tp: number; fp: number; fn: number; tn: number };
+  precision: number | null; recall: number | null; reachAgreement: number | null; reachCompared: number;
+}
+export interface BacktestCaseRow {
+  caseId: string; title: string; label: "HIT" | "MISS"; labelReach: string | null;
+  current: BacktestOutcome; draft: BacktestOutcome; changed: boolean;
+}
+export interface BacktestResult {
+  datasetId: string; datasetName: string; sha256: string; caseCount: number; ranAt: string;
+  report: { caseCount: number; current: BacktestSide; draft: BacktestSide; changedCount: number; rows: BacktestCaseRow[] };
+}
+export interface BacktestDatasetSummary {
+  id: string; name: string; caseCount: number; sha256: string; uploadedBy: string; createdAt: string;
+}
 export interface ParameterDraftView {
   draftId: string | null;
   status: "DRAFT" | "REVIEW" | "NONE";
-  submitterTarget: number;
-  currentSubmitterTarget: number;
-  hitThreshold: number;
-  currentHitThreshold: number;
+  values: DraftValues;
+  current: DraftValues;
   simResult: SimulationSummary | null;
+  backtestResult: BacktestResult | null;
 }
 
 export interface LedgerRow {
@@ -156,6 +182,7 @@ export interface JudgedItem {
   scoreT: string | null;
   judgedAt: string | null;
   superseded: boolean;
+  tExplain: string | null;
 }
 export interface ImminentItem {
   trendItemId: string;
@@ -173,7 +200,6 @@ export interface VerdictListResponse {
 export interface SeedSubmissionRequest {
   name: string;
   category: "MEME" | "PRODUCT" | "PERSON_CHANNEL" | "CHALLENGE" | "SLANG" | "ETC";
-  platform: string;
   evidenceUrl: string;
   confidence: 10 | 30 | 50;
   oneLine: string;
@@ -217,7 +243,7 @@ export interface TrendItemDetail {
   firstSeenAt: string; deadline: string; daysLeft: number; graceExtended: boolean;
   distinctSubmitters: number; distinctPlatforms: number; endorseCount: number;
   currentResult: string | null; currentReachLevel: string | null; currentScoreT: string | null; currentJudgedAt: string | null;
-  previewResult: string | null; previewReachLevel: string | null; previewScoreT: string | null;
+  previewResult: string | null; previewReachLevel: string | null; previewScoreT: string | null; previewExplain: string | null;
   submissions: SubmissionRow[];
 }
 
