@@ -129,10 +129,13 @@ export default function VerdictScreen() {
                 const tone = RESULT_TONE[it.result] ?? RESULT_TONE["-"];
                 return (
                   <div key={it.trendItemId} style={{ display: "grid", gridTemplateColumns: "1fr 90px 90px 90px 150px 170px", alignItems: "center", padding: "14px 20px", borderBottom: `1px solid rgba(20,19,15,0.05)` }}>
-                    <span style={{ font: "600 12.5px Pretendard" }}>
+                    <div style={{ font: "600 12.5px Pretendard" }}>
                       {it.canonicalName}
                       {it.superseded && <span style={{ marginLeft: 8, font: "600 10px ui-monospace, monospace", padding: "2px 6px", borderRadius: 5, background: "rgba(20,19,15,0.08)", color: C.faint }}>재판정됨</span>}
-                    </span>
+                      {it.tExplain && (
+                        <div style={{ font: "500 10.5px ui-monospace, monospace", color: C.faint, marginTop: 4 }}>{it.tExplain}</div>
+                      )}
+                    </div>
                     <span style={{ font: "600 11px ui-monospace, monospace", padding: "3px 6px", borderRadius: 5, justifySelf: "start", background: tone.bg, color: tone.fg }}>{it.result}</span>
                     <span style={{ font: "500 11.5px ui-monospace, monospace", color: C.faint }}>{it.reachLevel ?? "-"}</span>
                     <span style={{ font: "500 11.5px ui-monospace, monospace", color: C.faint }}>{it.scoreT ?? "-"}</span>

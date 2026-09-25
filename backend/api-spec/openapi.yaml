@@ -109,6 +109,12 @@ paths:
       description: >
         올리는 건 사람, 채점은 기계(01 §1). 중복이면 409로 동의 전환을 안내한다.
         근거 URL 없으면 반려, 이해관계는 고지 체크 필수.
+      parameters:
+        - name: X-Device-Id
+          in: header
+          required: false
+          schema: { type: string, maxLength: 128 }
+          description: 기기 ID(안드로이드 ID·iOS 제조사별 ID·웹 설치별 무작위 ID). 서버는 HMAC 해시만 저장한다(SP4 §4). 없어도 제보는 된다.
       requestBody:
         required: true
         content:
@@ -135,7 +141,7 @@ paths:
             제보를 받을 수 없음 — Problem.type으로 구분한다.
             quota-exhausted: 이번 주 제보권 소진(월 00:00 KST 리필, 제출 − VOID 반환 기준).
             item-closed: 관측이 끝난 항목(마감 이후·판정 중·판정 완료·VOID). 제보권은 쓰지 않는다. 병합된 항목 이름으로 제보하면 병합 승자에 합류한다.
-            about:blank: 필드 값 오류(확신도 등).
+            about:blank: 필드 값 오류(확신도 등). confidence가 10/30/50이 아니거나 X-Device-Id가 128자 초과.
           content: { application/json: { schema: { $ref: '#/components/schemas/Problem' } } }
   /v1/submissions/me:
     get:
@@ -603,64 +609,99 @@ paths:
         '422': { description: "사유 누락, 금액이 0이거나 ±9999를 벗어남" }
 
   # ─────────────────────────────  콘솔 · 거버넌스  ─────────────────────
-  /admin/parameter-drafts:
+  /admin/params/draft:
     get:
       tags: [admin-governance]
-      summary: 파라미터 드래프트 목록 (ADM-600)
+      summary: 활성 드래프트 (ADM-600) — 없으면 만든다(O/A). AUDITOR는 만들지 않고 운영값만(status NONE)
       security: [{ cookieAuth: [] }]
       responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema: { type: array, items: { $ref: '#/components/schemas/ParameterDraft' } }
-    post:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/ParameterDraftView' } } } }
+    put:
       tags: [admin-governance]
-      summary: 드래프트 생성 (가중치 합계 1.0 아니면 저장 불가)
+      summary: 드래프트 값 9개 저장 — 시뮬레이션·백테스트 결과를 지운다 (O/A)
       security: [{ cookieAuth: [] }]
       requestBody:
         required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/ParameterPayload' }
+        content: { application/json: { schema: { $ref: '#/components/schemas/DraftValues' } } }
       responses:
-        '201':
-          description: 생성됨
-          content: { application/json: { schema: { $ref: '#/components/schemas/ParameterDraft' } } }
-        '422': { description: 가중치 합계 ≠ 1.0 }
-  /admin/parameter-drafts/{id}/simulate:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/ParameterDraftView' } } } }
+        '409': { description: 승인 대기 중인 드래프트 }
+        '422': { description: "필드 누락·범위 위반 — detail이 필드명으로 시작 (예: \"persistenceFloor: 0 ~ 1 사이여야 합니다 (입력 1.5)\")" }
+  /admin/params/draft/simulate:
     post:
       tags: [admin-governance]
-      summary: 시뮬레이션 (과거 180일 재판정) — 승인 요청 전 필수
-      description: 같은 ScoreEngine을 임의 ParameterSet으로 호출(04 §1). 결과 없으면 승인요청 불가.
+      summary: 시뮬레이션 — 최근 180일 판정을 동결된 신호로 재계산 (O/A)
       security: [{ cookieAuth: [] }]
-      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/SimulationResult' }
-  /admin/parameter-drafts/{id}/request-approval:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/ParameterDraftView' } } } }
+  /admin/params/draft/backtest:
     post:
       tags: [admin-governance]
-      summary: 적용 승인 요청 (시뮬 완료 시에만) — 기본 예약(비소급)
+      summary: 백테스트 — 데이터셋을 현재 운영값·초안값으로 판정해 정답과 비교 (O/A, SP4 S9)
       security: [{ cookieAuth: [] }]
-      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [applyMode, applyAt]
+              required: [datasetId]
               properties:
-                applyMode: { type: string, enum: [SCHEDULED, RETROACTIVE] }
-                applyAt: { type: string, format: date-time }
-                rationale: { type: string, description: RETROACTIVE는 사유서 필수 }
+                datasetId: { type: string, format: uuid }
       responses:
-        '202': { description: 승인 대기 생성됨 (0/2) }
-        '409': { description: 시뮬레이션 미실행 }
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/ParameterDraftView' } } } }
+        '404': { description: 데이터셋 없음 }
+        '409': { description: 승인 대기 중인 드래프트 }
+        '422': { description: datasetId 형식 오류 }
+  /admin/params/draft/request-approval:
+    post:
+      tags: [admin-governance]
+      summary: 적용 승인 요청 — 마지막 수정 이후 시뮬레이션과 백테스트가 둘 다 있어야 한다 (O/A). 승인되면 즉시 운영값, 이후 판정부터(비소급)
+      security: [{ cookieAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string }
+      responses:
+        '200': { description: 승인 대기(REVIEW), content: { application/json: { schema: { $ref: '#/components/schemas/ParameterDraftView' } } } }
+        '409': { description: 이미 승인 대기 중 }
+        '422': { description: "사유 누락, 시뮬레이션 또는 백테스트 미실행" }
+  /admin/params/backtest-datasets:
+    get:
+      tags: [admin-governance]
+      summary: 백테스트 데이터셋 목록 (O/A/Au) — 본문 제외
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/BacktestDatasetSummary' } } } }
+    post:
+      tags: [admin-governance]
+      summary: 사례 파일 업로드 (O/A) — 불변 보관, 같은 SHA-256이면 기존 행
+      description: >
+        형식은 스펙 2026-09-24 §5.2(formatVersion 1). label은 평가용 정답이지 판정 입력이 아니다(R5·S10).
+        파일 2MB·사례 500건 이하.
+      security: [{ cookieAuth: [] }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/BacktestDatasetFile' } } }
+      responses:
+        '200': { description: 이미 있는 파일, content: { application/json: { schema: { $ref: '#/components/schemas/BacktestDatasetSummary' } } } }
+        '201': { description: 새로 보관됨, content: { application/json: { schema: { $ref: '#/components/schemas/BacktestDatasetSummary' } } } }
+        '409': { description: 같은 파일이 동시에 올라옴 }
+        '422': { description: "형식 위반 — detail은 \"cases[3].submissions[5].at: deadline보다 앞서야 합니다\" 형태" }
+  /admin/params/backtest-datasets/example:
+    get:
+      tags: [admin-governance]
+      summary: 합성 시나리오 12건(형식 견본) (O/A/Au)
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/BacktestDatasetFile' } } } }
   /admin/approvals:
     get:
       tags: [admin-governance]
@@ -1274,12 +1315,12 @@ components:
 
     SubmissionCreate:
       type: object
-      required: [name, category, platform, evidenceUrl, confidence, disclosure, oneLine]
+      required: [name, category, evidenceUrl, confidence, disclosure, oneLine]
       properties:
         name: { type: string }
         category: { $ref: '#/components/schemas/Category' }
-        platform: { type: string, description: 최초 목격 플랫폼 (디시 갤러리명 등) }
-        evidenceUrl: { type: string, format: uri }
+        platform: { type: string, maxLength: 60, description: "옛 앱 빌드 호환 — 보관만 하고 판정·표시에 쓰지 않는다. 플랫폼은 evidenceUrl 도메인으로 서버가 판별(SP4 S4·S12)" }
+        evidenceUrl: { type: string, format: uri, description: 플랫폼 판별에 쓴다 }
         confidence: { type: integer, enum: [10, 30, 50] }
         disclosure: { type: boolean, description: 이해관계 고지 (미고지 적발 시 제재 근거) }
         oneLine: { type: string, maxLength: 200 }
@@ -1466,6 +1507,7 @@ components:
         scoreT: { type: [string, 'null'] }
         judgedAt: { type: [string, 'null'] }
         superseded: { type: boolean, description: 재판정으로 대체된 이전 판정 여부 }
+        tExplain: { type: [string, 'null'], description: "산정 근거 — T 분해 문자열. SP4 이전 판정·VOID는 null" }
     VerdictImminentItem:
       type: object
       properties:
@@ -1481,38 +1523,148 @@ components:
         judged: { type: array, items: { $ref: '#/components/schemas/VerdictJudgedItem' } }
         imminent: { type: array, items: { $ref: '#/components/schemas/VerdictImminentItem' }, description: 마감 임박순 최대 30건 }
 
-    ParameterPayload:
+    IndependenceMode:
+      type: string
+      enum: [OFF, DEVICE, DEVICE_OR_IP]
+      description: 독립성 압축 — DEVICE_OR_IP는 공유 IP 오탐 위험(실사례 백테스트 전엔 끔)
+    DraftValues:
       type: object
-      description: submitterTarget = T가 1.0에 도달하는 목표 서로 다른 제보자 수 (근거 없는 초기 추정치, O1)
+      description: ADM-600 편집 값 9개(SP4 §5.1). 기본값은 SP4 이전 판정과 같다(중립).
+      required: [targetFloor, targetRatio, activeWindowDays, hitThreshold, persistenceFloor, persistenceFullDays, diversityFloor, diversityFullPlatforms, independenceMode]
       properties:
-        submitterTarget: { type: integer }
-        hitThreshold: { type: number }
-        halflifeDays: { type: integer }
-    ParameterDraft:
-      allOf:
-        - $ref: '#/components/schemas/ParameterPayload'
-        - type: object
-          properties:
-            id: { type: string, format: uuid }
-            status: { type: string, enum: [DRAFT, REVIEW, APPROVED, APPLIED, ROLLED_BACK] }
-            author: { type: string }
-            hasSimulation: { type: boolean }
-    SimulationResult:
+        targetFloor: { type: integer, minimum: 1, description: "목표치 하한(구 submitterTarget). 기본 20" }
+        targetRatio: { type: number, minimum: 0, maximum: 1, description: "목표치 = max(하한, ⌈활성 제보자 × 비율⌉). 기본 0" }
+        activeWindowDays: { type: integer, minimum: 7, maximum: 90, description: "활성 제보자를 세는 기간(관측 마감 직전). 기본 28" }
+        hitThreshold: { type: number, minimum: 0, maximum: 1, description: "기본 0.20" }
+        persistenceFloor: { type: number, minimum: 0, maximum: 1, description: "지속성 계수 하한. 1이면 꺼짐(기본)" }
+        persistenceFullDays: { type: integer, minimum: 1, maximum: 14, description: "지속성 1.0이 되는 제보일수(KST). 기본 5" }
+        diversityFloor: { type: number, minimum: 0, maximum: 1, description: "다양성 계수 하한. 1이면 꺼짐(기본)" }
+        diversityFullPlatforms: { type: integer, minimum: 2, maximum: 11, description: "다양성 1.0이 되는 플랫폼 수. 기본 3" }
+        independenceMode: { $ref: '#/components/schemas/IndependenceMode' }
+    SimulationSummary:
       type: object
       properties:
         changed: { type: integer }
         total: { type: integer }
-        rows:
+        missToHit: { type: integer }
+        hitToMiss: { type: integer }
+        reachChanged: { type: integer }
+    ParameterDraftView:
+      type: object
+      properties:
+        draftId: { type: [string, 'null'], format: uuid }
+        status: { type: string, enum: [DRAFT, REVIEW, NONE] }
+        values: { $ref: '#/components/schemas/DraftValues' }
+        current: { $ref: '#/components/schemas/DraftValues' }
+        simResult:
+          oneOf: [{ $ref: '#/components/schemas/SimulationSummary' }, { type: 'null' }]
+        backtestResult:
+          oneOf: [{ $ref: '#/components/schemas/BacktestResult' }, { type: 'null' }]
+    TBreakdown:
+      type: object
+      description: 유효 T 분해(SP4 §2) — T = ratio × persistence × diversity
+      properties:
+        accounts: { type: integer }
+        independent: { type: integer }
+        target: { type: integer }
+        activeSubmitters: { type: [integer, 'null'] }
+        ratio: { type: number }
+        activeDays: { type: integer }
+        persistenceFullDays: { type: integer }
+        persistence: { type: number }
+        platforms: { type: integer }
+        diversityFullPlatforms: { type: integer }
+        diversityApplied: { type: boolean, description: false면 플랫폼 코드 없는 제보(SP4 이전)가 섞여 다양성 1 }
+        diversity: { type: number }
+        t: { type: number }
+    BacktestOutcome:
+      type: object
+      properties:
+        result: { type: string, enum: [HIT, MISS] }
+        reach: { type: [string, 'null'] }
+        breakdown: { $ref: '#/components/schemas/TBreakdown' }
+        explain: { type: string, example: "T 0.48 = 제보자 15/20 (0.75) × 지속성 0.80 (2일/5일) × 다양성 0.80 (2곳/3곳)" }
+    BacktestSide:
+      type: object
+      properties:
+        confusion:
+          type: object
+          properties: { tp: { type: integer }, fp: { type: integer }, fn: { type: integer }, tn: { type: integer } }
+        precision: { type: [number, 'null'], description: TP/(TP+FP), 분모 0이면 null }
+        recall: { type: [number, 'null'], description: TP/(TP+FN) }
+        reachAgreement: { type: [number, 'null'] }
+        reachCompared: { type: integer }
+    BacktestResult:
+      type: object
+      properties:
+        datasetId: { type: string, format: uuid }
+        datasetName: { type: string }
+        sha256: { type: string }
+        caseCount: { type: integer }
+        ranAt: { type: string, format: date-time }
+        report:
+          type: object
+          properties:
+            caseCount: { type: integer }
+            current: { $ref: '#/components/schemas/BacktestSide' }
+            draft: { $ref: '#/components/schemas/BacktestSide' }
+            changedCount: { type: integer }
+            rows:
+              type: array
+              items:
+                type: object
+                properties:
+                  caseId: { type: string }
+                  title: { type: string }
+                  label: { type: string, enum: [HIT, MISS] }
+                  labelReach: { type: [string, 'null'] }
+                  current: { $ref: '#/components/schemas/BacktestOutcome' }
+                  draft: { $ref: '#/components/schemas/BacktestOutcome' }
+                  changed: { type: boolean }
+    BacktestDatasetSummary:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        caseCount: { type: integer }
+        sha256: { type: string }
+        uploadedBy: { type: string, description: 표시 이름 }
+        createdAt: { type: string, description: KST yyyy-MM-dd HH:mm }
+    BacktestDatasetFile:
+      type: object
+      required: [formatVersion, name, cases]
+      properties:
+        formatVersion: { type: integer, enum: [1] }
+        name: { type: string, maxLength: 120 }
+        cases:
           type: array
+          minItems: 1
+          maxItems: 500
           items:
             type: object
+            required: [caseId, title, label, deadline, submissions]
             properties:
-              label: { type: string, example: "HIT → MISS" }
-              count: { type: integer }
-        affectedUsers: { type: integer }
-        avgDelta: { type: number }
-        demotions: { type: integer }
-        promotions: { type: integer }
+              caseId: { type: string, maxLength: 60 }
+              title: { type: string, maxLength: 200 }
+              label: { type: string, enum: [HIT, MISS], description: 사후 정답 — 평가용, 판정 입력 아님 }
+              labelReach: { type: string, enum: [L1, L2, L3, L4], description: label이 HIT일 때만 }
+              note: { type: string }
+              deadline: { type: string, format: date-time }
+              activeSubmitters: { type: integer, minimum: 0, description: 없으면 목표치 = 하한 }
+              submissions:
+                type: array
+                minItems: 1
+                items:
+                  type: object
+                  required: [submitter, at, evidenceUrl]
+                  properties:
+                    submitter: { type: string, description: 이름표 — 같은 값 = 같은 사람 }
+                    at: { type: string, format: date-time, description: deadline보다 앞서야 한다 }
+                    evidenceUrl: { type: string, description: 플랫폼 판별에 쓴다 }
+                    device: { type: string, description: 이름표 — 같은 값 = 같은 기기 }
+                    ip: { type: string, description: 이름표 — 같은 값 = 같은 IP }
+                    seed: { type: boolean, default: false }
+                    joinedAt: { type: string, format: date-time }
     ApprovalRequest:
       type: object
       properties:

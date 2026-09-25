@@ -130,26 +130,36 @@ DRAFT → PENDING(관측 중) → JUDGING(D+14 도달) → RESOLVED(HIT|MISS)
 
 | 축 | 정의 | 상태 |
 |---|---|---|
-| 서로 다른 제보자 수 `n` | 유효 제보(시딩 제외)의 distinct user 수 | 구현 |
-| 시간 분포 | 2주 중 후속 제보가 들어온 날 수, 첫 48h 쏠림 비율 — 이미 뜬 것을 몰아서 적는 행동을 감점 | SP4 |
-| 플랫폼 다양성 | 유효 제보의 distinct 플랫폼 수(플랫폼은 enum) | 집계만 구현, 미사용 → SP4 |
-| 제보자 독립성 | 가입일·디바이스·IP 군집이 같은 제보자를 1명으로 압축 | SP4 |
+| 서로 다른 제보자 수(독립 제보자) | 유효 제보(시딩 제외)의 distinct user 수. 독립성 압축(`independenceMode`) 켜면 같은 기기·IP 군집을 1명으로 | 구현(SP4) |
+| 지속성 | 시딩 뺀 제보가 있었던 서로 다른 날(KST 달력일) 수 | 구현(SP4) |
+| 플랫폼 다양성 | 유효 제보의 distinct 플랫폼 코드 수(근거 링크 도메인으로 서버가 판별) | 구현(SP4) |
+| 제보자 독립성 | 기기·IP 해시 군집이 같은 제보자를 1명으로 압축(모드 OFF/DEVICE/DEVICE_OR_IP, 기본 OFF) | 구현(SP4) |
 
-`TrendSignal`은 제보마다 제보 시각·플랫폼·시딩 여부·제보자 가입일을 담고 판정 근거(`evidence_json`)에 그대로 동결된다 — SP4가 파이프라인을 다시 열지 않고 축을 더할 수 있고, 파라미터 시뮬레이션(ADM-600)도 이 동결 신호로 돈다.
+`TrendSignal`은 제보마다 제보 시각·플랫폼 코드·시딩 여부·기기/IP 그룹 번호를 담고 판정 근거(`evidence_json`)에 그대로 동결된다 — 파라미터 시뮬레이션·백테스트(ADM-600)도 이 동결 신호로 돈다.
 
 ### 4.2 종합 점수 T
 
 ```
-T = clip( n / submitterTarget , 0, 1 )        # 현행
+independent = 독립 제보자 수                                    # 시딩 제외, independenceMode로 압축
+target      = max(targetFloor, ceil(activeSubmitters × targetRatio − 1e-9))   # activeSubmitters 없으면 targetFloor
+ratio       = clip(independent / target, 0, 1)
+
+activeDays  = 시딩 제외 제보의 서로 다른 KST 날짜 수
+persistence = persistenceFloor + (1 − persistenceFloor) × min(1, activeDays / persistenceFullDays)
+
+platforms   = 시딩 제외 제보의 서로 다른 플랫폼 코드 수           # 코드 없는 제보(SP4 이전)가 섞이면 diversity = 1
+diversity   = diversityFloor + (1 − diversityFloor) × min(1, (platforms − 1) / (diversityFullPlatforms − 1))
+
+T = ratio × persistence × diversity
 ```
 
-`submitterTarget`(기본 20)은 절대값이라 유저 규모와 무관하다 — Phase 1 유저 50~100명이 카테고리별로 흩어지면 도달 불가능해 전원 MISS로 수렴하고, TI 하락 → 등급 정체 → 이탈의 디플레 루프가 생긴다. 반대로 계정 4개면 HIT(0.20), 15개면 L4다.
+`activeSubmitters` = 관측 마감 직전 `activeWindowDays`일 동안 비VOID·비시딩 제보를 1건 이상 한 서로 다른 유저 수. 판정 시점에 세어 판정 근거에 동결하고, 재판정·VOID는 원 판정의 동결값을 쓴다(J2).
 
-**SP4에서 상대값으로 전환한다(P9):**
-```
-submitterTarget = max( 하한 , 최근 N일 활성 제보자 수 × 비율 )
-```
-하한·비율·기간은 파라미터 스튜디오(ADM-600)에서 관리하고 값은 Phase 0 백테스트로 정한다(O1). 다축 신호의 가중치는 O8.
+**기본값은 중립이다** — `targetFloor 20`, `targetRatio 0`, `persistenceFloor 1.0`, `diversityFloor 1.0`, `independenceMode OFF`. 이 값에서는 새 공식의 결과가 옛 공식(`clip(서로 다른 비시딩 제보자 / 20, 0, 1)`)과 같다. 목표치·지속성·다양성·독립성의 나머지 파라미터(하한·비율·기간·기준·모드)는 파라미터 스튜디오(ADM-600)에서 관리하고, 값은 실사례 백테스트로 정한다(O1·O8).
+
+**플랫폼 판별**: 유저가 고르는 칩이 아니라 근거 링크의 도메인으로 서버가 판별한다(`ETC` 포함 11개 코드). 링크는 실제로 그 플랫폼 글이어야 해서 칩보다 속이기 어렵다.
+
+**제보자 독립성**: 앱이 보내는 `X-Device-Id` 헤더와 요청 IP를 HMAC 해시로만 수집한다(원문은 저장하지 않음). 압축 모드는 `OFF`(기본, 압축 없음) / `DEVICE`(같은 기기 그룹) / `DEVICE_OR_IP`(기기 또는 IP 그룹, 전이적으로 연결). 근거 없는 압축은 공유 IP(통신사 NAT 등)의 정상 유저를 뭉갤 수 있어 기본은 꺼져 있다.
 
 ### 4.3 판정 규칙
 

@@ -1,5 +1,5 @@
 /** dev 시연용 데이터. 관리자 콘솔.dc.html 예시를 반영. 실 API로 대체됨. */
-import type { AdminAccountSummary, ApprovalRequestView, AdminUserDetail, AuditPage, ClusterMergeResult, ImminentItem, JudgedItem, MergeCandidate, MergePreview, ParameterDraftView, QueueSummary, ReportQueueItem, ReportSubmissionCandidate, SeedAccuracyRow, SimulationSummary, TrendItemDetail, TrendItemSummary, VerdictListResponse } from "./api/types";
+import type { AdminAccountSummary, ApprovalRequestView, AdminUserDetail, AuditPage, BacktestDatasetSummary, ClusterMergeResult, DraftValues, ImminentItem, JudgedItem, MergeCandidate, MergePreview, ParameterDraftView, QueueSummary, ReportQueueItem, ReportSubmissionCandidate, SeedAccuracyRow, SimulationSummary, TrendItemDetail, TrendItemSummary, VerdictListResponse } from "./api/types";
 
 export const fxQueueSummary: QueueSummary = {
   slaBreaches: 1,
@@ -65,15 +65,21 @@ export const fxMergePreview: MergePreview = {
   quotaRefundHandles: ["user_1122"],
 };
 
+const NEUTRAL: DraftValues = {
+  targetFloor: 20, targetRatio: 0, activeWindowDays: 28, hitThreshold: 0.2,
+  persistenceFloor: 1, persistenceFullDays: 5, diversityFloor: 1, diversityFullPlatforms: 3, independenceMode: "OFF",
+};
+
 export const fxParamDraft: ParameterDraftView = {
   draftId: "pd-17",
   status: "DRAFT",
-  submitterTarget: 20,
-  currentSubmitterTarget: 20,
-  hitThreshold: 0.2,
-  currentHitThreshold: 0.2,
+  values: NEUTRAL,
+  current: NEUTRAL,
   simResult: null,
+  backtestResult: null,
 };
+
+export const fxBacktestDatasets: BacktestDatasetSummary[] = [];
 
 export const fxClusterMergeResult: ClusterMergeResult = {
   candidates: 8, autoMerged: 1, queued: 2, separated: 4, skippedJudged: 1, deferred: 0, failed: 0,
@@ -127,9 +133,9 @@ export const fxReportQueue: ReportQueueItem[] = [
 ];
 
 const fxJudged: JudgedItem[] = [
-  { trendItemId: "t1", canonicalName: "탕후루 챌린지", result: "HIT", reachLevel: "L2", scoreT: "0.5500", judgedAt: "2026-08-07 03:00", superseded: false },
-  { trendItemId: "t2", canonicalName: "도파민 디톡스", result: "MISS", reachLevel: null, scoreT: "0.1200", judgedAt: "2026-08-06 03:00", superseded: false },
-  { trendItemId: "t3", canonicalName: "제로슈거 밀키트", result: "VOID", reachLevel: null, scoreT: null, judgedAt: "2026-08-05 03:00", superseded: true },
+  { trendItemId: "t1", canonicalName: "탕후루 챌린지", result: "HIT", reachLevel: "L2", scoreT: "0.5500", judgedAt: "2026-08-07 03:00", superseded: false, tExplain: "제보자 11/20 × 지속성 1.00 × 다양성 1.00" },
+  { trendItemId: "t2", canonicalName: "도파민 디톡스", result: "MISS", reachLevel: null, scoreT: "0.1200", judgedAt: "2026-08-06 03:00", superseded: false, tExplain: "제보자 3/20 × 지속성 0.80 × 다양성 1.00" },
+  { trendItemId: "t3", canonicalName: "제로슈거 밀키트", result: "VOID", reachLevel: null, scoreT: null, judgedAt: "2026-08-05 03:00", superseded: true, tExplain: null },
 ];
 const fxImminent: ImminentItem[] = [
   { trendItemId: "t4", canonicalName: "가을 캠퍼스룩", firstSeenAt: "2026-07-31 09:00", deadline: "2026-08-14 09:00", daysLeft: 0, graceExtended: false },
@@ -168,7 +174,7 @@ export const fxTrendItemDetail: TrendItemDetail = {
   firstSeenAt: "2026-08-15 09:12", deadline: "2026-08-29 09:12", daysLeft: 9, graceExtended: false,
   distinctSubmitters: 12, distinctPlatforms: 3, endorseCount: 6,
   currentResult: null, currentReachLevel: null, currentScoreT: null, currentJudgedAt: null,
-  previewResult: "HIT", previewReachLevel: "L3", previewScoreT: "0.6000",
+  previewResult: "HIT", previewReachLevel: "L3", previewScoreT: "0.6000", previewExplain: "제보자 12/20 × 지속성 1.00 × 다양성 1.00",
   submissions: [
     { submissionId: "sub-1", userHandle: "user_4410", orderRank: 1, confidence: 50, submitterTi: 0.63, createdAt: "2026-08-15 09:12",
       platform: "인스타", oneLine: "친구들 사이에서 다들 이걸로 챌린지 영상 찍는 중", evidenceUrl: "https://instagram.com/p/example1" },

@@ -70,7 +70,8 @@ public class AdminSeedService {
     public record SeedSubmissionRequest(
             @NotBlank @Size(max = 120) String name,
             @NotBlank String category,
-            @NotBlank @Size(max = 60) String platform,
+            // 보관용(S12) — 콘솔은 보내지 않는다
+            @Size(max = 60) String platform,
             @NotBlank String evidenceUrl,
             @NotNull Integer confidence,
             @NotBlank @Size(max = 200) String oneLine) {}

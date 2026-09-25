@@ -1,6 +1,7 @@
 package kr.trendstage.persistence.entity;
 
 import jakarta.persistence.*;
+import kr.trendstage.domain.signal.PlatformResolver;
 import kr.trendstage.persistence.type.SubmissionResult;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -35,11 +36,24 @@ public class Submission {
     @Column(nullable = false)
     private short confidence;
 
-    @Column(name = "source_platform", nullable = false, length = 60)
+    /** 유저가 고른 칩 값 — SP4부터 보관용(S12). 판정·표시에 쓰지 않는다. */
+    @Column(name = "source_platform", length = 60)
     private String sourcePlatform;
 
     @Column(name = "evidence_url", nullable = false)
     private String evidenceUrl;
+
+    /** 근거 링크로 판별한 플랫폼 코드(Platform 이름, SP4 S4). 생성자가 정하고 바뀌지 않는다. */
+    @Column(nullable = false, length = 20, updatable = false)
+    private String platform;
+
+    /** HMAC(기기 ID) — 원문은 저장하지 않는다(SP4 §4). 없으면 null. */
+    @Column(name = "device_hash", length = 64, updatable = false)
+    private String deviceHash;
+
+    /** HMAC(IPv4 전체 또는 IPv6 /64). */
+    @Column(name = "ip_hash", length = 64, updatable = false)
+    private String ipHash;
 
     @Column(name = "one_line", nullable = false, length = 200)
     private String oneLine;
@@ -80,6 +94,7 @@ public class Submission {
         this.oneLine = oneLine;
         this.disclosure = disclosure;
         this.seed = seed;
+        this.platform = PlatformResolver.resolve(evidenceUrl).name();
     }
 
     /** 생성 시각을 명시(Clock). created_at은 order_rank 기준이라 이후 바뀌지 않는다. */
@@ -99,6 +114,15 @@ public class Submission {
     public String getSourcePlatform() { return sourcePlatform; }
     public String getOneLine() { return oneLine; }
     public String getEvidenceUrl() { return evidenceUrl; }
+    public String getPlatform() { return platform; }
+    public String getDeviceHash() { return deviceHash; }
+    public String getIpHash() { return ipHash; }
+
+    /** 제보 출처 해시 — save 전에 한 번 부른다(컬럼이 updatable=false라 이후 변경은 반영되지 않는다). */
+    public void recordOrigin(String deviceHash, String ipHash) {
+        this.deviceHash = deviceHash;
+        this.ipHash = ipHash;
+    }
     public SubmissionResult getResult() { return result; }
     public boolean isSeed() { return seed; }
     public Instant getCreatedAt() { return createdAt; }

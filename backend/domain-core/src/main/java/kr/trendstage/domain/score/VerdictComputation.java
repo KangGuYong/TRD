@@ -24,10 +24,10 @@ public final class VerdictComputation {
      */
     public static VerdictPlan run(TrendSignal signal, List<SubmissionRef> subs, ParameterSet p) {
         if (signal.validCount() == 0) {
-            return new VerdictPlan(VerdictResult.VOID, null, 0.0, List.of());
+            return new VerdictPlan(VerdictResult.VOID, null, 0.0, List.of(), null);
         }
         VerdictOutcome o = VerdictEngine.evaluate(signal, p);
-        return new VerdictPlan(o.result(), o.reach(), o.t(), ledgerLines(o, subs, p));
+        return new VerdictPlan(o.result(), o.reach(), o.t(), ledgerLines(o, subs, p), o.breakdown());
     }
 
     private static List<LedgerLine> ledgerLines(VerdictOutcome o, List<SubmissionRef> subs, ParameterSet p) {

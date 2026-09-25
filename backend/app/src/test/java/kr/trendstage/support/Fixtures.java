@@ -1,5 +1,6 @@
 package kr.trendstage.support;
 
+import kr.trendstage.domain.signal.PlatformResolver;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.math.BigDecimal;
@@ -37,12 +38,33 @@ public class Fixtures {
         return insertSubmission(userId, itemId, confidence, createdAt, false);
     }
 
+    /** 출처가 있는 제보 — 플랫폼은 링크로 판별(엔티티와 같은 규칙), 해시는 그대로(소문자 hex 64자 또는 null). */
+    public UUID submissionFrom(UUID userId, UUID itemId, Instant createdAt, String evidenceUrl,
+                               String deviceHash, String ipHash) {
+        String key = jdbc.queryForObject("SELECT normalized_key FROM trend_items WHERE id = ?", String.class, itemId);
+        return jdbc.queryForObject("INSERT INTO submissions (user_id, trend_item_id, raw_input, normalized_key, confidence, "
+                        + "platform, evidence_url, one_line, created_at, is_seed, device_hash, ip_hash) "
+                        + "VALUES (?, ?, ?, ?, 30, ?, ?, '설명', ?, false, ?, ?) RETURNING id",
+                UUID.class, userId, itemId, key, key, PlatformResolver.resolve(evidenceUrl).name(), evidenceUrl,
+                Timestamp.from(createdAt), deviceHash, ipHash);
+    }
+
+    /** 항목의 가장 최근 판정 근거 JSON. */
+    public String evidenceJson(UUID itemId) {
+        return jdbc.queryForObject("SELECT evidence_json::text FROM verdicts WHERE trend_item_id = ? "
+                + "ORDER BY judged_at DESC LIMIT 1", String.class, itemId);
+    }
+
     public UUID seedSubmission(UUID userId, UUID itemId, Instant createdAt) {
         return insertSubmission(userId, itemId, 30, createdAt, true);
     }
 
     public void voidSubmission(UUID submissionId, Instant at) {
         jdbc.update("UPDATE submissions SET result = 'VOID', voided_at = ? WHERE id = ?", Timestamp.from(at), submissionId);
+    }
+
+    public String platform(UUID submissionId) {
+        return jdbc.queryForObject("SELECT platform FROM submissions WHERE id = ?", String.class, submissionId);
     }
 
     public String submissionResult(UUID submissionId) {
@@ -106,6 +128,11 @@ public class Fixtures {
 
     public void setVisibility(UUID itemId, String visibility) {
         jdbc.update("UPDATE trend_items SET visibility = ?::trend_visibility WHERE id = ?", visibility, itemId);
+    }
+
+    /** 전역 활성 드래프트(DRAFT·REVIEW)를 지운다 — 스튜디오 테스트의 시작과 끝에 부른다(드래프트는 전역 하나). */
+    public void clearActiveDrafts() {
+        jdbc.update("DELETE FROM parameter_drafts WHERE status IN ('DRAFT', 'REVIEW')");
     }
 
     /** 적용된 파라미터 드래프트(가장 최근 APPLIED가 현재값). 테스트 끝에 반드시 {@link #deleteDraft}로 지운다 — 공유 DB. */
@@ -175,10 +202,14 @@ public class Fixtures {
         jdbc.update("UPDATE trend_items SET state = ?::trend_state WHERE id = ?", state, itemId);
     }
 
-    /** 상태는 그대로 두고 현행 판정 행만 만든다(상태·판정 행 불일치 가드 테스트용). */
+    /**
+     * 상태는 그대로 두고 현행 판정 행만 만든다(상태·판정 행 불일치 가드 테스트용). evidence_json이 '{}'라
+     * ParamStudioService.simulate()가 파싱하면 신호가 없어 NPE가 난다 — judged_at을 180일 시뮬레이션 창
+     * 밖(2000년)으로 둬서 다른 패키지의 params 테스트가 이 행을 줍지 않게 한다.
+     */
     public void verdictRow(UUID itemId) {
         jdbc.update("INSERT INTO verdicts (trend_item_id, result, score_t, judged_at, evidence_json) "
-                + "VALUES (?, 'MISS', 0.1, now(), '{}'::jsonb)", itemId);
+                + "VALUES (?, 'MISS', 0.1, TIMESTAMPTZ '2000-01-01 00:00:00+00', '{}'::jsonb)", itemId);
     }
 
     public String key(UUID itemId) {
@@ -225,8 +256,8 @@ public class Fixtures {
         String key = jdbc.queryForObject("SELECT normalized_key FROM trend_items WHERE id = ?", String.class, itemId);
         return jdbc.queryForObject(
                 "INSERT INTO submissions (user_id, trend_item_id, raw_input, normalized_key, confidence, "
-                        + "source_platform, evidence_url, one_line, created_at, is_seed) "
-                        + "VALUES (?, ?, ?, ?, ?, 'X', 'https://example.com', '설명', ?, ?) RETURNING id",
+                        + "source_platform, platform, evidence_url, one_line, created_at, is_seed) "
+                        + "VALUES (?, ?, ?, ?, ?, 'X', 'ETC', 'https://example.com', '설명', ?, ?) RETURNING id",
                 UUID.class, userId, itemId, key, key, confidence, Timestamp.from(createdAt), seed);
     }
 

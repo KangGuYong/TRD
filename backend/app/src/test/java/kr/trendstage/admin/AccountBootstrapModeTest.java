@@ -35,7 +35,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * 공유 DB에는 자격자가 늘 있으므로 전용 컨테이너를 쓴다.
  */
 @SpringBootTest(properties = {"logging.level.org.hibernate.SQL=WARN", "logging.level.org.hibernate.orm.jdbc.bind=WARN",
-        "jobs.sla-watch.cron=-"})
+        "jobs.sla-watch.cron=-", "signal.hash-secret=test-signal-secret"})
 @AutoConfigureMockMvc
 @Import(TestClockConfig.class)
 class AccountBootstrapModeTest {

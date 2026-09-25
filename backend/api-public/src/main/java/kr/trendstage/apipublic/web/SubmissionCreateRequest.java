@@ -9,7 +9,8 @@ import kr.trendstage.persistence.type.TrendCategory;
 public record SubmissionCreateRequest(
         @NotBlank @Size(max = 120) String name,
         @NotNull TrendCategory category,
-        @NotBlank @Size(max = 60) String platform,
+        // 옛 앱 빌드의 칩 값 — 보관만 한다(S12). 판정·표시는 근거 링크로.
+        @Size(max = 60) String platform,
         @NotBlank String evidenceUrl,
         @NotNull Integer confidence,
         @NotNull Boolean disclosure,

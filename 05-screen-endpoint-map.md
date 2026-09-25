@@ -151,9 +151,13 @@
 ### ADM-600 · 파라미터 스튜디오 ★
 | 상호작용 | API | 스펙 | 구현 | 권한 |
 |---|---|:--:|:--:|---|
-| 드래프트 조회/수정(`hitThreshold`·`submitterTarget` 등 단일값 필드만 있음) | `GET·PUT /admin/params/draft` | 🔶 | ✅ | O/A · 실제는 액터당 활성 드래프트 1개(ID 없이 `/draft`), 스펙은 여전히 구모델 `GET·POST /admin/parameter-drafts`(다건·ID기반) — 경로·모델 모두 갱신 필요 |
+| 드래프트 조회/수정(9개 필드: 목표치 3·판정 1·지속성 2·다양성 2·독립성 1) | `GET·PUT /admin/params/draft` | 🔶 | ✅ | O/A · 실제는 액터당 활성 드래프트 1개(ID 없이 `/draft`), 스펙은 여전히 구모델 `GET·POST /admin/parameter-drafts`(다건·ID기반) — 경로·모델 모두 갱신 필요 |
 | 시뮬레이션(180일 재판정) | `POST /admin/params/draft/simulate` | 🔶 | ✅ | O/A · 승인요청 선행 · 스펙은 구경로 `POST /admin/parameter-drafts/{id}/simulate` |
-| 승인 요청(기본 예약·비소급) | `POST /admin/params/draft/request-approval` | 🔶 | ✅ | O/A · 스펙은 구경로 `POST /admin/parameter-drafts/{id}/request-approval` |
+| 백테스트 데이터셋 업로드(불변 보관, 같은 해시는 기존 행 반환) | `POST /admin/params/backtest-datasets` | ✅ | ✅ | O/A · 감사 `BACKTEST_DATASET_UPLOAD`(SP4) |
+| 백테스트 데이터셋 목록 | `GET /admin/params/backtest-datasets` | ✅ | ✅ | O/A/Au(조회)(SP4) |
+| 백테스트 예시 데이터셋 받기 | `GET /admin/params/backtest-datasets/example` | ✅ | ✅ | O/A/Au(조회)(SP4) |
+| 백테스트 실행(현재 vs 초안, 정밀도·재현율) | `POST /admin/params/draft/backtest` | ✅ | ✅ | O/A · 감사 `PARAM_BACKTEST`(SP4) |
+| 승인 요청(기본 예약·비소급, 시뮬레이션+백테스트 둘 다 필요) | `POST /admin/params/draft/request-approval` | 🔶 | ✅ | O/A · 스펙은 구경로 `POST /admin/parameter-drafts/{id}/request-approval`. SP4부터 백테스트 결과도 선행 조건 |
 | 적용 승인 | `POST /admin/approvals/{id}/approve` | ✅ | ✅ | **A(2인)** |
 
 ### ADM-610 · 등급 정책

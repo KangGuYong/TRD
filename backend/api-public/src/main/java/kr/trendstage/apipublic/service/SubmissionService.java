@@ -32,6 +32,8 @@ import java.util.UUID;
  * 제보 등록/조회. 완전일치(normalized_key) 매칭까지만 여기서 처리한다 — 임베딩 유사도(0.75~0.85
  * 회색지대)는 별도 배치(cluster_merge)가 다룬다(03 §2②·③).
  * 제보권은 QuotaService가 이번 주 제보 행에서 계산해 집행한다(J4). 관측이 끝난 항목에는 제보를 받지 않는다(J6).
+ * 기기 ID·IP는 SignalHasher로 해시만 저장한다(SP4 §4). 플랫폼은 엔티티가 근거 링크로 정하고, 요청의
+ * platform은 보관용(S12).
  */
 @Service
 public class SubmissionService {
@@ -45,20 +47,25 @@ public class SubmissionService {
     private final QuotaService quotaService;
     private final TrendItemLookup lookup;
     private final TrendItemCreator creator;
+    private final SignalHasher hasher;
     private final Clock clock;
 
     public SubmissionService(TrendItemRepository trends, SubmissionRepository submissions,
                              SubmissionOrderRankRepository orderRanks, UserRepository users,
-                             QuotaService quotaService, TrendItemLookup lookup, TrendItemCreator creator, Clock clock) {
+                             QuotaService quotaService, TrendItemLookup lookup, TrendItemCreator creator,
+                             SignalHasher hasher, Clock clock) {
         this.trends = trends; this.submissions = submissions; this.orderRanks = orderRanks;
         this.users = users; this.quotaService = quotaService; this.lookup = lookup; this.creator = creator;
-        this.clock = clock;
+        this.hasher = hasher; this.clock = clock;
     }
 
     @Transactional
-    public SubmissionMineResponse create(UUID userId, SubmissionCreateRequest req) {
+    public SubmissionMineResponse create(UUID userId, SubmissionCreateRequest req, SubmissionOrigin origin) {
         if (!VALID_CONFIDENCE.contains(req.confidence())) {
             throw new SubmissionValidationException("confidence는 10/30/50 중 하나여야 합니다");
+        }
+        if (origin.deviceId() != null && origin.deviceId().length() > SignalHasher.MAX_DEVICE_ID) {
+            throw new SubmissionValidationException("X-Device-Id는 " + SignalHasher.MAX_DEVICE_ID + "자 이하여야 합니다");
         }
         String normalized = NameNormalizer.normalize(req.name());
         Instant now = clock.instant();
@@ -84,10 +91,12 @@ public class SubmissionService {
                 requireOpenAndNotDuplicate(item, userId, now);   // 동시 첫 제보 — 먼저 생긴 항목에 합류
             }
         }
-        Submission sub = submissions.save(new Submission(
+        Submission sub = new Submission(
                 userId, item.getId(), req.name(), normalized,
                 req.confidence().shortValue(), req.platform(), req.evidenceUrl(), req.oneLine(),
-                req.disclosure(), false, now));
+                req.disclosure(), false, now);
+        sub.recordOrigin(hasher.device(origin.deviceId()), hasher.ip(origin.remoteAddr()));
+        submissions.save(sub);
         return toResponse(sub, item);
     }
 

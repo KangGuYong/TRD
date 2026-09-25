@@ -53,7 +53,6 @@ export interface TrendDetail extends TrendSummary {
 export interface SubmissionCreate {
   name: string;
   category: Category;
-  platform: string;
   evidenceUrl: string;
   confidence: 10 | 30 | 50;
   disclosure: boolean;

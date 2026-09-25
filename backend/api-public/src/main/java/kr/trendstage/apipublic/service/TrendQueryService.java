@@ -4,6 +4,7 @@ import kr.trendstage.apipublic.web.PropagationStepResponse;
 import kr.trendstage.apipublic.web.TrendDetailResponse;
 import kr.trendstage.apipublic.web.TrendNotFoundException;
 import kr.trendstage.apipublic.web.TrendSummaryResponse;
+import kr.trendstage.domain.signal.Platform;
 import kr.trendstage.domain.trend.DisplayStage;
 import kr.trendstage.domain.trend.DailySelectionPicker;
 import kr.trendstage.domain.trend.StageEvaluator;
@@ -140,7 +141,7 @@ public class TrendQueryService {
         String meaning = submissions.findFirstByTrendItemIdOrderByCreatedAtAsc(item.getId())
                 .map(Submission::getOneLine).orElse("");
 
-        String pathText = String.join(" → ", platforms);
+        String pathText = platforms.stream().map(Platform::labelOf).collect(Collectors.joining(" → "));
 
         return new TrendSummaryResponse(
                 item.getId(),
@@ -206,9 +207,8 @@ public class TrendQueryService {
         List<Submission> subs = submissions.findByTrendItemIdAndResultNot(trendItemId, kr.trendstage.persistence.type.SubmissionResult.VOID);
         Map<String, Instant> firstSeenByPlatform = new LinkedHashMap<>();
         subs.stream()
-                .filter(s -> s.getSourcePlatform() != null)
                 .sorted(Comparator.comparing(Submission::getCreatedAt))
-                .forEach(s -> firstSeenByPlatform.putIfAbsent(s.getSourcePlatform(), s.getCreatedAt()));
+                .forEach(s -> firstSeenByPlatform.putIfAbsent(Platform.labelOf(s.getPlatform()), s.getCreatedAt()));
         return firstSeenByPlatform.entrySet().stream()
                 .map(e -> new PropagationStepResponse(e.getKey(), PATH_DATE.format(e.getValue()), null, true))
                 .toList();

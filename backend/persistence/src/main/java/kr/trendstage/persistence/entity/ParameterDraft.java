@@ -1,8 +1,11 @@
 package kr.trendstage.persistence.entity;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.*;
+import kr.trendstage.domain.params.DraftValues;
 import kr.trendstage.domain.params.ParameterSet;
+import kr.trendstage.domain.signal.IndependenceMode;
 import kr.trendstage.persistence.type.ApplyMode;
 import kr.trendstage.persistence.type.ParamStatus;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -37,6 +40,10 @@ public class ParameterDraft {
     @Column(name = "sim_result", columnDefinition = "jsonb")
     private String simResult;
 
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "backtest_result", columnDefinition = "jsonb")
+    private String backtestResult;
+
     @Enumerated(EnumType.STRING) @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     @Column(name = "apply_mode", nullable = false)
     private ApplyMode applyMode = ApplyMode.SCHEDULED;
@@ -65,18 +72,25 @@ public class ParameterDraft {
     public ParamStatus getStatus() { return status; }
     public String getPayload() { return payload; }
     public String getSimResult() { return simResult; }
+    public String getBacktestResult() { return backtestResult; }
     public ApplyMode getApplyMode() { return applyMode; }
     public UUID getApprovalId() { return approvalId; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getAppliedAt() { return appliedAt; }
 
+    /** 값을 고치면 이전 시뮬레이션·백테스트는 더 이상 이 값의 근거가 아니다(SP4 §5.1). */
     public void updatePayload(String payload) {
         this.payload = payload;
         this.simResult = null;
+        this.backtestResult = null;
     }
 
     public void recordSimResult(String simResult) {
         this.simResult = simResult;
+    }
+
+    public void recordBacktestResult(String backtestResult) {
+        this.backtestResult = backtestResult;
     }
 
     public void moveToReview(UUID approvalId) {
@@ -97,21 +111,39 @@ public class ParameterDraft {
     }
 
     /**
-     * payload(JSONB)를 ParameterSet으로 변환. submitterTarget/hitThreshold 2개만 드래프트가
-     * 편집하고 나머지 14개 필드는 defaults() 고정값을 쓴다(ADM-600 스코프, ParamSimulation과 동일 가정).
+     * payload(JSONB) → 편집 값 9개. 없는 키는 기본값(중립) — SP4 이전 payload(submitterTarget·hitThreshold만)도
+     * 그대로 읽는다(S8). submitterTarget은 targetFloor의 옛 이름이다.
      */
-    public ParameterSet toParameterSet(ObjectMapper objectMapper) {
+    public DraftValues toDraftValues(ObjectMapper objectMapper) {
         try {
-            var node = objectMapper.readTree(payload);
-            ParameterSet d = ParameterSet.defaults();
-            return new ParameterSet(
-                    node.get("submitterTarget").asInt(), node.get("hitThreshold").asDouble(),
-                    d.bandL2, d.bandL3, d.bandL4,
-                    d.mL1, d.mL2, d.mL3, d.mL4,
-                    d.wRank1, d.wRank2, d.wRank3, d.wRankRest,
-                    d.halflifeDays, d.tiAlpha, d.tiBeta);
+            JsonNode n = objectMapper.readTree(payload);
+            DraftValues d = DraftValues.of(ParameterSet.defaults());
+            int floor = n.hasNonNull("targetFloor") ? n.get("targetFloor").asInt()
+                    : n.hasNonNull("submitterTarget") ? n.get("submitterTarget").asInt() : d.targetFloor();
+            return new DraftValues(floor,
+                    dbl(n, "targetRatio", d.targetRatio()),
+                    integer(n, "activeWindowDays", d.activeWindowDays()),
+                    dbl(n, "hitThreshold", d.hitThreshold()),
+                    dbl(n, "persistenceFloor", d.persistenceFloor()),
+                    integer(n, "persistenceFullDays", d.persistenceFullDays()),
+                    dbl(n, "diversityFloor", d.diversityFloor()),
+                    integer(n, "diversityFullPlatforms", d.diversityFullPlatforms()),
+                    n.hasNonNull("independenceMode") ? IndependenceMode.valueOf(n.get("independenceMode").asText())
+                            : d.independenceMode());
         } catch (Exception e) {
             throw new IllegalStateException("payload 파싱 실패: draft=" + id, e);
         }
+    }
+
+    public ParameterSet toParameterSet(ObjectMapper objectMapper) {
+        return toDraftValues(objectMapper).toParameterSet();
+    }
+
+    private static double dbl(JsonNode n, String key, double fallback) {
+        return n.hasNonNull(key) ? n.get(key).asDouble() : fallback;
+    }
+
+    private static int integer(JsonNode n, String key, int fallback) {
+        return n.hasNonNull(key) ? n.get(key).asInt() : fallback;
     }
 }
