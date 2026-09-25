@@ -86,6 +86,7 @@ cd backend
 ```
 
 - 기동되면 `GET http://localhost:8080/v1/trends?daily=true` 로 확인.
+- `infra/.env`에 `SIGNAL_HASH_SECRET`이 없으면 docker compose가 시작하지 않는다(SP4). `openssl rand -hex 32`로 만든 값을 넣는다. 로컬에서 `bootRun`하면 `backend/app/.env`나 환경변수로 준다.
 
 ### 3) 앱 (Expo)
 
