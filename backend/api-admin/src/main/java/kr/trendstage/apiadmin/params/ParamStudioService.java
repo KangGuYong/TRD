@@ -1,5 +1,6 @@
 package kr.trendstage.apiadmin.params;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
 import kr.trendstage.apiadmin.approval.ActionType;
@@ -7,6 +8,7 @@ import kr.trendstage.apiadmin.approval.ApprovalGate;
 import kr.trendstage.apiadmin.auth.AdminValidationException;
 import kr.trendstage.apiadmin.auth.DraftLockedException;
 import kr.trendstage.audit.AuditLogService;
+import kr.trendstage.domain.params.DraftValues;
 import kr.trendstage.domain.params.ParamSimulation;
 import kr.trendstage.domain.params.ParameterSet;
 import kr.trendstage.domain.params.SimulationSummary;
@@ -35,6 +37,7 @@ import java.util.UUID;
 /**
  * ADM-600. 드래프트→시뮬레이션→2인 승인 요청까지만 다룬다(설계서 범위).
  * 시뮬레이션은 evidence_json에 동결된 신호만 읽는 읽기 전용 연산 — submissions 재조회 없음.
+ * 승인 요청 조건: 마지막 수정 이후 시뮬레이션과 백테스트(SP4 S9).
  */
 @Service
 public class ParamStudioService {
@@ -85,17 +88,18 @@ public class ParamStudioService {
     }
 
     @Transactional
-    public ParameterDraft updateDraftValues(UUID actorId, AdminRole actorRole, int submitterTarget, double hitThreshold) {
-        if (submitterTarget < 1) {
-            throw new AdminValidationException("목표 제보자 수는 1 이상이어야 합니다");
-        }
+    public ParameterDraft updateDraftValues(UUID actorId, AdminRole actorRole, DraftValues values) {
         ParameterDraft draft = getOrCreateActiveDraft(actorId);
         if (draft.getStatus() == ParamStatus.REVIEW) {
             throw new DraftLockedException("승인 대기 중인 드래프트는 수정할 수 없습니다");
         }
-        draft.updatePayload(payloadJson(submitterTarget, hitThreshold));
+        draft.updatePayload(payloadJson(values));
         auditLogService.record(actorId, actorRole, "PARAM_DRAFT_UPDATE", "PARAMETER_DRAFT", draft.getId(), Map.of(
-                "submitterTarget", submitterTarget, "hitThreshold", hitThreshold));
+                "targetFloor", values.targetFloor(), "targetRatio", values.targetRatio(),
+                "activeWindowDays", values.activeWindowDays(), "hitThreshold", values.hitThreshold(),
+                "persistenceFloor", values.persistenceFloor(), "persistenceFullDays", values.persistenceFullDays(),
+                "diversityFloor", values.diversityFloor(), "diversityFullPlatforms", values.diversityFullPlatforms(),
+                "independenceMode", values.independenceMode().name()));
         return draft;
     }
 
@@ -124,6 +128,9 @@ public class ParamStudioService {
         if (draft.getSimResult() == null) {
             throw new AdminValidationException("시뮬레이션을 먼저 실행해야 승인 요청을 보낼 수 있습니다");
         }
+        if (draft.getBacktestResult() == null) {
+            throw new AdminValidationException("백테스트를 먼저 실행해야 승인 요청을 보낼 수 있습니다");
+        }
         if (draft.getStatus() == ParamStatus.REVIEW) {
             throw new DraftLockedException("이미 승인 대기 중인 드래프트입니다");
         }
@@ -147,12 +154,15 @@ public class ParamStudioService {
     }
 
     private String defaultPayloadJson() {
-        ParameterSet d = ParameterSet.defaults();
-        return payloadJson(d.targetFloor, d.hitThreshold);
+        return payloadJson(DraftValues.of(ParameterSet.defaults()));
     }
 
-    private String payloadJson(int submitterTarget, double hitThreshold) {
-        return "{\"submitterTarget\":%d,\"hitThreshold\":%s}".formatted(submitterTarget, hitThreshold);
+    private String payloadJson(DraftValues values) {
+        try {
+            return objectMapper.writeValueAsString(values);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("드래프트 값 직렬화 실패", e);
+        }
     }
 
     private String simResultJson(SimulationSummary s) {

@@ -130,6 +130,11 @@ public class Fixtures {
         jdbc.update("UPDATE trend_items SET visibility = ?::trend_visibility WHERE id = ?", visibility, itemId);
     }
 
+    /** 전역 활성 드래프트(DRAFT·REVIEW)를 지운다 — 스튜디오 테스트의 시작과 끝에 부른다(드래프트는 전역 하나). */
+    public void clearActiveDrafts() {
+        jdbc.update("DELETE FROM parameter_drafts WHERE status IN ('DRAFT', 'REVIEW')");
+    }
+
     /** 적용된 파라미터 드래프트(가장 최근 APPLIED가 현재값). 테스트 끝에 반드시 {@link #deleteDraft}로 지운다 — 공유 DB. */
     public UUID appliedDraft(String payloadJson) {
         return jdbc.queryForObject("INSERT INTO parameter_drafts (author_id, status, payload, applied_at) "
