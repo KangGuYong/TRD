@@ -81,7 +81,7 @@ public class TrendItemAdminService {
             String firstSeenAt, String deadline, long daysLeft, boolean graceExtended,
             int distinctSubmitters, int distinctPlatforms, long endorseCount,
             String currentResult, String currentReachLevel, String currentScoreT, String currentJudgedAt,
-            String previewResult, String previewReachLevel, String previewScoreT,
+            String previewResult, String previewReachLevel, String previewScoreT, String previewExplain,
             List<SubmissionRow> submissions) {}
 
     @Transactional(readOnly = true)
@@ -143,6 +143,7 @@ public class TrendItemAdminService {
                 plan == null ? null : plan.result().name(),
                 plan == null || plan.reach() == null ? null : plan.reach().name(),
                 plan == null ? null : BigDecimal.valueOf(plan.t()).setScale(4, RoundingMode.HALF_UP).toPlainString(),
+                plan == null || plan.breakdown() == null ? null : plan.breakdown().describe(),
                 rows);
     }
 }

@@ -1,5 +1,6 @@
 package kr.trendstage.support;
 
+import kr.trendstage.domain.signal.PlatformResolver;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.math.BigDecimal;
@@ -35,6 +36,23 @@ public class Fixtures {
 
     public UUID submission(UUID userId, UUID itemId, int confidence, Instant createdAt) {
         return insertSubmission(userId, itemId, confidence, createdAt, false);
+    }
+
+    /** 출처가 있는 제보 — 플랫폼은 링크로 판별(엔티티와 같은 규칙), 해시는 그대로(소문자 hex 64자 또는 null). */
+    public UUID submissionFrom(UUID userId, UUID itemId, Instant createdAt, String evidenceUrl,
+                               String deviceHash, String ipHash) {
+        String key = jdbc.queryForObject("SELECT normalized_key FROM trend_items WHERE id = ?", String.class, itemId);
+        return jdbc.queryForObject("INSERT INTO submissions (user_id, trend_item_id, raw_input, normalized_key, confidence, "
+                        + "platform, evidence_url, one_line, created_at, is_seed, device_hash, ip_hash) "
+                        + "VALUES (?, ?, ?, ?, 30, ?, ?, '설명', ?, false, ?, ?) RETURNING id",
+                UUID.class, userId, itemId, key, key, PlatformResolver.resolve(evidenceUrl).name(), evidenceUrl,
+                Timestamp.from(createdAt), deviceHash, ipHash);
+    }
+
+    /** 항목의 가장 최근 판정 근거 JSON. */
+    public String evidenceJson(UUID itemId) {
+        return jdbc.queryForObject("SELECT evidence_json::text FROM verdicts WHERE trend_item_id = ? "
+                + "ORDER BY judged_at DESC LIMIT 1", String.class, itemId);
     }
 
     public UUID seedSubmission(UUID userId, UUID itemId, Instant createdAt) {

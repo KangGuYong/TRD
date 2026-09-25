@@ -56,4 +56,10 @@ public interface SubmissionRepository extends JpaRepository<Submission, UUID> {
 
     /** 판정완료 건수(전 기간), 시딩 제외. */
     long countByUserIdAndResultAndSeedFalse(UUID userId, SubmissionResult result);
+
+    /** 상대 목표치 입력(SP4 S2) — [from, to) 안에 비VOID·비시딩 제보를 1건 이상 한 서로 다른 유저 수. */
+    @Query("select count(distinct s.userId) from Submission s "
+            + "where s.seed = false and s.result <> :excluded and s.createdAt >= :from and s.createdAt < :to")
+    long countActiveSubmitters(@Param("from") Instant from, @Param("to") Instant to,
+                               @Param("excluded") SubmissionResult excluded);
 }
