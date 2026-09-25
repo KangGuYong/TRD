@@ -66,8 +66,8 @@ services:
       FIREBASE_CREDENTIALS_PATH: ${FIREBASE_CREDENTIALS_PATH:-}
       # sla_watch 주기(스프링 cron, 초 분 시 일 월 요일 — jobs.sla-watch.cron). 기본 매시 정각.
       JOBS_SLA_WATCH_CRON: "${JOBS_SLA_WATCH_CRON:-0 0 * * * *}"
-      # 제보 기기·IP 해시 비밀값(SP4). 없으면 compose가 여기서 멈춘다 — infra/.env에 넣는다.
-      SIGNAL_HASH_SECRET: "${SIGNAL_HASH_SECRET:?infra/.env에 SIGNAL_HASH_SECRET을 넣으세요 (openssl rand -hex 32)}"
+      # 제보 기기·IP 해시 비밀값(SP4). 비어 있으면 백엔드가 기동을 거부한다(SignalHasher fail-fast) — infra/.env에 넣는다.
+      SIGNAL_HASH_SECRET: "${SIGNAL_HASH_SECRET:-}"
       SERVER_FORWARD_HEADERS_STRATEGY: "${SERVER_FORWARD_HEADERS_STRATEGY:-none}"
     volumes:
       # Firebase 키 같은 시크릿 파일은 infra/secrets/ 에 둔다(gitignore 대상 — secrets/README.md).

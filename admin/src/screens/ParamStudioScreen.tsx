@@ -62,7 +62,7 @@ export default function ParamStudioScreen() {
           <Group title="목표치">
             <NumRow label="하한" hint="서로 다른 제보자" cur={draft.current.targetFloor} val={v.targetFloor} step={1} disabled={!canEdit} onChange={(x) => set("targetFloor", x)} />
             <NumRow label="비율" hint="활성 제보자 대비" cur={draft.current.targetRatio} val={v.targetRatio} step={0.01} disabled={!canEdit} onChange={(x) => set("targetRatio", x)} />
-            <NumRow label="활성 기간(일)" cur={draft.current.activeWindowDays} val={v.activeWindowDays} step={1} disabled={!canEdit} onChange={(x) => set("activeWindowDays", x)} />
+            <NumRow label="활성 기간(일)" hint="시뮬·백테스트엔 미반영" cur={draft.current.activeWindowDays} val={v.activeWindowDays} step={1} disabled={!canEdit} onChange={(x) => set("activeWindowDays", x)} />
           </Group>
           <Group title="판정">
             <NumRow label="HIT 임계값" cur={draft.current.hitThreshold} val={v.hitThreshold} step={0.01} disabled={!canEdit} onChange={(x) => set("hitThreshold", x)} />
@@ -182,7 +182,7 @@ function BacktestCard({ draft, canRun, busy, act, put, flash }: {
     const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
     const a = document.createElement("a");
     a.href = url; a.download = "synthetic-v1.json"; a.click();
-    URL.revokeObjectURL(url);
+    setTimeout(() => URL.revokeObjectURL(url), 0);
   });
 
   const rows: BacktestCaseRow[] = r ? r.report.rows.filter((row) => !onlyChanged || row.changed) : [];
@@ -212,6 +212,9 @@ function BacktestCard({ draft, canRun, busy, act, put, flash }: {
         <>
           <div style={{ font: "500 11.5px Pretendard", color: C.sub, marginTop: 12 }}>
             '{r.datasetName}' {r.caseCount}건 · 해시 {r.sha256.slice(0, 12)} · 판정이 바뀐 사례 {r.report.changedCount}건
+          </div>
+          <div style={{ font: "500 10.5px Pretendard", color: C.faint, marginTop: 2 }}>
+            정답 라벨은 사람이 붙인 평가용 값입니다. 예시(합성 시나리오) 파일의 라벨은 설계 의도일 뿐 실측이 아닙니다.
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 10 }}>
             <SideBox title="현재 운영값" side={r.report.current} />
