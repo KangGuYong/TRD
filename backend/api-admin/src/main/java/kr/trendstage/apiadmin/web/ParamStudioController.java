@@ -2,6 +2,7 @@ package kr.trendstage.apiadmin.web;
 
 import kr.trendstage.apiadmin.auth.AdminPrincipal;
 import kr.trendstage.apiadmin.auth.AdminValidationException;
+import kr.trendstage.apiadmin.params.BacktestService;
 import kr.trendstage.apiadmin.params.ParamStudioService;
 import kr.trendstage.domain.params.DraftValues;
 import kr.trendstage.domain.signal.IndependenceMode;
@@ -14,16 +15,20 @@ import org.springframework.web.bind.annotation.*;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import java.util.UUID;
+
 /** ADM-600. 드래프트 편집·시뮬레이션·승인요청은 OPERATOR 이상(02 §1.1 paramDraft와 동일 권한). */
 @RestController
 @RequestMapping("/admin/params")
 public class ParamStudioController {
 
     private final ParamStudioService service;
+    private final BacktestService backtestService;
     private final ObjectMapper objectMapper;
 
-    public ParamStudioController(ParamStudioService service, ObjectMapper objectMapper) {
+    public ParamStudioController(ParamStudioService service, BacktestService backtestService, ObjectMapper objectMapper) {
         this.service = service;
+        this.backtestService = backtestService;
         this.objectMapper = objectMapper;
     }
 
@@ -97,6 +102,20 @@ public class ParamStudioController {
                                                    @AuthenticationPrincipal AdminPrincipal actor) {
         String reason = req == null ? null : req.reason();
         return toResponse(service.requestApproval(actor.id(), actor.role(), reason));
+    }
+
+    public record BacktestRunRequest(String datasetId) {}
+
+    @PostMapping("/draft/backtest")
+    @PreAuthorize("hasAnyRole('OPERATOR', 'ADMIN')")
+    public ParameterDraftResponse backtest(@RequestBody BacktestRunRequest req, @AuthenticationPrincipal AdminPrincipal actor) {
+        UUID datasetId;
+        try {
+            datasetId = UUID.fromString(req.datasetId());
+        } catch (IllegalArgumentException | NullPointerException e) {
+            throw new AdminValidationException("datasetId: UUID가 필요합니다");
+        }
+        return toResponse(backtestService.run(actor.id(), actor.role(), datasetId));
     }
 
     private ParameterDraftResponse toResponse(ParameterDraft draft) {
