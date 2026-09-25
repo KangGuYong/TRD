@@ -66,13 +66,14 @@ BEGIN
         FOR p IN 1 .. array_length(rec.platforms, 1) LOOP
             v_sub := ('5eed0000-0005-0000-' || lpad(rec.idx::text, 4, '0') || '-' || lpad(p::text, 12, '0'))::uuid;
             INSERT INTO submissions (id, user_id, trend_item_id, raw_input, normalized_key, confidence,
-                                      source_platform, evidence_url, one_line, result, created_at)
+                                      source_platform, platform, evidence_url, one_line, result, created_at)
             VALUES (
                 v_sub,
                 CASE (p % 3) WHEN 0 THEN user_a WHEN 1 THEN user_b ELSE user_c END,
                 v_item, rec.name, v_norm,
                 (ARRAY[10, 30, 50])[1 + ((rec.idx + p) % 3)],
                 rec.platforms[p],
+                'ETC',
                 'https://example.com/evidence/' || rec.idx || '-' || p,
                 rec.name || ' 제보',
                 'PENDING',
@@ -96,8 +97,8 @@ BEGIN
 
         v_sub := gen_random_uuid();
         INSERT INTO submissions (id, user_id, trend_item_id, raw_input, normalized_key, confidence,
-                                  source_platform, evidence_url, one_line, result, created_at)
-        VALUES (v_sub, user_a, v_item, '판정완료 테스트 항목 A' || i, v_norm, 30, 'X',
+                                  source_platform, platform, evidence_url, one_line, result, created_at)
+        VALUES (v_sub, user_a, v_item, '판정완료 테스트 항목 A' || i, v_norm, 30, 'X', 'ETC',
                 'https://example.com/evidence/a-' || i, '테스트 제보 A' || i,
                 v_result::submission_result, now() - interval '25 days');
 
@@ -130,8 +131,8 @@ BEGIN
 
         v_sub := gen_random_uuid();
         INSERT INTO submissions (id, user_id, trend_item_id, raw_input, normalized_key, confidence,
-                                  source_platform, evidence_url, one_line, result, created_at)
-        VALUES (v_sub, user_b, v_item, '판정완료 테스트 항목 B' || i, v_norm, 30, 'X',
+                                  source_platform, platform, evidence_url, one_line, result, created_at)
+        VALUES (v_sub, user_b, v_item, '판정완료 테스트 항목 B' || i, v_norm, 30, 'X', 'ETC',
                 'https://example.com/evidence/b-' || i, '테스트 제보 B' || i,
                 v_result::submission_result, now() - interval '30 days');
 

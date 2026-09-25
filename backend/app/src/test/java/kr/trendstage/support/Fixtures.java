@@ -45,6 +45,10 @@ public class Fixtures {
         jdbc.update("UPDATE submissions SET result = 'VOID', voided_at = ? WHERE id = ?", Timestamp.from(at), submissionId);
     }
 
+    public String platform(UUID submissionId) {
+        return jdbc.queryForObject("SELECT platform FROM submissions WHERE id = ?", String.class, submissionId);
+    }
+
     public String submissionResult(UUID submissionId) {
         return jdbc.queryForObject("SELECT result::text FROM submissions WHERE id = ?", String.class, submissionId);
     }
@@ -225,8 +229,8 @@ public class Fixtures {
         String key = jdbc.queryForObject("SELECT normalized_key FROM trend_items WHERE id = ?", String.class, itemId);
         return jdbc.queryForObject(
                 "INSERT INTO submissions (user_id, trend_item_id, raw_input, normalized_key, confidence, "
-                        + "source_platform, evidence_url, one_line, created_at, is_seed) "
-                        + "VALUES (?, ?, ?, ?, ?, 'X', 'https://example.com', '설명', ?, ?) RETURNING id",
+                        + "source_platform, platform, evidence_url, one_line, created_at, is_seed) "
+                        + "VALUES (?, ?, ?, ?, ?, 'X', 'ETC', 'https://example.com', '설명', ?, ?) RETURNING id",
                 UUID.class, userId, itemId, key, key, confidence, Timestamp.from(createdAt), seed);
     }
 
