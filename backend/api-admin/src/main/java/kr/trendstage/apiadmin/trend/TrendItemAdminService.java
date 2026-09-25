@@ -2,6 +2,7 @@ package kr.trendstage.apiadmin.trend;
 
 import kr.trendstage.apiadmin.auth.AdminValidationException;
 import kr.trendstage.domain.score.VerdictPlan;
+import kr.trendstage.domain.signal.Platform;
 import kr.trendstage.domain.verdict.DeadlineWindow;
 import kr.trendstage.judge.JudgeService;
 import kr.trendstage.persistence.entity.Submission;
@@ -125,7 +126,7 @@ public class TrendItemAdminService {
                         userGrades.findTopByUserIdOrderByComputedAtDesc(s.getUserId())
                                 .map(g -> g.getTrustIndex().doubleValue()).orElse(null),
                         DISPLAY_FORMAT.format(s.getCreatedAt()),
-                        s.getSourcePlatform(), s.getOneLine(), s.getEvidenceUrl()))
+                        Platform.labelOf(s.getPlatform()), s.getOneLine(), s.getEvidenceUrl()))
                 .toList();
 
         Instant deadline = DeadlineWindow.effectiveDeadline(item.getFirstSeenAt(), item.getJudgmentDeadlineOverride());

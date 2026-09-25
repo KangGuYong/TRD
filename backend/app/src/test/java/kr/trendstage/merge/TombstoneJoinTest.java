@@ -1,6 +1,7 @@
 package kr.trendstage.merge;
 
 import kr.trendstage.apiadmin.seed.AdminSeedService;
+import kr.trendstage.apipublic.service.SubmissionOrigin;
 import kr.trendstage.apipublic.service.SubmissionService;
 import kr.trendstage.apipublic.service.WatchService;
 import kr.trendstage.apipublic.web.DuplicateSubmissionException;
@@ -52,7 +53,7 @@ class TombstoneJoinTest extends AbstractIntegrationTest {
         fx.merged(l, s);
         UUID u = fx.user();
 
-        submissions.create(u, req(fx.key(l)));   // 지금까지는 422 item-closed
+        submissions.create(u, req(fx.key(l)), SubmissionOrigin.NONE);   // 지금까지는 422 item-closed
 
         assertThat(itemOfUserSubmission(u)).isEqualTo(s);
     }
@@ -66,7 +67,7 @@ class TombstoneJoinTest extends AbstractIntegrationTest {
         fx.merged(l2, l);
         UUID u = fx.user();
 
-        submissions.create(u, req(fx.key(l2)));
+        submissions.create(u, req(fx.key(l2)), SubmissionOrigin.NONE);
 
         assertThat(itemOfUserSubmission(u)).isEqualTo(s);
     }
@@ -79,7 +80,7 @@ class TombstoneJoinTest extends AbstractIntegrationTest {
         UUID u = fx.user();
         fx.submission(u, s, 30, now.minus(Duration.ofHours(1)));
 
-        assertThatThrownBy(() -> submissions.create(u, req(fx.key(l))))
+        assertThatThrownBy(() -> submissions.create(u, req(fx.key(l)), SubmissionOrigin.NONE))
                 .isInstanceOf(DuplicateSubmissionException.class);
     }
 
@@ -124,7 +125,7 @@ class TombstoneJoinTest extends AbstractIntegrationTest {
         for (UUID u : List.of(u1, u2)) {
             futures.add(pool.submit(() -> {
                 start.await();
-                submissions.create(u, req(name));
+                submissions.create(u, req(name), SubmissionOrigin.NONE);
                 return null;
             }));
         }
