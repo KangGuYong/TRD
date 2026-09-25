@@ -12,7 +12,7 @@ public record ParamsSnapshot(int submitterTarget, double hitThreshold, double ba
                              int halflifeDays, double tiAlpha, double tiBeta) {
 
     public static ParamsSnapshot of(ParameterSet p) {
-        return new ParamsSnapshot(p.submitterTarget, p.hitThreshold, p.bandL2, p.bandL3, p.bandL4,
+        return new ParamsSnapshot(p.targetFloor, p.hitThreshold, p.bandL2, p.bandL3, p.bandL4,
                 p.mL1, p.mL2, p.mL3, p.mL4, p.wRank1, p.wRank2, p.wRank3, p.wRankRest,
                 p.halflifeDays, p.tiAlpha, p.tiBeta);
     }

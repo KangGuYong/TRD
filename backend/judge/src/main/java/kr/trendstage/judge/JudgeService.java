@@ -292,13 +292,13 @@ public class JudgeService {
         Map<UUID, Integer> ranks = orderRanks.findByTrendItemId(item.getId()).stream()
                 .collect(Collectors.toMap(SubmissionOrderRank::getSubmissionId, SubmissionOrderRank::getOrderRank));
 
-        List<TrendSignal.Entry> entries = subs.stream().map(s -> new TrendSignal.Entry(
+        List<TrendSignal.Entry> entries = subs.stream().map(s -> TrendSignal.Entry.legacy(
                 s.getId(), s.getUserId(), s.isSeed(), s.getCreatedAt(), s.getSourcePlatform(),
                 joinedAt.get(s.getUserId()))).toList();
         List<SubmissionRef> refs = subs.stream().map(s -> new SubmissionRef(
                 s.getId(), s.getUserId(), s.getConfidence(),
                 ranks.getOrDefault(s.getId(), Integer.MAX_VALUE), s.isSeed())).toList();
-        return new Inputs(new TrendSignal(deadline, entries), refs, subs, ranks);
+        return new Inputs(TrendSignal.of(deadline, entries), refs, subs, ranks);
     }
 
     String evidence(VerdictPlan plan, Inputs in, ParameterSet p, UUID supersededVerdictId, String adminReason) {

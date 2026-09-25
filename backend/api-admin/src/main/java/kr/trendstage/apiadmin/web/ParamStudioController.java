@@ -44,7 +44,7 @@ public class ParamStudioController {
 
     private ParameterDraftResponse operationalView() {
         ParameterSet current = service.currentOperationalParams();
-        return new ParameterDraftResponse(null, "NONE", current.submitterTarget, current.submitterTarget,
+        return new ParameterDraftResponse(null, "NONE", current.targetFloor, current.targetFloor,
                 current.hitThreshold, current.hitThreshold, null);
     }
 
@@ -82,7 +82,7 @@ public class ParamStudioController {
             }
             return new ParameterDraftResponse(
                     draft.getId().toString(), draft.getStatus().name(),
-                    payload.get("submitterTarget").asInt(), current.submitterTarget,
+                    payload.get("submitterTarget").asInt(), current.targetFloor,
                     payload.get("hitThreshold").asDouble(), current.hitThreshold,
                     sim);
         } catch (Exception e) {

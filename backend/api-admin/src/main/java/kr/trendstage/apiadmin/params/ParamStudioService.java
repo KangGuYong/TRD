@@ -148,7 +148,7 @@ public class ParamStudioService {
 
     private String defaultPayloadJson() {
         ParameterSet d = ParameterSet.defaults();
-        return payloadJson(d.submitterTarget, d.hitThreshold);
+        return payloadJson(d.targetFloor, d.hitThreshold);
     }
 
     private String payloadJson(int submitterTarget, double hitThreshold) {
