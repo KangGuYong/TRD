@@ -1583,7 +1583,7 @@ components:
         result: { type: string, enum: [HIT, MISS] }
         reach: { type: [string, 'null'] }
         breakdown: { $ref: '#/components/schemas/TBreakdown' }
-        explain: { type: string, example: "T 0.48 = 제보자 15/20 (0.75) × 지속성 0.80 (2일/5일) × 다양성 0.80 (2곳/3곳)" }
+        explain: { type: string, example: "T 0.48 = 제보자 15/20 (0.75) × 지속성 0.80 (2일 · 기준 5일) × 다양성 0.80 (2곳 · 기준 3곳)" }
     BacktestSide:
       type: object
       properties:

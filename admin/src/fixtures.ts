@@ -115,7 +115,7 @@ export const fxAdminAccounts: AdminAccountSummary[] = [
 ];
 
 export const fxApprovals: ApprovalRequestView[] = [
-  { id: "ap1", actionType: "PARAM_APPLY", targetRef: "pd-17", requestedBy: "admin-fx-1", requestedByName: "김운영", approvals: 0, requiredApprovals: 1, status: "PENDING", reason: "O1 백테스트 결과 반영 — submitterTarget 20→18", summary: "파라미터 적용: submitterTarget 20→18", createdAt: "2026-08-07 11:20", resolvedAt: null },
+  { id: "ap1", actionType: "PARAM_APPLY", targetRef: "pd-17", requestedBy: "admin-fx-1", requestedByName: "김운영", approvals: 0, requiredApprovals: 1, status: "PENDING", reason: "O1 백테스트 결과 반영 — 목표치 하한 20→18", summary: "파라미터 적용 · 드래프트 pd-17 · 데이터셋 '과거 사례 1차'(30건) — 정밀도 0.62→0.78, 재현율 0.80→0.75, 판정 변경 4건", createdAt: "2026-08-07 11:20", resolvedAt: null },
   { id: "ap2", actionType: "LEDGER_ADJ", targetRef: "user_4410", requestedBy: "admin-fx-2", requestedByName: "박관리", approvals: 0, requiredApprovals: 1, status: "PENDING", reason: "hitThreshold 0.20→0.22 보정", summary: "원장 조정: user_4410 +150.0", createdAt: "2026-08-05 09:40", resolvedAt: null },
 ];
 
@@ -133,8 +133,8 @@ export const fxReportQueue: ReportQueueItem[] = [
 ];
 
 const fxJudged: JudgedItem[] = [
-  { trendItemId: "t1", canonicalName: "탕후루 챌린지", result: "HIT", reachLevel: "L2", scoreT: "0.5500", judgedAt: "2026-08-07 03:00", superseded: false, tExplain: "제보자 11/20 × 지속성 1.00 × 다양성 1.00" },
-  { trendItemId: "t2", canonicalName: "도파민 디톡스", result: "MISS", reachLevel: null, scoreT: "0.1200", judgedAt: "2026-08-06 03:00", superseded: false, tExplain: "제보자 3/20 × 지속성 0.80 × 다양성 1.00" },
+  { trendItemId: "t1", canonicalName: "탕후루 챌린지", result: "HIT", reachLevel: "L2", scoreT: "0.5500", judgedAt: "2026-08-07 03:00", superseded: false, tExplain: "T 0.55 = 제보자 11/20 (0.55) × 지속성 1.00 (6일 · 기준 5일) × 다양성 1.00 (3곳 · 기준 3곳)" },
+  { trendItemId: "t2", canonicalName: "도파민 디톡스", result: "MISS", reachLevel: null, scoreT: "0.1200", judgedAt: "2026-08-06 03:00", superseded: false, tExplain: "T 0.12 = 제보자 3/20 (0.15) × 지속성 0.80 (2일 · 기준 5일) × 다양성 1.00 (3곳 · 기준 3곳)" },
   { trendItemId: "t3", canonicalName: "제로슈거 밀키트", result: "VOID", reachLevel: null, scoreT: null, judgedAt: "2026-08-05 03:00", superseded: true, tExplain: null },
 ];
 const fxImminent: ImminentItem[] = [
@@ -174,7 +174,7 @@ export const fxTrendItemDetail: TrendItemDetail = {
   firstSeenAt: "2026-08-15 09:12", deadline: "2026-08-29 09:12", daysLeft: 9, graceExtended: false,
   distinctSubmitters: 12, distinctPlatforms: 3, endorseCount: 6,
   currentResult: null, currentReachLevel: null, currentScoreT: null, currentJudgedAt: null,
-  previewResult: "HIT", previewReachLevel: "L3", previewScoreT: "0.6000", previewExplain: "제보자 12/20 × 지속성 1.00 × 다양성 1.00",
+  previewResult: "HIT", previewReachLevel: "L3", previewScoreT: "0.6000", previewExplain: "T 0.60 = 제보자 12/20 (0.60) × 지속성 1.00 (5일 · 기준 5일) × 다양성 1.00 (4곳 · 기준 3곳)",
   submissions: [
     { submissionId: "sub-1", userHandle: "user_4410", orderRank: 1, confidence: 50, submitterTi: 0.63, createdAt: "2026-08-15 09:12",
       platform: "인스타", oneLine: "친구들 사이에서 다들 이걸로 챌린지 영상 찍는 중", evidenceUrl: "https://instagram.com/p/example1" },

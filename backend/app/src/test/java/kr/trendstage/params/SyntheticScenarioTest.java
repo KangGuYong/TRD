@@ -61,7 +61,7 @@ class SyntheticScenarioTest {
         BacktestReport r = Backtest.run(cases(), ParameterSet.defaults(), EXAMPLE.toParameterSet());
         BacktestReport.CaseRow c02 = r.rows().stream().filter(row -> row.caseId().equals("c02")).findFirst().orElseThrow();
         assertThat(c02.draft().explain())
-                .isEqualTo("T 0.29 = 제보자 5/8 (0.63) × 지속성 0.63 (1일/4일) × 다양성 0.75 (2곳/3곳)");
+                .isEqualTo("T 0.29 = 제보자 5/8 (0.63) × 지속성 0.63 (1일 · 기준 4일) × 다양성 0.75 (2곳 · 기준 3곳)");
     }
 
     @Test

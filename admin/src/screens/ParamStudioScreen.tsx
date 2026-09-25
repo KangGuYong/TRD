@@ -53,7 +53,8 @@ export default function ParamStudioScreen() {
         </span>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+      {/* 좁으면 두 카드를 세로로 쌓는다 — 나란히 두면 입력 행 라벨이 한 글자씩 줄바꿈된다 */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 12 }}>
         <Card>
           <b style={{ fontSize: 13 }}>판정 파라미터</b>
           <div style={{ font: "500 11.5px Pretendard", color: C.faint, marginTop: 6, lineHeight: 1.6 }}>
@@ -128,7 +129,7 @@ export default function ParamStudioScreen() {
 
       <BacktestCard draft={draft} canRun={CAN.paramDraft(role) && hasDraft && !locked && !dirty} busy={busy} act={act} put={put} flash={flash} />
 
-      <div style={{ display: "flex", gap: 8, marginTop: 12, alignItems: "center" }}>
+      <div style={{ display: "flex", gap: 8, marginTop: 12, alignItems: "center", flexWrap: "wrap" }}>
         {hasDraft && (
           <>
             <Btn disabled={!CAN.paramDraft(role) || locked || dirty || busy} title={dirty ? "먼저 적용하세요" : undefined}
@@ -192,7 +193,7 @@ function BacktestCard({ draft, canRun, busy, act, put, flash }: {
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
         <b style={{ fontSize: 13 }}>백테스트 — 사례 파일로 현재 vs 초안</b>
         <span style={{ font: "500 11px Pretendard", color: C.faint }}>정답 라벨은 평가에만 씁니다 — 판정 입력은 제보뿐(R5)</span>
-        <span style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
+        <span style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           <select value={selected} onChange={(e) => setSelected(e.target.value)}
             style={{ padding: "6px 8px", borderRadius: 7, border: `1px solid ${C.line}`, font: "500 12px Pretendard", maxWidth: 260 }}>
             {(datasets ?? []).length === 0 && <option value="">데이터셋 없음</option>}
@@ -216,7 +217,7 @@ function BacktestCard({ draft, canRun, busy, act, put, flash }: {
           <div style={{ font: "500 10.5px Pretendard", color: C.faint, marginTop: 2 }}>
             정답 라벨은 사람이 붙인 평가용 값입니다. 예시(합성 시나리오) 파일의 라벨은 설계 의도일 뿐 실측이 아닙니다.
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 10 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10, marginTop: 10 }}>
             <SideBox title="현재 운영값" side={r.report.current} />
             <SideBox title="초안" side={r.report.draft} highlight />
           </div>

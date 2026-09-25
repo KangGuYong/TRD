@@ -8,6 +8,9 @@ import { useRole, CAN } from "../state/role";
 import { useAuth } from "../state/auth";
 import type { ApprovalRequestView } from "../api/types";
 
+// 좁은 화면에서는 요약 열을 짓누르지 않고 가로 스크롤한다(TrendDetailScreen 제보 이력과 같은 방식).
+const ROW_GRID: React.CSSProperties = { display: "grid", gridTemplateColumns: "140px 90px 110px 1fr 90px 130px 170px", minWidth: 1000 };
+
 const ACTION_LABEL: Record<ApprovalRequestView["actionType"], string> = {
   PARAM_APPLY: "파라미터 적용",
   VERDICT_REJUDGE: "재판정(100+)",
@@ -76,7 +79,8 @@ export default function ApprovalsScreen() {
       </div>
 
       <Card style={{ padding: 0, overflow: "hidden" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "140px 90px 110px 1fr 90px 130px 170px", padding: "13px 20px", borderBottom: `1px solid ${C.line}`, background: "rgba(20,19,15,0.02)" }}>
+        <div style={{ overflowX: "auto" }}>
+        <div style={{ ...ROW_GRID, padding: "13px 20px", borderBottom: `1px solid ${C.line}`, background: "rgba(20,19,15,0.02)" }}>
           {["액션", "대상", "요청자", "요약", "승인현황", "생성시각", ""].map((h) => (
             <span key={h} style={{ font: "600 10.5px Pretendard", letterSpacing: ".06em", color: C.faint }}>{h}</span>
           ))}
@@ -91,7 +95,7 @@ export default function ApprovalsScreen() {
                 const isRequester = principal != null && row.requestedBy === principal.id;
                 const disabled = !canConfirm || isRequester || busyId === row.id;
                 return (
-                  <div key={row.id} style={{ display: "grid", gridTemplateColumns: "140px 90px 110px 1fr 90px 130px 170px", alignItems: "center", padding: "14px 20px", borderBottom: "1px solid rgba(20,19,15,0.05)" }}>
+                  <div key={row.id} style={{ ...ROW_GRID, alignItems: "center", padding: "14px 20px", borderBottom: "1px solid rgba(20,19,15,0.05)" }}>
                     <span style={{ font: "600 11px ui-monospace, monospace", padding: "3px 6px", borderRadius: 5, justifySelf: "start", background: "rgba(20,19,15,0.06)", color: C.ink }}>
                       {ACTION_LABEL[row.actionType]}
                     </span>
@@ -114,6 +118,7 @@ export default function ApprovalsScreen() {
             </>
           )}
         </StateView>
+        </div>
       </Card>
 
       {toast && <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", background: C.ink, color: "#fff", padding: "12px 18px", borderRadius: 10, font: "500 12.5px Pretendard" }}>{toast}</div>}

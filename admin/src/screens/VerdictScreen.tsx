@@ -17,6 +17,10 @@ const RESULT_TONE: Record<string, { bg: string; fg: string }> = {
 type ActionKind = "void" | "rejudge" | "grace";
 
 /** ADM-200. R1: 관리자는 VOID·재판정 요청·유예 연장만 할 수 있다 — 결과값을 직접 편집하는 UI는 없다. */
+// 좁은 화면에서는 열을 짓누르지 않고 가로 스크롤한다(TrendDetailScreen 제보 이력과 같은 방식).
+const IMMINENT_GRID: React.CSSProperties = { display: "grid", gridTemplateColumns: "1fr 150px 150px 90px 130px", minWidth: 720 };
+const JUDGED_GRID: React.CSSProperties = { display: "grid", gridTemplateColumns: "1fr 90px 90px 90px 150px 170px", minWidth: 820 };
+
 export default function VerdictScreen() {
   const q = useVerdicts();
   const { role } = useRole();
@@ -81,7 +85,8 @@ export default function VerdictScreen() {
         <div style={{ padding: "14px 20px", borderBottom: `1px solid ${C.line}`, background: "rgba(20,19,15,0.02)" }}>
           <b style={{ fontSize: 13.5 }}>판정 임박 (D+14 이내)</b>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 150px 150px 90px 130px", padding: "13px 20px", borderBottom: `1px solid ${C.line}` }}>
+        <div style={{ overflowX: "auto" }}>
+        <div style={{ ...IMMINENT_GRID, padding: "13px 20px", borderBottom: `1px solid ${C.line}` }}>
           {["항목", "최초 제보", "판정 예정", "남은 일수", ""].map((h) => (
             <span key={h} style={{ font: "600 10.5px Pretendard", letterSpacing: ".06em", color: C.faint }}>{h}</span>
           ))}
@@ -93,7 +98,7 @@ export default function VerdictScreen() {
                 <div style={{ padding: "20px", color: C.faint, font: "500 12.5px Pretendard" }}>임박한 항목이 없습니다.</div>
               )}
               {data.imminent.map((it) => (
-                <div key={it.trendItemId} style={{ display: "grid", gridTemplateColumns: "1fr 150px 150px 90px 130px", alignItems: "center", padding: "14px 20px", borderBottom: `1px solid rgba(20,19,15,0.05)` }}>
+                <div key={it.trendItemId} style={{ ...IMMINENT_GRID, alignItems: "center", padding: "14px 20px", borderBottom: `1px solid rgba(20,19,15,0.05)` }}>
                   <span style={{ font: "600 12.5px Pretendard" }}>
                     {it.canonicalName}
                     {it.graceExtended && <span style={{ marginLeft: 8, font: "600 10px ui-monospace, monospace", padding: "2px 6px", borderRadius: 5, background: "rgba(20,19,15,0.08)", color: C.faint }}>유예됨</span>}
@@ -108,13 +113,15 @@ export default function VerdictScreen() {
             </>
           )}
         </StateView>
+        </div>
       </Card>
 
       <Card style={{ padding: 0, overflow: "hidden" }}>
         <div style={{ padding: "14px 20px", borderBottom: `1px solid ${C.line}`, background: "rgba(20,19,15,0.02)" }}>
           <b style={{ fontSize: 13.5 }}>판정 완료</b>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 90px 90px 90px 150px 170px", padding: "13px 20px", borderBottom: `1px solid ${C.line}` }}>
+        <div style={{ overflowX: "auto" }}>
+        <div style={{ ...JUDGED_GRID, padding: "13px 20px", borderBottom: `1px solid ${C.line}` }}>
           {["항목", "결과", "확산", "T", "판정 시각", ""].map((h) => (
             <span key={h} style={{ font: "600 10.5px Pretendard", letterSpacing: ".06em", color: C.faint }}>{h}</span>
           ))}
@@ -128,13 +135,10 @@ export default function VerdictScreen() {
               {data.judged.map((it) => {
                 const tone = RESULT_TONE[it.result] ?? RESULT_TONE["-"];
                 return (
-                  <div key={it.trendItemId} style={{ display: "grid", gridTemplateColumns: "1fr 90px 90px 90px 150px 170px", alignItems: "center", padding: "14px 20px", borderBottom: `1px solid rgba(20,19,15,0.05)` }}>
+                  <div key={it.trendItemId} style={{ ...JUDGED_GRID, alignItems: "center", padding: "14px 20px", borderBottom: `1px solid rgba(20,19,15,0.05)` }}>
                     <div style={{ font: "600 12.5px Pretendard" }}>
                       {it.canonicalName}
                       {it.superseded && <span style={{ marginLeft: 8, font: "600 10px ui-monospace, monospace", padding: "2px 6px", borderRadius: 5, background: "rgba(20,19,15,0.08)", color: C.faint }}>재판정됨</span>}
-                      {it.tExplain && (
-                        <div style={{ font: "500 10.5px ui-monospace, monospace", color: C.faint, marginTop: 4 }}>{it.tExplain}</div>
-                      )}
                     </div>
                     <span style={{ font: "600 11px ui-monospace, monospace", padding: "3px 6px", borderRadius: 5, justifySelf: "start", background: tone.bg, color: tone.fg }}>{it.result}</span>
                     <span style={{ font: "500 11.5px ui-monospace, monospace", color: C.faint }}>{it.reachLevel ?? "-"}</span>
@@ -152,6 +156,10 @@ export default function VerdictScreen() {
                         </>
                       )}
                     </div>
+                    {it.tExplain && (
+                      // 산정 근거는 행 전체 폭 — 항목 열 폭에 묶이면 좁은 화면에서 한 글자씩 줄바꿈된다
+                      <div style={{ gridColumn: "1 / -1", font: "500 10.5px ui-monospace, monospace", color: C.faint, marginTop: 6 }}>{it.tExplain}</div>
+                    )}
                   </div>
                 );
               })}
@@ -161,6 +169,7 @@ export default function VerdictScreen() {
             </>
           )}
         </StateView>
+        </div>
       </Card>
 
       {dialog && (

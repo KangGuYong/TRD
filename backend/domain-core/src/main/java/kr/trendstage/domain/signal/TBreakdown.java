@@ -12,15 +12,15 @@ public record TBreakdown(int accounts, int independent, int target, Integer acti
                          int platforms, int diversityFullPlatforms, boolean diversityApplied, double diversity,
                          double t) {
 
-    /** 예: "T 0.48 = 제보자 15/20 (0.75) × 지속성 0.80 (2일/5일) × 다양성 0.80 (2곳/3곳)" */
+    /** 예: "T 0.48 = 제보자 15/20 (0.75) × 지속성 0.80 (2일 · 기준 5일) × 다양성 0.80 (2곳 · 기준 3곳)" */
     public String describe() {
         String who = accounts == independent
                 ? "제보자 %d/%d (%s)".formatted(independent, target, f(ratio))
                 : "제보자 %d/%d (%s · 계정 %d → 독립 %d)".formatted(independent, target, f(ratio), accounts, independent);
         String div = diversityApplied
-                ? "다양성 %s (%d곳/%d곳)".formatted(f(diversity), platforms, diversityFullPlatforms)
+                ? "다양성 %s (%d곳 · 기준 %d곳)".formatted(f(diversity), platforms, diversityFullPlatforms)
                 : "다양성 %s (플랫폼 판별 없음)".formatted(f(diversity));
-        return "T %s = %s × 지속성 %s (%d일/%d일) × %s".formatted(
+        return "T %s = %s × 지속성 %s (%d일 · 기준 %d일) × %s".formatted(
                 f(t), who, f(persistence), activeDays, persistenceFullDays, div);
     }
 

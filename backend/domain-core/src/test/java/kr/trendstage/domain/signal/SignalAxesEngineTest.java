@@ -194,9 +194,9 @@ class SignalAxesEngineTest {
     @Test
     void describeFormat() {
         TBreakdown plain = new TBreakdown(15, 15, 20, 150, 0.75, 2, 5, 0.80, 2, 3, true, 0.80, 0.48);
-        assertEquals("T 0.48 = 제보자 15/20 (0.75) × 지속성 0.80 (2일/5일) × 다양성 0.80 (2곳/3곳)", plain.describe());
+        assertEquals("T 0.48 = 제보자 15/20 (0.75) × 지속성 0.80 (2일 · 기준 5일) × 다양성 0.80 (2곳 · 기준 3곳)", plain.describe());
         TBreakdown merged = new TBreakdown(15, 13, 20, null, 0.65, 3, 5, 1.0, 1, 3, false, 1.0, 0.65);
-        assertEquals("T 0.65 = 제보자 13/20 (0.65 · 계정 15 → 독립 13) × 지속성 1.00 (3일/5일) × 다양성 1.00 (플랫폼 판별 없음)",
+        assertEquals("T 0.65 = 제보자 13/20 (0.65 · 계정 15 → 독립 13) × 지속성 1.00 (3일 · 기준 5일) × 다양성 1.00 (플랫폼 판별 없음)",
                 merged.describe());
     }
 
