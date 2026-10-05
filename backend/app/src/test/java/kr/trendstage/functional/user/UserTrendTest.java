@@ -172,7 +172,6 @@ class UserTrendTest extends FunctionalTestBase {
     }
 
     @Test
-    @org.junit.jupiter.api.Disabled("BUG-3: 비공개 항목에도 투표·인정이 된다(D1 결정: 404)")
     @DisplayName("USR-TRD-11 비공개(TEMP_HIDDEN·PERMANENT_HIDDEN) 항목 투표·인정은 404 (D1)")
     void hiddenItemInteractionsAre404() throws Exception {
         clock.set(T0);

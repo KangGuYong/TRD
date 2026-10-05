@@ -8,6 +8,7 @@ import kr.trendstage.persistence.repo.EndorsementRepository;
 import kr.trendstage.persistence.repo.TrendItemRepository;
 import kr.trendstage.persistence.repo.VoteRepository;
 import kr.trendstage.persistence.type.TrendState;
+import kr.trendstage.persistence.type.TrendVisibility;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -45,8 +46,11 @@ public class TrendInteractionService {
         }
     }
 
+    /** 상세 조회(TrendQueryService.detail)와 같은 기준 — 병합됐거나 비공개(신고 대응)면 없는 항목으로 본다(D1). */
     private void requireExists(UUID trendItemId) {
         TrendItem item = trends.findById(trendItemId).orElseThrow(() -> new TrendNotFoundException("존재하지 않는 항목입니다"));
-        if (item.getState() == TrendState.MERGED) throw new TrendNotFoundException("존재하지 않는 항목입니다");
+        if (item.getState() == TrendState.MERGED || item.getVisibility() != TrendVisibility.PUBLIC) {
+            throw new TrendNotFoundException("존재하지 않는 항목입니다");
+        }
     }
 }

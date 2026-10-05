@@ -50,7 +50,7 @@
 | USR-TRD-08 | 상세: 내가 워치한 항목 | `watched=true`(다른 유저 시점에서는 false) | — | PASS |
 | USR-TRD-09 | 투표 `{willTrend:true}` → 다시 `{willTrend:false}` | 둘 다 200, `votes` 1행 유지·값 토글, `voteCount` 문구 갱신 | — | PASS |
 | USR-TRD-10 | 투표: `willTrend` 누락 → 400 / 없는 항목·MERGED → 404 | — | — | PASS |
-| USR-TRD-11 | 투표·인정: TEMP_HIDDEN·PERMANENT_HIDDEN 항목 | 404 | D1(결정: 상세와 일치) — 현재 200/201 | BUG-3 |
+| USR-TRD-11 | 투표·인정: TEMP_HIDDEN·PERMANENT_HIDDEN 항목 | 404 | D1(결정: 상세와 일치) — 현재 200/201 | PASS(BUG-3 수정) |
 | USR-TRD-12 | 인정 첫 요청 → 201(바디 없음), 두 번째 → 409 | `endorsements` 1행 | — | PASS |
 | USR-TRD-13 | 인정: 없는 항목·MERGED → 404 | — | — | PASS |
 | USR-TRD-14 | 인정: 그 항목에 제보한 유저 | 409 | D2(결정: OpenAPI대로) — 현재 201 | BUG-4 |
@@ -218,7 +218,7 @@
 |---|---|---|---|
 | BUG-1 | USR-TRD-04 | 오늘의 5개가 선정 후 비공개·병합된 항목을 그날 계속 노출(명예훼손 대응 비공개 무력화) | `TrendQueryService` 오늘의 5개 재조회 — 저장된 선정을 상태·공개 여부 재확인 없이 반환 — **수정됨**(읽을 때 PUBLIC·비병합만) |
 | BUG-2 | USR-TRD-15 | 같은 유저의 투표·인정 동시 첫 요청이 UNIQUE 위반으로 500 | `TrendInteractionService.vote/endorse` — **수정됨**(INSERT … ON CONFLICT) |
-| BUG-3 | USR-TRD-11 | 비공개(TEMP_HIDDEN·PERMANENT_HIDDEN) 항목에도 투표·인정이 된다(D1: 404) | `TrendInteractionService` 항목 조회 — MERGED만 거름 |
+| BUG-3 | USR-TRD-11 | 비공개(TEMP_HIDDEN·PERMANENT_HIDDEN) 항목에도 투표·인정이 된다(D1: 404) | `TrendInteractionService` 항목 조회 — MERGED만 거름 — **수정됨**(비공개도 404) |
 | BUG-4 | USR-TRD-14 | 제보자 본인이 자기 항목을 인정할 수 있다(D2: 409) | `TrendInteractionService.endorse` |
 | BUG-5 | USR-RPT-08 | 소명 기한(요청+48h) 미검사 — 마감 후 제출도 200(D3: 409) | `ReportService` 소명 제출 |
 | BUG-6 | ADM-PRM-09 | REVIEW(승인 대기) 드래프트도 simulate가 `sim_result`를 덮어씀(D4: 409) | `ParamStudioService.simulate` |
