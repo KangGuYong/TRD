@@ -152,20 +152,20 @@
 
 | ID | 케이스 | 기대 | 근거·비고 | 상태 |
 |---|---|---|---|---|
-| ADM-RPT-01 | `GET /admin/reports/{id}/submissions` | 200, 그 항목의 비VOID 제보(시딩 포함) 생성순, 신고자 id 없음 | — | TODO |
-| ADM-RPT-02 | 없는 신고 → 422 | — | — | TODO |
+| ADM-RPT-01 | `GET /admin/reports/{id}/submissions` | 200, 그 항목의 비VOID 제보(시딩 포함) 생성순, 신고자 id 없음 | — | PASS |
+| ADM-RPT-02 | 없는 신고 → 422 | — | — | PASS |
 
 ### ADM-SEED 시딩 — `AdminSeedTest`
 
 | ID | 케이스 | 기대 | 근거·비고 | 상태 |
 |---|---|---|---|---|
-| ADM-SEED-01 | OPERATOR 첫 시딩 | 200 `{submissionId, canonicalName, trendItemId}`. `users`에 `seed_<loginId>` 생성·`admin_accounts.seed_user_id` 연결, `submissions.is_seed=true`, 감사 `SEED_SUBMISSION_CREATE` | 200 vs OpenAPI 201은 D7 | TODO |
-| ADM-SEED-02 | 같은 관리자가 같은 항목 재시딩 → 422 | — | — | TODO |
-| ADM-SEED-03 | `confidence=20`·잘못된 category → 422 / 필수 필드 누락 → 400 | — | — | TODO |
-| ADM-SEED-04 | 시딩은 유저 제보권을 쓰지 않고, 같은 이름으로 유저 제보 시 그 항목에 합류 | 유저 `quotaUsed` 그대로 반영, 같은 `trendItemId` | Phase 1 시딩 = 클러스터 앵커 | TODO |
-| ADM-SEED-05 | JUDGING·RESOLVED 항목 시딩 → 200 | D9: 현재 동작 고정 | TODO |
-| ADM-SEED-06 | `GET /admin/seed/accuracy` — 시딩 HIT 1·MISS 1인 관리자 | 그 관리자 행 `hit=1, miss=1, judged=2, trustIndex=(1+2)/(2+5)` | — | TODO |
-| ADM-SEED-07 | 역할: REVIEWER·AUDITOR 시딩 → 403, 정확도 조회는 4개 역할 200 | — | — | TODO |
+| ADM-SEED-01 | OPERATOR 첫 시딩 | 200 `{submissionId, canonicalName, trendItemId}`. `users`에 `seed_<loginId>` 생성·`admin_accounts.seed_user_id` 연결, `submissions.is_seed=true`, 감사 `SEED_SUBMISSION_CREATE` | 200 vs OpenAPI 201은 D7 | PASS |
+| ADM-SEED-02 | 같은 관리자가 같은 항목 재시딩 → 422 | — | — | PASS |
+| ADM-SEED-03 | `confidence=20`·잘못된 category → 422 / 필수 필드 누락 → 400 | — | — | PASS |
+| ADM-SEED-04 | 시딩은 유저 제보권을 쓰지 않고, 같은 이름으로 유저 제보 시 그 항목에 합류 | 유저 `quotaUsed` 그대로 반영, 같은 `trendItemId` | Phase 1 시딩 = 클러스터 앵커 | PASS |
+| ADM-SEED-05 | JUDGING·RESOLVED 항목 시딩 → 200 | D9: 현재 동작 고정 | PASS |
+| ADM-SEED-06 | `GET /admin/seed/accuracy` — 시딩 HIT 1·MISS 1인 관리자 | 그 관리자 행 `hit=1, miss=1, judged=2, trustIndex=(1+2)/(2+5)` | — | PASS |
+| ADM-SEED-07 | 역할: REVIEWER·AUDITOR 시딩 → 403, 정확도 조회는 4개 역할 200 | — | — | PASS |
 
 ### ADM-ITM 항목 — `AdminTrendItemTest`
 
