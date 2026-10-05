@@ -89,6 +89,10 @@ public class ParamStudioService {
         if (submitterTarget < 1) {
             throw new AdminValidationException("목표 제보자 수는 1 이상이어야 합니다");
         }
+        // T는 0~1로 잘린 값이라 임계값도 그 안이어야 한다 — 0 이하면 모두 HIT, 1 초과면 아무것도 HIT가 못 된다(D5)
+        if (!(hitThreshold > 0 && hitThreshold <= 1)) {
+            throw new AdminValidationException("판정 임계값은 0 초과 1 이하여야 합니다");
+        }
         ParameterDraft draft = getOrCreateActiveDraft(actorId);
         if (draft.getStatus() == ParamStatus.REVIEW) {
             throw new DraftLockedException("승인 대기 중인 드래프트는 수정할 수 없습니다");
@@ -102,6 +106,10 @@ public class ParamStudioService {
     @Transactional
     public ParameterDraft simulate(UUID actorId, AdminRole actorRole) {
         ParameterDraft draft = getOrCreateActiveDraft(actorId);
+        // 승인자가 보는 시뮬레이션은 요청 시점 결과로 고정한다 — 수정(PUT)과 같은 잠금(D4)
+        if (draft.getStatus() == ParamStatus.REVIEW) {
+            throw new DraftLockedException("승인 대기 중인 드래프트는 다시 시뮬레이션할 수 없습니다");
+        }
         ParameterSet draftParams = draft.toParameterSet(objectMapper);
 
         Instant since = clock.instant().minus(Duration.ofDays(SIM_WINDOW_DAYS));

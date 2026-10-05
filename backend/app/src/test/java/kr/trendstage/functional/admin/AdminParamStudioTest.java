@@ -78,13 +78,13 @@ class AdminParamStudioTest extends FunctionalTestBase {
     }
 
     @Test
-    @org.junit.jupiter.api.Disabled("BUG-7: hitThreshold 범위를 검증하지 않는다(D5 결정: 0 < hitThreshold ≤ 1, 밖이면 422)")
     @DisplayName("ADM-PRM-04 PUT hitThreshold -0.1·1.5·0은 422 (D5: 0 < hitThreshold ≤ 1)")
     void putThresholdOutOfRangeIs422() throws Exception {
         for (String t : new String[]{"-0.1", "1.5", "0"}) {
             putJson(DRAFT, op, "{\"submitterTarget\":20,\"hitThreshold\":" + t + "}")
                     .andExpect(status().isUnprocessableEntity());
         }
+        putJson(DRAFT, op, "{\"submitterTarget\":20,\"hitThreshold\":1.0}").andExpect(status().isOk());   // 상한 1은 포함
     }
 
     @Test
@@ -139,7 +139,6 @@ class AdminParamStudioTest extends FunctionalTestBase {
     }
 
     @Test
-    @org.junit.jupiter.api.Disabled("BUG-6: REVIEW(승인 대기) 드래프트도 simulate가 sim_result를 덮어쓴다(D4 결정: 409)")
     @DisplayName("ADM-PRM-09 REVIEW 중 simulate는 409, sim_result 그대로 (D4)")
     void simulateDuringReviewIs409() throws Exception {
         UUID id = draftId();

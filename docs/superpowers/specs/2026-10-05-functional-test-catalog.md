@@ -140,12 +140,12 @@
 | ADM-PRM-01 | OPERATOR `GET /admin/params/draft` (드래프트 없음) | 200, 드래프트 생성(DRAFT), `current*` 값 = 현재 파라미터 | AUDITOR는 기존 `RoleMatrixTest`(생성 안 함) | PASS |
 | ADM-PRM-02 | PUT `{submitterTarget:25, hitThreshold:0.25}` | 200, 값 반영, `simResult` 비워짐, 감사 `PARAM_DRAFT_UPDATE` | — | PASS |
 | ADM-PRM-03 | PUT `submitterTarget=0` → 422 | — | — | PASS |
-| ADM-PRM-04 | PUT `hitThreshold=-0.1` / `1.5` / `0` | 422 (`0 < hitThreshold ≤ 1`만 허용) | D5 — 현재 200 | BUG-7 |
+| ADM-PRM-04 | PUT `hitThreshold=-0.1` / `1.5` / `0` | 422 (`0 < hitThreshold ≤ 1`만 허용), `1.0`은 200 | D5 — 현재 200 | PASS(BUG-7 수정) |
 | ADM-PRM-05 | simulate | 200, `simResult{changed,total,missToHit,hitToMiss,reachChanged}`, 감사 `PARAM_SIMULATE` | — | PASS |
 | ADM-PRM-06 | 시뮬레이션 없이 승인 요청 → 422 / PUT 후(시뮬레이션 지워짐) 승인 요청 → 422 | CLAUDE.md "시뮬레이션 없이 승인 요청 불가" | PASS |
 | ADM-PRM-07 | 시뮬레이션 후 승인 요청(사유 있음) | 200 `status=REVIEW`, `approval_requests` PARAM_APPLY 1행, 감사 `APPROVAL_REQUEST` | 승인 이후는 기존 `ApprovalFlowTest` | PASS |
 | ADM-PRM-08 | 승인 요청: 사유 빈값 → 422 / REVIEW 중 다시 요청 → 409 / REVIEW 중 PUT → 409 | — | — | PASS |
-| ADM-PRM-09 | REVIEW 중 simulate | 409, `sim_result` 그대로 | D4 — 현재 200·덮어씀 | BUG-6 |
+| ADM-PRM-09 | REVIEW 중 simulate | 409, `sim_result` 그대로 | D4 — 현재 200·덮어씀 | PASS(BUG-6 수정) |
 | ADM-PRM-10 | 역할: REVIEWER는 GET·PUT·simulate·request-approval 모두 403 / AUDITOR는 PUT·simulate·request-approval 403 | — | — | PASS |
 
 ### ADM-RPT 신고 대상 제보 목록 — `AdminReportSubmissionsTest`
@@ -221,8 +221,8 @@
 | BUG-3 | USR-TRD-11 | 비공개(TEMP_HIDDEN·PERMANENT_HIDDEN) 항목에도 투표·인정이 된다(D1: 404) | `TrendInteractionService` 항목 조회 — MERGED만 거름 — **수정됨**(비공개도 404) |
 | BUG-4 | USR-TRD-14 | 제보자 본인이 자기 항목을 인정할 수 있다(D2: 409) | `TrendInteractionService.endorse` — **수정됨**(유효 제보가 있으면 409) |
 | BUG-5 | USR-RPT-08 | 소명 기한(요청+48h) 미검사 — 마감 후 제출도 200(D3: 409) | `ReportService` 소명 제출 — **수정됨**(기한 지나면 409, 제출 시각도 주입 Clock) |
-| BUG-6 | ADM-PRM-09 | REVIEW(승인 대기) 드래프트도 simulate가 `sim_result`를 덮어씀(D4: 409) | `ParamStudioService.simulate` |
-| BUG-7 | ADM-PRM-04 | `hitThreshold` 범위 미검증(D5: `0 < t ≤ 1` 밖이면 422) | `ParamStudioService` 드래프트 수정 |
+| BUG-6 | ADM-PRM-09 | REVIEW(승인 대기) 드래프트도 simulate가 `sim_result`를 덮어씀(D4: 409) | `ParamStudioService.simulate` — **수정됨**(REVIEW면 409) |
+| BUG-7 | ADM-PRM-04 | `hitThreshold` 범위 미검증(D5: `0 < t ≤ 1` 밖이면 422) | `ParamStudioService` 드래프트 수정 — **수정됨**(0 < t ≤ 1 밖이면 422) |
 | BUG-8 | ADM-VRD-08 | 유예 연장이 MERGED·VOID 항목에도 된다(D8: PENDING·JUDGING만) | `VerdictAdminService.extendGrace` |
 | BUG-9 | USR-SUB-14 | 제보 생성 응답의 `orderRank`가 항상 null — `save()` 후 flush 없이 순위 뷰 조회 | `SubmissionService.create/toResponse` — **수정됨**(뷰 엔티티에 @Synchronize("submissions") — 조회 전 자동 flush) |
 | BUG-10 | USR-SUB-10 | 판정 끝난 제보의 `delta`·`reachLevel`·`note`(산정 근거)가 항상 null | `SubmissionService.toResponse` — **수정됨**(원장 합·현재 판정 reach·T+원 산정식+조정 합계) |
