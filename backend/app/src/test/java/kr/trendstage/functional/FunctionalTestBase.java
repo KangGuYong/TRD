@@ -9,6 +9,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -83,8 +84,9 @@ public abstract class FunctionalTestBase extends AbstractIntegrationTest {
         return fx.itemOf(uuid(submissionJson, "$.id"));
     }
 
+    /** 응답 본문. charset 없는 application/json을 MockMvc는 ISO-8859-1로 읽으므로 UTF-8을 명시한다. */
     protected String body(ResultActions result) throws Exception {
-        return result.andReturn().getResponse().getContentAsString();
+        return result.andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
     }
 
     protected String getOk(String url, RequestPostProcessor who, Object... vars) throws Exception {

@@ -12,28 +12,29 @@
 
 | ID | 케이스 | 기대 | 근거·비고 | 상태 |
 |---|---|---|---|---|
-| USR-AUTH-01 | 인증 없이 보호 엔드포인트 18개(GET/POST/PUT/DELETE 각각) 호출 | 모두 401, 바디 없음 | `PublicSecurityConfig` — 파라미터화 테스트 1개 | TODO |
-| USR-AUTH-02 | 인증 없이 `GET /v1/trends`, `GET /v1/trends/{id}` | 200 | 공개 경로. OpenAPI의 401은 D7 | TODO |
-| USR-AUTH-03 | 잘못된 Bearer 토큰(Firebase 미설정)으로 보호 경로 | 401 (500 아님) | 필터가 미설정 예외를 삼킴 | TODO |
-| USR-AUTH-04 | `/v1` POST에 CSRF 토큰 없음 | 403이 아님(201/200) | `/v1`은 STATELESS·CSRF 없음. 기존 `AdminCsrfTest#publicApiChainIsUnaffected`는 401만 봄 | TODO |
+| USR-AUTH-01 | 인증 없이 보호 엔드포인트 18개(GET/POST/PUT/DELETE 각각) 호출 | 모두 401, 바디 없음 | `PublicSecurityConfig` — 파라미터화 테스트 1개 | PASS |
+| USR-AUTH-02 | 인증 없이 `GET /v1/trends`, `GET /v1/trends/{id}` | 200 | 공개 경로. OpenAPI의 401은 D7 | PASS |
+| USR-AUTH-03 | 잘못된 Bearer 토큰(Firebase 미설정)으로 보호 경로 | 401 (500 아님) | 필터가 미설정 예외를 삼킴 | PASS |
+| USR-AUTH-04 | `/v1` POST에 CSRF 토큰 없음 | 403이 아님(201/200) | `/v1`은 STATELESS·CSRF 없음. 기존 `AdminCsrfTest#publicApiChainIsUnaffected`는 401만 봄 | PASS |
 
 ### USR-SUB 제보 — `UserSubmissionTest`
 
 | ID | 케이스 | 기대 | 근거·비고 | 상태 |
 |---|---|---|---|---|
-| USR-SUB-01 | 새 이름 제보 | 201, `status=PENDING`, `orderRank=1`, `judgeInDays=14`, `word`=입력 이름. DB: `trend_items` 1행(PENDING, PUBLIC, first_seen=T0), `submissions.is_seed=false` | — | TODO |
-| USR-SUB-02 | 다른 유저가 공백·대소문자만 다른 이름(`"  Foo   BAR "` vs `"foo bar"`) 제보 | 201, 같은 `trend_items.id`에 합류, `orderRank=2` | 완전일치 병합(`NameNormalizer`) — 단위 테스트 없음 | TODO |
-| USR-SUB-03 | 같은 유저가 같은 항목에 다시 제보 | 409, 바디 `{trendItemId, dupeRank, message}`(Problem 아님), 제보권 차감 없음 | 기존 서비스 수준: `SubmissionQuotaIntegrationTest#duplicatesAndSeedsDoNotConsumeQuota` | TODO |
-| USR-SUB-04 | `confidence=20` | 422 | {10,30,50}만 | TODO |
-| USR-SUB-05 | 필수 필드 누락·길이 초과(name 121자, oneLine 201자), `category` 잘못된 enum | 400 | bean validation | TODO |
+| USR-SUB-01 | 새 이름 제보 | 201, `status=PENDING`, `orderRank=1`, `judgeInDays=14`, `word`=입력 이름. DB: `trend_items` 1행(PENDING, PUBLIC, first_seen=T0), `submissions.is_seed=false` | — | PASS |
+| USR-SUB-02 | 다른 유저가 공백·대소문자만 다른 이름(`"  Foo   BAR "` vs `"foo bar"`) 제보 | 201, 같은 `trend_items.id`에 합류, `orderRank=2` | 완전일치 병합(`NameNormalizer`) — 단위 테스트 없음 | PASS |
+| USR-SUB-03 | 같은 유저가 같은 항목에 다시 제보 | 409, 바디 `{trendItemId, dupeRank, message}`(Problem 아님), 제보권 차감 없음 | 기존 서비스 수준: `SubmissionQuotaIntegrationTest#duplicatesAndSeedsDoNotConsumeQuota` | PASS |
+| USR-SUB-04 | `confidence=20` | 422 | {10,30,50}만 | PASS |
+| USR-SUB-05 | 필수 필드 누락·길이 초과(name 121자, oneLine 201자), `category` 잘못된 enum | 400 | bean validation | PASS |
 | USR-SUB-06 | L0 유저 3번째 제보 | 422 `type=quota-exhausted` | 기존: `#quotaExhaustedIsProblem422WithType` — **링크만**, 재작성 안 함 | PASS(기존) |
-| USR-SUB-07 | 마감(D+14) 지난 항목 / JUDGING 항목에 제보 | 422 `type=item-closed`, 제보권 차감 없음 | 경계값은 기존 `#closedItemsRejectWithoutCharge`. HTTP 매핑만 확인 | TODO |
+| USR-SUB-07 | 마감(D+14) 지난 항목 / JUDGING 항목에 제보 | 422 `type=item-closed`, 제보권 차감 없음 | 경계값은 기존 `#closedItemsRejectWithoutCharge`. HTTP 매핑만 확인 | PASS |
 | USR-SUB-08 | 병합된 이름(MERGED 툼스톤)으로 제보 | 201, 생존 항목 id | 기존: `TombstoneJoinTest#submissionOnMergedNameJoinsSurvivor` — 링크 | PASS(기존) |
-| USR-SUB-09 | `GET /v1/submissions/me` | 200, 최신순, 다른 유저 제보 없음, PENDING이면 `judgeInDays` 있음 | — | TODO |
+| USR-SUB-09 | `GET /v1/submissions/me` | 200, 최신순, 다른 유저 제보 없음, PENDING이면 `judgeInDays` 있음 | — | PASS |
 | USR-SUB-10 | 판정 끝난 제보의 `GET /v1/submissions/me` | `status`=HIT/MISS, `delta` 채워짐, `judgeInDays=null` | JRN-01에서 함께 확인 | TODO |
-| USR-SUB-11 | NFD로 분해된 한글 이름(macOS 입력) 제보 → NFC 이름 항목 | 같은 항목에 합류 | `NameNormalizer` NFC | TODO |
-| USR-SUB-12 | 같은 유저가 같은 새 이름을 동시에 두 번 제보(네트워크 재시도) | 201 1건 + 409 1건, 500 없음, 제보 1행 | — | TODO |
-| USR-SUB-13 | 이름 정확히 120자 | 201 (121자는 400 — USR-SUB-05) | 경계값 | TODO |
+| USR-SUB-11 | NFD로 분해된 한글 이름(macOS 입력) 제보 → NFC 이름 항목 | 같은 항목에 합류 | `NameNormalizer` NFC | PASS |
+| USR-SUB-12 | 같은 유저가 같은 새 이름을 동시에 두 번 제보(네트워크 재시도) | 201 1건 + 409 1건, 500 없음, 제보 1행 | — | PASS |
+| USR-SUB-13 | 이름 정확히 120자 | 201 (121자는 400 — USR-SUB-05) | 경계값 | PASS |
+| USR-SUB-14 | 생성 응답의 `orderRank` | 1위, 이어서 2위 | OpenAPI "판정 전에는 파생 잠정값" — 현재 항상 null(flush 전 뷰 조회). USR-SUB-01·02는 순위를 `GET /v1/submissions/me`로 확인 | BUG-9 |
 
 ### USR-TRD 트렌드 조회·투표·인정 — `UserTrendTest`
 
