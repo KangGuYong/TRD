@@ -104,32 +104,32 @@
 
 | ID | 케이스 | 기대 | 근거·비고 | 상태 |
 |---|---|---|---|---|
-| ADM-ME-01 | `GET /admin/me` (4개 역할 각각) | 200, `{id, loginId, displayName, role}`이 세션 값 | — | TODO |
-| ADM-ACC-01 | `GET /admin/accounts` 역할: ADMIN·AUDITOR 200 / REVIEWER·OPERATOR 403 | — | 02 §1.1 | TODO |
-| ADM-ACC-02 | 비활성화: ADMIN이 다른 계정을 비활성화 | 200, `disabledAt` 채워짐, 감사 `ACCOUNT_DISABLE` 1행, 그 계정의 다음 요청 401 `session-revoked` | — | TODO |
-| ADM-ACC-03 | 비활성화: 자기 자신 → 403 / 없는 계정 → 422 / OPERATOR가 호출 → 403 | — | — | TODO |
+| ADM-ME-01 | `GET /admin/me` (4개 역할 각각) | 200, `{id, loginId, displayName, role}`이 세션 값 | — | PASS |
+| ADM-ACC-01 | `GET /admin/accounts` 역할: ADMIN·AUDITOR 200 / REVIEWER·OPERATOR 403 | — | 02 §1.1 | PASS |
+| ADM-ACC-02 | 비활성화: ADMIN이 다른 계정을 비활성화 | 200, `disabledAt` 채워짐, 감사 `ACCOUNT_DISABLE` 1행, 그 계정의 다음 요청 401 `session-revoked` | — | PASS |
+| ADM-ACC-03 | 비활성화: 자기 자신 → 403 / 없는 계정 → 422 / OPERATOR가 호출 → 403 | — | — | PASS |
 
 ### ADM-BAT 배치 수동 실행 — `AdminBatchTest`
 
 | ID | 케이스 | 기대 | 근거·비고 | 상태 |
 |---|---|---|---|---|
-| ADM-BAT-01 | OPERATOR가 `cluster-merge/run` (임베딩 서비스 없음) | 200, `autoMerged=queued=separated=0`, `failed=candidates`. 감사 `CLUSTER_MERGE_MANUAL_TRIGGER` 1행 증가. 내 후보 항목의 `merge_checked_at`은 NULL 유지 | 설계 §2.1의 `embedding.service.url` 고정 | TODO |
-| ADM-BAT-02 | `shedlock`의 `cluster_merge` 잠금을 미래로 설정 후 실행 | 409, 감사 행 증가 없음. 끝나면 잠금 해제 | ADM-900 "실행 중이면 409" | TODO |
-| ADM-BAT-03 | REVIEWER·AUDITOR → 403 | — | — | TODO |
+| ADM-BAT-01 | OPERATOR가 `cluster-merge/run` (임베딩 서비스 없음) | 200, `autoMerged=queued=separated=0`, `failed=candidates`. 감사 `CLUSTER_MERGE_MANUAL_TRIGGER` 1행 증가. 내 후보 항목의 `merge_checked_at`은 NULL 유지 | 설계 §2.1의 `embedding.service.url` 고정 | PASS |
+| ADM-BAT-02 | `shedlock`의 `cluster_merge` 잠금을 미래로 설정 후 실행 | 409, 감사 행 증가 없음. 끝나면 잠금 해제 | ADM-900 "실행 중이면 409" | PASS |
+| ADM-BAT-03 | REVIEWER·AUDITOR → 403 | — | — | PASS |
 
 ### ADM-MQ 병합 큐 — `AdminMergeQueueTest`
 
 | ID | 케이스 | 기대 | 근거·비고 | 상태 |
 |---|---|---|---|---|
-| ADM-MQ-01 | `GET /admin/merge-queue` (4개 역할) | 200, 내 PENDING 행이 `similarity`·`newName`·`oldName`·`orderPreview`와 함께 있음. 시딩은 "시딩 handle"로 표시 | — | TODO |
-| ADM-MQ-02 | `GET …/{id}/preview` | 200, 생존=first_seen이 이른 쪽, `orderRank` 전후, `firstSeenAtBefore/After`, `deadlineBefore/After`, `dedupVoidedHandles`, `quotaRefundHandles`(시딩 제외) | 계산 규칙은 기존 `MergeRecomputeTest` | TODO |
-| ADM-MQ-03 | 미리보기: 없는 id·이미 처리된 항목 → 422 | — | — | TODO |
-| ADM-MQ-04 | 병합 역할: REVIEWER·OPERATOR 200 / AUDITOR 403 | — | 기존은 ADMIN만 | TODO |
-| ADM-MQ-05 | 같은 `Idempotency-Key`로 병합 두 번 | 두 번째 200 `replayed=true`, 감사 `MERGE` 1행 | 기존 서비스 수준 `MergeIdempotencyTest` — HTTP 매핑만 | TODO |
-| ADM-MQ-06 | 같은 키로 다른 결정(분리) → 422 `idempotency-key-mismatch` / 처리된 항목에 새 키 → 409 `merge-queue-decided` | — | — | TODO |
-| ADM-MQ-07 | 판정된 항목(RESOLVED)과 병합 → 409 `merge-resolved`, 큐는 PENDING 유지 | — | CLAUDE.md "판정 후면 병합 금지" | TODO |
-| ADM-MQ-08 | 분리 | 200 `status=SKIPPED`, 감사 `MERGE_SEPARATE`, 두 항목·제보 변화 없음 | — | TODO |
-| ADM-MQ-09 | 분리: 키 없음 → 400 `idempotency-key-required` / 판정된 항목 → 200(가드 없음, 데이터 변화 없음) | 현재 동작 고정 | TODO |
+| ADM-MQ-01 | `GET /admin/merge-queue` (4개 역할) | 200, 내 PENDING 행이 `similarity`·`newName`·`oldName`·`orderPreview`와 함께 있음. 시딩은 "시딩 handle"로 표시 | — | PASS |
+| ADM-MQ-02 | `GET …/{id}/preview` | 200, 생존=first_seen이 이른 쪽, `orderRank` 전후, `firstSeenAtBefore/After`, `deadlineBefore/After`, `dedupVoidedHandles`, `quotaRefundHandles`(시딩 제외) | 계산 규칙은 기존 `MergeRecomputeTest` | PASS |
+| ADM-MQ-03 | 미리보기: 없는 id·이미 처리된 항목 → 422 | — | — | PASS |
+| ADM-MQ-04 | 병합 역할: REVIEWER·OPERATOR 200 / AUDITOR 403 | — | 기존은 ADMIN만 | PASS |
+| ADM-MQ-05 | 같은 `Idempotency-Key`로 병합 두 번 | 두 번째 200 `replayed=true`, 감사 `MERGE` 1행 | 기존 서비스 수준 `MergeIdempotencyTest` — HTTP 매핑만 | PASS |
+| ADM-MQ-06 | 같은 키로 다른 결정(분리) → 422 `idempotency-key-mismatch` / 처리된 항목에 새 키 → 409 `merge-queue-decided` | — | — | PASS |
+| ADM-MQ-07 | 판정된 항목(RESOLVED)과 병합 → 409 `merge-resolved`, 큐는 PENDING 유지 | — | CLAUDE.md "판정 후면 병합 금지" | PASS |
+| ADM-MQ-08 | 분리 | 200 `status=SKIPPED`, 감사 `MERGE_SEPARATE`, 두 항목·제보 변화 없음 | — | PASS |
+| ADM-MQ-09 | 분리: 키 없음 → 400 `idempotency-key-required` / 판정된 항목 → 200(가드 없음, 데이터 변화 없음) | 현재 동작 고정 | PASS |
 
 ### ADM-PRM 파라미터 스튜디오 — `AdminParamStudioTest`
 
@@ -137,58 +137,58 @@
 
 | ID | 케이스 | 기대 | 근거·비고 | 상태 |
 |---|---|---|---|---|
-| ADM-PRM-01 | OPERATOR `GET /admin/params/draft` (드래프트 없음) | 200, 드래프트 생성(DRAFT), `current*` 값 = 현재 파라미터 | AUDITOR는 기존 `RoleMatrixTest`(생성 안 함) | TODO |
-| ADM-PRM-02 | PUT `{submitterTarget:25, hitThreshold:0.25}` | 200, 값 반영, `simResult` 비워짐, 감사 `PARAM_DRAFT_UPDATE` | — | TODO |
-| ADM-PRM-03 | PUT `submitterTarget=0` → 422 | — | — | TODO |
-| ADM-PRM-04 | PUT `hitThreshold=-0.1` / `1.5` / `0` | 422 (`0 < hitThreshold ≤ 1`만 허용) | D5 — 현재 200 | TODO(BUG 예상) |
-| ADM-PRM-05 | simulate | 200, `simResult{changed,total,missToHit,hitToMiss,reachChanged}`, 감사 `PARAM_SIMULATE` | — | TODO |
-| ADM-PRM-06 | 시뮬레이션 없이 승인 요청 → 422 / PUT 후(시뮬레이션 지워짐) 승인 요청 → 422 | CLAUDE.md "시뮬레이션 없이 승인 요청 불가" | TODO |
-| ADM-PRM-07 | 시뮬레이션 후 승인 요청(사유 있음) | 200 `status=REVIEW`, `approval_requests` PARAM_APPLY 1행, 감사 `APPROVAL_REQUEST` | 승인 이후는 기존 `ApprovalFlowTest` | TODO |
-| ADM-PRM-08 | 승인 요청: 사유 빈값 → 422 / REVIEW 중 다시 요청 → 409 / REVIEW 중 PUT → 409 | — | — | TODO |
-| ADM-PRM-09 | REVIEW 중 simulate | 409, `sim_result` 그대로 | D4 — 현재 200·덮어씀 | TODO(BUG 예상) |
-| ADM-PRM-10 | 역할: REVIEWER는 GET·PUT·simulate·request-approval 모두 403 / AUDITOR는 PUT·simulate·request-approval 403 | — | — | TODO |
+| ADM-PRM-01 | OPERATOR `GET /admin/params/draft` (드래프트 없음) | 200, 드래프트 생성(DRAFT), `current*` 값 = 현재 파라미터 | AUDITOR는 기존 `RoleMatrixTest`(생성 안 함) | PASS |
+| ADM-PRM-02 | PUT `{submitterTarget:25, hitThreshold:0.25}` | 200, 값 반영, `simResult` 비워짐, 감사 `PARAM_DRAFT_UPDATE` | — | PASS |
+| ADM-PRM-03 | PUT `submitterTarget=0` → 422 | — | — | PASS |
+| ADM-PRM-04 | PUT `hitThreshold=-0.1` / `1.5` / `0` | 422 (`0 < hitThreshold ≤ 1`만 허용) | D5 — 현재 200 | BUG-7 |
+| ADM-PRM-05 | simulate | 200, `simResult{changed,total,missToHit,hitToMiss,reachChanged}`, 감사 `PARAM_SIMULATE` | — | PASS |
+| ADM-PRM-06 | 시뮬레이션 없이 승인 요청 → 422 / PUT 후(시뮬레이션 지워짐) 승인 요청 → 422 | CLAUDE.md "시뮬레이션 없이 승인 요청 불가" | PASS |
+| ADM-PRM-07 | 시뮬레이션 후 승인 요청(사유 있음) | 200 `status=REVIEW`, `approval_requests` PARAM_APPLY 1행, 감사 `APPROVAL_REQUEST` | 승인 이후는 기존 `ApprovalFlowTest` | PASS |
+| ADM-PRM-08 | 승인 요청: 사유 빈값 → 422 / REVIEW 중 다시 요청 → 409 / REVIEW 중 PUT → 409 | — | — | PASS |
+| ADM-PRM-09 | REVIEW 중 simulate | 409, `sim_result` 그대로 | D4 — 현재 200·덮어씀 | BUG-6 |
+| ADM-PRM-10 | 역할: REVIEWER는 GET·PUT·simulate·request-approval 모두 403 / AUDITOR는 PUT·simulate·request-approval 403 | — | — | PASS |
 
 ### ADM-RPT 신고 대상 제보 목록 — `AdminReportSubmissionsTest`
 
 | ID | 케이스 | 기대 | 근거·비고 | 상태 |
 |---|---|---|---|---|
-| ADM-RPT-01 | `GET /admin/reports/{id}/submissions` | 200, 그 항목의 비VOID 제보(시딩 포함) 생성순, 신고자 id 없음 | — | TODO |
-| ADM-RPT-02 | 없는 신고 → 422 | — | — | TODO |
+| ADM-RPT-01 | `GET /admin/reports/{id}/submissions` | 200, 그 항목의 비VOID 제보(시딩 포함) 생성순, 신고자 id 없음 | — | PASS |
+| ADM-RPT-02 | 없는 신고 → 422 | — | — | PASS |
 
 ### ADM-SEED 시딩 — `AdminSeedTest`
 
 | ID | 케이스 | 기대 | 근거·비고 | 상태 |
 |---|---|---|---|---|
-| ADM-SEED-01 | OPERATOR 첫 시딩 | 200 `{submissionId, canonicalName, trendItemId}`. `users`에 `seed_<loginId>` 생성·`admin_accounts.seed_user_id` 연결, `submissions.is_seed=true`, 감사 `SEED_SUBMISSION_CREATE` | 200 vs OpenAPI 201은 D7 | TODO |
-| ADM-SEED-02 | 같은 관리자가 같은 항목 재시딩 → 422 | — | — | TODO |
-| ADM-SEED-03 | `confidence=20`·잘못된 category → 422 / 필수 필드 누락 → 400 | — | — | TODO |
-| ADM-SEED-04 | 시딩은 유저 제보권을 쓰지 않고, 같은 이름으로 유저 제보 시 그 항목에 합류 | 유저 `quotaUsed` 그대로 반영, 같은 `trendItemId` | Phase 1 시딩 = 클러스터 앵커 | TODO |
-| ADM-SEED-05 | JUDGING·RESOLVED 항목 시딩 → 200 | D9: 현재 동작 고정 | TODO |
-| ADM-SEED-06 | `GET /admin/seed/accuracy` — 시딩 HIT 1·MISS 1인 관리자 | 그 관리자 행 `hit=1, miss=1, judged=2, trustIndex=(1+2)/(2+5)` | — | TODO |
-| ADM-SEED-07 | 역할: REVIEWER·AUDITOR 시딩 → 403, 정확도 조회는 4개 역할 200 | — | — | TODO |
+| ADM-SEED-01 | OPERATOR 첫 시딩 | 200 `{submissionId, canonicalName, trendItemId}`. `users`에 `seed_<loginId>` 생성·`admin_accounts.seed_user_id` 연결, `submissions.is_seed=true`, 감사 `SEED_SUBMISSION_CREATE` | 200 vs OpenAPI 201은 D7 | PASS |
+| ADM-SEED-02 | 같은 관리자가 같은 항목 재시딩 → 422 | — | — | PASS |
+| ADM-SEED-03 | `confidence=20`·잘못된 category → 422 / 필수 필드 누락 → 400 | — | — | PASS |
+| ADM-SEED-04 | 시딩은 유저 제보권을 쓰지 않고, 같은 이름으로 유저 제보 시 그 항목에 합류 | 유저 `quotaUsed` 그대로 반영, 같은 `trendItemId` | Phase 1 시딩 = 클러스터 앵커 | PASS |
+| ADM-SEED-05 | JUDGING·RESOLVED 항목 시딩 → 200 | D9: 현재 동작 고정 | PASS |
+| ADM-SEED-06 | `GET /admin/seed/accuracy` — 시딩 HIT 1·MISS 1인 관리자 | 그 관리자 행 `hit=1, miss=1, judged=2, trustIndex=(1+2)/(2+5)` | — | PASS |
+| ADM-SEED-07 | 역할: REVIEWER·AUDITOR 시딩 → 403, 정확도 조회는 4개 역할 200 | — | — | PASS |
 
 ### ADM-ITM 항목 — `AdminTrendItemTest`
 
 | ID | 케이스 | 기대 | 근거·비고 | 상태 |
 |---|---|---|---|---|
-| ADM-ITM-01 | `GET /admin/trend-items` | 내 항목(MERGED 포함)이 `submitterCount`(시딩·VOID 제외)·`currentResult`와 함께 있음 | 개수 규칙은 기존 `TrendItemListCountTest` | TODO |
-| ADM-ITM-02 | 상세: 미판정 항목 | 200, `deadline`·`daysLeft`·`distinctSubmitters`·`distinctPlatforms`(시딩 제외)·`endorseCount`, `preview*` 채워짐, `submissions[].orderRank`(시딩 null) | — | TODO |
-| ADM-ITM-03 | 상세: 판정된 항목 | `current*` 채워짐, `preview*` 없음 | — | TODO |
-| ADM-ITM-04 | 상세: 없는 id → 422 | — | — | TODO |
+| ADM-ITM-01 | `GET /admin/trend-items` | 내 항목(MERGED 포함)이 `submitterCount`(시딩·VOID 제외)·`currentResult`와 함께 있음 | 개수 규칙은 기존 `TrendItemListCountTest` | PASS |
+| ADM-ITM-02 | 상세: 미판정 항목 | 200, `deadline`·`daysLeft`·`distinctSubmitters`·`distinctPlatforms`(시딩 제외)·`endorseCount`, `preview*` 채워짐, `submissions[].orderRank`(시딩 null) | — | PASS |
+| ADM-ITM-03 | 상세: 판정된 항목 | `current*` 채워짐, `preview*` 없음 | — | PASS |
+| ADM-ITM-04 | 상세: 없는 id → 422 | — | — | PASS |
 
 ### ADM-VRD 판정 목록·유예 연장 — `AdminVerdictTest`
 
 | ID | 케이스 | 기대 | 근거·비고 | 상태 |
 |---|---|---|---|---|
-| ADM-VRD-01 | `GET /admin/verdicts` | 판정된 내 항목은 `judged`에, 마감 임박 내 항목은 `imminent`에(`daysLeft` 오름차순) | `imminent`는 최대 30개 — 마감을 가장 가깝게 잡아 포함시킴 | TODO |
-| ADM-VRD-02 | 역할: OPERATOR·ADMIN·AUDITOR 200 / REVIEWER 403 | — | — | TODO |
-| ADM-VRD-03 | 유예 연장 3일 (PENDING) | 200, 마감 = D+14+3일, 감사 `VERDICT_GRACE_EXTEND` | 02 ADM-200 | TODO |
-| ADM-VRD-04 | 연장 누적이 D+21을 넘음(예: D+20에서 7일) | 200, 마감 = D+21(잘림). 이미 D+21에서 연장 → 422 | 상한 D+21 | TODO |
-| ADM-VRD-05 | `days=0`·`8` → 422 / 판정된 항목 → 422 / 없는 항목 → 422 | 1~7일(02와 코드. 05 문서의 "1~90일"은 오류) | TODO |
-| ADM-VRD-06 | JUDGING 항목을 연장해 새 마감이 미래 | 200, 항목 PENDING 복귀 | — | TODO |
-| ADM-VRD-07 | 사유 없이 연장 | 200(서버가 사유 요구 안 함 — 02 §사유 입력) | 현재 동작 고정 | TODO |
-| ADM-VRD-08 | MERGED·VOID 항목 연장 | 422, override 변화 없음 | D8(PENDING·JUDGING만) — 현재 200 | TODO(BUG 예상) |
-| ADM-VRD-09 | 역할: REVIEWER·AUDITOR 연장 → 403 | — | — | TODO |
+| ADM-VRD-01 | `GET /admin/verdicts` | 판정된 내 항목은 `judged`에, 마감 임박 내 항목은 `imminent`에(`daysLeft` 오름차순) | `imminent`는 최대 30개 — 마감을 가장 가깝게 잡아 포함시킴 | PASS |
+| ADM-VRD-02 | 역할: OPERATOR·ADMIN·AUDITOR 200 / REVIEWER 403 | — | — | PASS |
+| ADM-VRD-03 | 유예 연장 3일 (PENDING) | 200, 마감 = D+14+3일, 감사 `VERDICT_GRACE_EXTEND` | 02 ADM-200 | PASS |
+| ADM-VRD-04 | 연장 누적이 D+21을 넘음(예: D+20에서 7일) | 200, 마감 = D+21(잘림). 이미 D+21에서 연장 → 422 | 상한 D+21 | PASS |
+| ADM-VRD-05 | `days=0`·`8` → 422 / 판정된 항목 → 422 / 없는 항목 → 422 | 1~7일(02와 코드. 05 문서의 "1~90일"은 오류) | PASS |
+| ADM-VRD-06 | JUDGING 항목을 연장해 새 마감이 미래 | 200, 항목 PENDING 복귀 | — | PASS |
+| ADM-VRD-07 | 사유 없이 연장 | 200(서버가 사유 요구 안 함 — 02 §사유 입력) | 현재 동작 고정 | PASS |
+| ADM-VRD-08 | MERGED·VOID 항목 연장 | 422, override 변화 없음 | D8(PENDING·JUDGING만) — 현재 200 | BUG-8 |
+| ADM-VRD-09 | 역할: REVIEWER·AUDITOR 연장 → 403 | — | — | PASS |
 
 ---
 
