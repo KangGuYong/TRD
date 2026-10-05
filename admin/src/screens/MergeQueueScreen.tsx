@@ -46,14 +46,14 @@ export default function MergeQueueScreen() {
     setBusyId(id);
     try {
       await decideMergeCandidate(id, action, reason);
-      await qc.invalidateQueries({ queryKey: ["admin", "merge-queue"] });
+      await Promise.all([qc.invalidateQueries({ queryKey: ["admin", "merge-queue"] }), qc.invalidateQueries({ queryKey: ["admin", "queues"] })]);   // 배지도(ADM-UI-2)
       flash(`${label} 처리됨 (감사 로그 기록)`);
       setReason("");
     } catch (e) {
       if (e instanceof ApiError && e.type && DECISION_MESSAGES[e.type]) {
         flash(DECISION_MESSAGES[e.type]);
         if (e.type === "merge-queue-decided" || e.type === "merge-target-merged") {
-          await qc.invalidateQueries({ queryKey: ["admin", "merge-queue"] });
+          await Promise.all([qc.invalidateQueries({ queryKey: ["admin", "merge-queue"] }), qc.invalidateQueries({ queryKey: ["admin", "queues"] })]);   // 배지도(ADM-UI-2)
         }
       } else {
         flash(e instanceof ApiError ? e.message : `${label} 처리에 실패했습니다`);
