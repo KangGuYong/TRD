@@ -173,6 +173,25 @@ class UserSubmissionTest extends FunctionalTestBase {
     }
 
     @Test
+    @DisplayName("USR-SUB-15 판정 전에 VOID된 제보의 note는 항목 T 없이 'VOID · 점수 변동 없음'(APP-6)")
+    void voidedSubmissionNoteHasNoItemT() throws Exception {
+        clock.set(T0);
+        UUID item = fx.item(T0);
+        for (int i = 0; i < 4; i++) fx.submission(fx.user(), item, 30, T0.plusSeconds(i));
+        UUID x = fx.user();
+        UUID voided = fx.submission(x, item, 30, T0.plusSeconds(10));
+        fx.voidSubmission(voided, T0.plusSeconds(20));
+        clock.set(AFTER_DEADLINE);
+        runVerdicts();
+        assertThat(fx.itemState(item)).isEqualTo("RESOLVED");   // 항목은 판정돼 T가 있다
+
+        String json = getOk("/v1/submissions/me", asUser(x));
+
+        assertThat((String) read(json, "$[0].status")).isEqualTo("VOID");
+        assertThat((String) read(json, "$[0].note")).isEqualTo("VOID · 점수 변동 없음");
+    }
+
+    @Test
     @DisplayName("USR-SUB-13 이름 정확히 120자는 201")
     void name120CharsIsAccepted() throws Exception {
         clock.set(T0);
