@@ -30,7 +30,7 @@
 | USR-SUB-07 | 마감(D+14) 지난 항목 / JUDGING 항목에 제보 | 422 `type=item-closed`, 제보권 차감 없음 | 경계값은 기존 `#closedItemsRejectWithoutCharge`. HTTP 매핑만 확인 | PASS |
 | USR-SUB-08 | 병합된 이름(MERGED 툼스톤)으로 제보 | 201, 생존 항목 id | 기존: `TombstoneJoinTest#submissionOnMergedNameJoinsSurvivor` — 링크 | PASS(기존) |
 | USR-SUB-09 | `GET /v1/submissions/me` | 200, 최신순, 다른 유저 제보 없음, PENDING이면 `judgeInDays` 있음 | — | PASS |
-| USR-SUB-10 | 판정 끝난 제보의 `GET /v1/submissions/me` | `status`=HIT/MISS, `delta` 채워짐, `judgeInDays=null` | JRN-01에서 함께 확인 | TODO |
+| USR-SUB-10 | 판정 끝난 제보의 `GET /v1/submissions/me` | `status`=HIT/MISS, `delta`·`reachLevel`·`note`(산정 근거) 채워짐, `judgeInDays=null` | OpenAPI SubmissionMine — 현재 세 필드 항상 null. `JourneyTest`에 둠 | BUG-10 |
 | USR-SUB-11 | NFD로 분해된 한글 이름(macOS 입력) 제보 → NFC 이름 항목 | 같은 항목에 합류 | `NameNormalizer` NFC | PASS |
 | USR-SUB-12 | 같은 유저가 같은 새 이름을 동시에 두 번 제보(네트워크 재시도) | 201 1건 + 409 1건, 500 없음, 제보 1행 | — | PASS |
 | USR-SUB-13 | 이름 정확히 120자 | 201 (121자는 400 — USR-SUB-05) | 경계값 | PASS |
@@ -46,7 +46,7 @@
 | USR-TRD-04 | 오늘의 5개 선정 후 그중 한 항목이 TEMP_HIDDEN 또는 MERGED가 됨 → 다시 조회 | 그 항목이 빠짐 | 설계 §5 — 지금은 계속 노출 | BUG-1 |
 | USR-TRD-05 | `GET /v1/trends/{id}` 정상 | 200, `meaning`=가장 이른 제보의 oneLine, `pathText`, `reachedCount`, 투표 0이면 `voteCount=null` | — | PASS |
 | USR-TRD-06 | 상세: 없는 id / MERGED / TEMP_HIDDEN / PERMANENT_HIDDEN | 404 | — | PASS |
-| USR-TRD-07 | 상세: 판정된 항목 | `verdict`="적중했어요"/"빗나갔어요", `verdictWhy`, `reachLevel` | JRN-01·02에서 확인 | TODO |
+| USR-TRD-07 | 상세: 판정된 항목 | `verdict`="적중했어요"/"빗나갔어요", `verdictWhy`, `reachLevel` | JRN-01·02에서 확인 | PASS |
 | USR-TRD-08 | 상세: 내가 워치한 항목 | `watched=true`(다른 유저 시점에서는 false) | — | PASS |
 | USR-TRD-09 | 투표 `{willTrend:true}` → 다시 `{willTrend:false}` | 둘 다 200, `votes` 1행 유지·값 토글, `voteCount` 문구 갱신 | — | PASS |
 | USR-TRD-10 | 투표: `willTrend` 누락 → 400 / 없는 항목·MERGED → 404 | — | — | PASS |
@@ -198,10 +198,10 @@
 
 | ID | 시나리오 | 기대 | 근거 | 상태 |
 |---|---|---|---|---|
-| JRN-01 | **HIT.** 유저 A(c50)·B(c30)·C(c10)·D(c10)가 T0부터 1분 간격으로 같은 항목에 제보(B는 공백·대소문자만 다른 이름) → 시계 D+14+1s → `verdict_runner` | 항목 HIT·L1(T=4/20=0.2). A `GET /v1/me/ledger`: HIT +60(=50×1.0×1.2), B +21.6, C +4.8, D +2.4. A `GET /v1/submissions/me`: HIT·delta 60·orderRank 1. `GET /v1/trends/{id}`: "적중했어요"·L1. A `GET /v1/me/grade`: judgedCount 1, TI 0.5(=(1+2)/(1+5)), activeScore 60 | 점수 공식, 선점 가중, T | TODO |
-| JRN-02 | **MISS.** A(c50)·B(c30)·C(c10) 3명 → 판정 | MISS. 원장 −25·−15·−5(=c×0.5). A의 TI 0.333(=2/6). 상세 "빗나갔어요" | 실패 페널티 = 이득의 절반 | TODO |
-| JRN-03 | **시딩 제외.** (a) 시딩 1건(가장 먼저) + 실유저 4명 → HIT, A(첫 실유저, c50) +60(순위 1), 시딩 원장 행 없음, `evidence_json.orderRanks`에 시딩 없음. (b) 다른 관리자 3명 시딩 + 실유저 3명 → **MISS** | 시딩은 T·선점 순위·원장에서 제외. 시딩만으로 HIT 안 됨 | R5 | TODO |
-| JRN-04 | **병합 후 같은 유저 중복 → VOID → 제보권 반환.** U가 "alpha"(항목 X, T0)와 "alpha 2"(항목 Y, T0+1h) 제보 → `quotaUsed=2` → 큐(Y→X) → REVIEWER가 병합(Idempotency-Key) | 생존 X. U의 늦은 제보(Y 쪽) VOID(`/v1/submissions/me`에서 VOID). `GET /v1/me/summary` `quotaUsed=1`. U의 새 제보 201 | 중복 제보 VOID, `voided_at` 주 반환 | TODO |
+| JRN-01 | **HIT.** 유저 A(c50)·B(c30)·C(c10)·D(c10)가 T0부터 1분 간격으로 같은 항목에 제보(B는 공백·대소문자만 다른 이름) → 시계 D+14+1s → `verdict_runner` | 항목 HIT·L1(T=4/20=0.2). A `GET /v1/me/ledger`: HIT +60(=50×1.0×1.2), B +21.6, C +4.8, D +2.4. A `GET /v1/submissions/me`: HIT·delta 60·orderRank 1. `GET /v1/trends/{id}`: "적중했어요"·L1. A `GET /v1/me/grade`: judgedCount 1, TI 0.5(=(1+2)/(1+5)), activeScore 60 | 점수 공식, 선점 가중, T | PASS |
+| JRN-02 | **MISS.** A(c50)·B(c30)·C(c10) 3명 → 판정 | MISS. 원장 −25·−15·−5(=c×0.5). A의 TI 0.333(=2/6). 상세 "빗나갔어요" | 실패 페널티 = 이득의 절반 | PASS |
+| JRN-03 | **시딩 제외.** (a) 시딩 1건(가장 먼저) + 실유저 4명 → HIT, A(첫 실유저, c50) +60(순위 1), 시딩 원장 행 없음, `evidence_json.orderRanks`에 시딩 없음. (b) 다른 관리자 3명 시딩 + 실유저 3명 → **MISS** | 시딩은 T·선점 순위·원장에서 제외. 시딩만으로 HIT 안 됨 | R5 | PASS |
+| JRN-04 | **병합 후 같은 유저 중복 → VOID → 제보권 반환.** U가 "alpha"(항목 X, T0)와 "alpha 2"(항목 Y, T0+1h) 제보 → `quotaUsed=2` → 큐(Y→X) → REVIEWER가 병합(Idempotency-Key) | 생존 X. U의 늦은 제보(Y 쪽) VOID(`/v1/submissions/me`에서 VOID). `GET /v1/me/summary` `quotaUsed=1`. U의 새 제보 201 | 중복 제보 VOID, `voided_at` 주 반환 | PASS |
 | JRN-05 | **재판정 + 승인 게이트 + 원장 불변.** JRN-01 상태에서 D의 제보를 VOID(fixture) → OPERATOR가 재판정 | 차액 합 >100이라 202(아무것도 안 씀) → 다른 ADMIN이 승인 → MISS(T=3/20), A의 원장 = 원래 HIT +60 행 그대로 + ADJ −85(합 −25). 원장 행 수는 늘기만 함, 기존 행 `delta` 불변 | R2, ApprovalGate 100점 | TODO |
 | JRN-06 | **판정된 항목 VOID.** JRN-01 상태에서 OPERATOR가 항목 VOID(차액 합 88.8 ≤100 → 200 즉시) | 각 유저 원장 합 0(ADJ 상쇄), 원래 행 불변. `/v1/submissions/me` VOID. A `GET /v1/me/grade` judgedCount 0·activeScore 0. 상세 `verdict=null` | R2, VOID = 점수 변동 없음 | TODO |
 | JRN-07 | **투표·인정은 판정에 안 들어감.** 제보자 3명 + 다른 유저 30명이 `willTrend=true` 투표·인정 → 판정 | MISS, `evidence_json.distinctSubmitters=3`, T=0.15. 투표자 `GET /v1/me/summary` `votesTotal=1, votesCorrect=0` | R1 | TODO |
