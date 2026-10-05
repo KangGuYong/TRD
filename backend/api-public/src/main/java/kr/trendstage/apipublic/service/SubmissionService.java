@@ -8,12 +8,16 @@ import kr.trendstage.apipublic.web.SubmissionMineResponse;
 import kr.trendstage.apipublic.web.SubmissionValidationException;
 import kr.trendstage.domain.trend.NameNormalizer;
 import kr.trendstage.domain.verdict.DeadlineWindow;
+import kr.trendstage.persistence.entity.ScoreLedgerEntry;
 import kr.trendstage.persistence.entity.Submission;
 import kr.trendstage.persistence.entity.TrendItem;
+import kr.trendstage.persistence.entity.Verdict;
+import kr.trendstage.persistence.repo.ScoreLedgerRepository;
 import kr.trendstage.persistence.repo.SubmissionOrderRankRepository;
 import kr.trendstage.persistence.repo.SubmissionRepository;
 import kr.trendstage.persistence.repo.TrendItemRepository;
 import kr.trendstage.persistence.repo.UserRepository;
+import kr.trendstage.persistence.repo.VerdictRepository;
 import kr.trendstage.persistence.trend.TrendItemCreator;
 import kr.trendstage.persistence.trend.TrendItemLookup;
 import kr.trendstage.persistence.type.SubmissionResult;
@@ -21,10 +25,12 @@ import kr.trendstage.persistence.type.TrendState;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 
@@ -45,13 +51,17 @@ public class SubmissionService {
     private final QuotaService quotaService;
     private final TrendItemLookup lookup;
     private final TrendItemCreator creator;
+    private final ScoreLedgerRepository ledger;
+    private final VerdictRepository verdicts;
     private final Clock clock;
 
     public SubmissionService(TrendItemRepository trends, SubmissionRepository submissions,
                              SubmissionOrderRankRepository orderRanks, UserRepository users,
-                             QuotaService quotaService, TrendItemLookup lookup, TrendItemCreator creator, Clock clock) {
+                             QuotaService quotaService, TrendItemLookup lookup, TrendItemCreator creator,
+                             ScoreLedgerRepository ledger, VerdictRepository verdicts, Clock clock) {
         this.trends = trends; this.submissions = submissions; this.orderRanks = orderRanks;
         this.users = users; this.quotaService = quotaService; this.lookup = lookup; this.creator = creator;
+        this.ledger = ledger; this.verdicts = verdicts;
         this.clock = clock;
     }
 
@@ -127,8 +137,32 @@ public class SubmissionService {
                 ? Math.max(0, Duration.between(clock.instant(), deadline).toDays())
                 : null;
 
+        Judged judged = s.getResult() == SubmissionResult.PENDING ? Judged.NONE : judged(s, item);
         return new SubmissionMineResponse(
                 s.getId(), item.getCanonicalName(), s.getResult().name(),
-                null, null, s.getConfidence(), orderRank, null, judgeInDays, s.getCreatedAt());
+                judged.reachLevel(), judged.delta(), s.getConfidence(), orderRank, judged.note(), judgeInDays, s.getCreatedAt());
+    }
+
+    private record Judged(String reachLevel, Double delta, String note) {
+        static final Judged NONE = new Judged(null, null, null);
+    }
+
+    /**
+     * 판정 뒤 받은 점수와 산정 근거. delta = 이 제보에 귀속된 원장 합(재판정·VOID 조정 포함, 판정 전 VOID면 0),
+     * note = "T=… · " + 원 판정 행의 산정식 + (조정이 있으면) " · 조정 후 합계 …".
+     * ponytail: 제보마다 원장·판정을 따로 조회(N+1) — 목록이 커지면 submission_id IN (...) 한 번으로 묶는다.
+     */
+    private Judged judged(Submission s, TrendItem item) {
+        List<ScoreLedgerEntry> rows = ledger.findBySubmissionIdOrderByCreatedAtAsc(s.getId());
+        BigDecimal sum = rows.stream().map(ScoreLedgerEntry::getDelta).reduce(BigDecimal.ZERO, BigDecimal::add);
+        Verdict current = verdicts.findCurrentByTrendItemId(item.getId()).orElse(null);
+
+        String reachLevel = s.getResult() == SubmissionResult.HIT && current != null && current.getReachLevel() != null
+                ? current.getReachLevel().name() : null;
+        StringBuilder note = new StringBuilder();
+        if (current != null && current.getScoreT() != null) note.append("T=").append(current.getScoreT().toPlainString()).append(" · ");
+        note.append(rows.isEmpty() ? "VOID · 점수 변동 없음" : rows.get(0).getReason());
+        if (rows.size() > 1) note.append(String.format(Locale.US, " · 조정 후 합계 %+.1f", sum.doubleValue()));
+        return new Judged(reachLevel, sum.doubleValue(), note.toString());
     }
 }

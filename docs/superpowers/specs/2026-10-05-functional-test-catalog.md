@@ -30,7 +30,7 @@
 | USR-SUB-07 | 마감(D+14) 지난 항목 / JUDGING 항목에 제보 | 422 `type=item-closed`, 제보권 차감 없음 | 경계값은 기존 `#closedItemsRejectWithoutCharge`. HTTP 매핑만 확인 | PASS |
 | USR-SUB-08 | 병합된 이름(MERGED 툼스톤)으로 제보 | 201, 생존 항목 id | 기존: `TombstoneJoinTest#submissionOnMergedNameJoinsSurvivor` — 링크 | PASS(기존) |
 | USR-SUB-09 | `GET /v1/submissions/me` | 200, 최신순, 다른 유저 제보 없음, PENDING이면 `judgeInDays` 있음 | — | PASS |
-| USR-SUB-10 | 판정 끝난 제보의 `GET /v1/submissions/me` | `status`=HIT/MISS, `delta`·`reachLevel`·`note`(산정 근거) 채워짐, `judgeInDays=null` | OpenAPI SubmissionMine — 현재 세 필드 항상 null. `JourneyTest`에 둠 | BUG-10 |
+| USR-SUB-10 | 판정 끝난 제보의 `GET /v1/submissions/me` | `status`=HIT/MISS, `delta`·`reachLevel`·`note`(산정 근거) 채워짐, `judgeInDays=null` | OpenAPI SubmissionMine — 현재 세 필드 항상 null. `JourneyTest`에 둠 | PASS(BUG-10 수정) |
 | USR-SUB-11 | NFD로 분해된 한글 이름(macOS 입력) 제보 → NFC 이름 항목 | 같은 항목에 합류 | `NameNormalizer` NFC | PASS |
 | USR-SUB-12 | 같은 유저가 같은 새 이름을 동시에 두 번 제보(네트워크 재시도) | 201 1건 + 409 1건, 500 없음, 제보 1행 | — | PASS |
 | USR-SUB-13 | 이름 정확히 120자 | 201 (121자는 400 — USR-SUB-05) | 경계값 | PASS |
@@ -225,4 +225,4 @@
 | BUG-7 | ADM-PRM-04 | `hitThreshold` 범위 미검증(D5: `0 < t ≤ 1` 밖이면 422) | `ParamStudioService` 드래프트 수정 |
 | BUG-8 | ADM-VRD-08 | 유예 연장이 MERGED·VOID 항목에도 된다(D8: PENDING·JUDGING만) | `VerdictAdminService.extendGrace` |
 | BUG-9 | USR-SUB-14 | 제보 생성 응답의 `orderRank`가 항상 null — `save()` 후 flush 없이 순위 뷰 조회 | `SubmissionService.create/toResponse` |
-| BUG-10 | USR-SUB-10 | 판정 끝난 제보의 `delta`·`reachLevel`·`note`(산정 근거)가 항상 null | `SubmissionService.toResponse` |
+| BUG-10 | USR-SUB-10 | 판정 끝난 제보의 `delta`·`reachLevel`·`note`(산정 근거)가 항상 null | `SubmissionService.toResponse` — **수정됨**(원장 합·현재 판정 reach·T+원 산정식+조정 합계) |
