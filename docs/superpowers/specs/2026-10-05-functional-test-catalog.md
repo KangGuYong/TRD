@@ -121,15 +121,15 @@
 
 | ID | 케이스 | 기대 | 근거·비고 | 상태 |
 |---|---|---|---|---|
-| ADM-MQ-01 | `GET /admin/merge-queue` (4개 역할) | 200, 내 PENDING 행이 `similarity`·`newName`·`oldName`·`orderPreview`와 함께 있음. 시딩은 "시딩 handle"로 표시 | — | TODO |
-| ADM-MQ-02 | `GET …/{id}/preview` | 200, 생존=first_seen이 이른 쪽, `orderRank` 전후, `firstSeenAtBefore/After`, `deadlineBefore/After`, `dedupVoidedHandles`, `quotaRefundHandles`(시딩 제외) | 계산 규칙은 기존 `MergeRecomputeTest` | TODO |
-| ADM-MQ-03 | 미리보기: 없는 id·이미 처리된 항목 → 422 | — | — | TODO |
-| ADM-MQ-04 | 병합 역할: REVIEWER·OPERATOR 200 / AUDITOR 403 | — | 기존은 ADMIN만 | TODO |
-| ADM-MQ-05 | 같은 `Idempotency-Key`로 병합 두 번 | 두 번째 200 `replayed=true`, 감사 `MERGE` 1행 | 기존 서비스 수준 `MergeIdempotencyTest` — HTTP 매핑만 | TODO |
-| ADM-MQ-06 | 같은 키로 다른 결정(분리) → 422 `idempotency-key-mismatch` / 처리된 항목에 새 키 → 409 `merge-queue-decided` | — | — | TODO |
-| ADM-MQ-07 | 판정된 항목(RESOLVED)과 병합 → 409 `merge-resolved`, 큐는 PENDING 유지 | — | CLAUDE.md "판정 후면 병합 금지" | TODO |
-| ADM-MQ-08 | 분리 | 200 `status=SKIPPED`, 감사 `MERGE_SEPARATE`, 두 항목·제보 변화 없음 | — | TODO |
-| ADM-MQ-09 | 분리: 키 없음 → 400 `idempotency-key-required` / 판정된 항목 → 200(가드 없음, 데이터 변화 없음) | 현재 동작 고정 | TODO |
+| ADM-MQ-01 | `GET /admin/merge-queue` (4개 역할) | 200, 내 PENDING 행이 `similarity`·`newName`·`oldName`·`orderPreview`와 함께 있음. 시딩은 "시딩 handle"로 표시 | — | PASS |
+| ADM-MQ-02 | `GET …/{id}/preview` | 200, 생존=first_seen이 이른 쪽, `orderRank` 전후, `firstSeenAtBefore/After`, `deadlineBefore/After`, `dedupVoidedHandles`, `quotaRefundHandles`(시딩 제외) | 계산 규칙은 기존 `MergeRecomputeTest` | PASS |
+| ADM-MQ-03 | 미리보기: 없는 id·이미 처리된 항목 → 422 | — | — | PASS |
+| ADM-MQ-04 | 병합 역할: REVIEWER·OPERATOR 200 / AUDITOR 403 | — | 기존은 ADMIN만 | PASS |
+| ADM-MQ-05 | 같은 `Idempotency-Key`로 병합 두 번 | 두 번째 200 `replayed=true`, 감사 `MERGE` 1행 | 기존 서비스 수준 `MergeIdempotencyTest` — HTTP 매핑만 | PASS |
+| ADM-MQ-06 | 같은 키로 다른 결정(분리) → 422 `idempotency-key-mismatch` / 처리된 항목에 새 키 → 409 `merge-queue-decided` | — | — | PASS |
+| ADM-MQ-07 | 판정된 항목(RESOLVED)과 병합 → 409 `merge-resolved`, 큐는 PENDING 유지 | — | CLAUDE.md "판정 후면 병합 금지" | PASS |
+| ADM-MQ-08 | 분리 | 200 `status=SKIPPED`, 감사 `MERGE_SEPARATE`, 두 항목·제보 변화 없음 | — | PASS |
+| ADM-MQ-09 | 분리: 키 없음 → 400 `idempotency-key-required` / 판정된 항목 → 200(가드 없음, 데이터 변화 없음) | 현재 동작 고정 | PASS |
 
 ### ADM-PRM 파라미터 스튜디오 — `AdminParamStudioTest`
 
