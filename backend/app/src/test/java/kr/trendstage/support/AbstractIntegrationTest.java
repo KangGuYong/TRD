@@ -35,7 +35,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
         "logging.level.org.hibernate.SQL=WARN",
         "logging.level.org.hibernate.orm.jdbc.bind=WARN",
         // sla_watch는 매시 정각에 돈다 — 테스트가 정각을 지나면 공유 DB를 건드려 다른 테스트를 흔든다(Spring '-'는 크론 비활성).
-        "jobs.sla-watch.cron=-"
+        "jobs.sla-watch.cron=-",
+        // 제보 기기·IP 해시 비밀값(SP4 §4) — 비어 있으면 기동 실패
+        "signal.hash-secret=test-signal-secret",
 })
 @AutoConfigureMockMvc
 @Import(TestClockConfig.class)

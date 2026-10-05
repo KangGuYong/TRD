@@ -1,6 +1,7 @@
 package kr.trendstage.submission;
 
 import kr.trendstage.apipublic.service.QuotaService;
+import kr.trendstage.apipublic.service.SubmissionOrigin;
 import kr.trendstage.apipublic.service.SubmissionService;
 import kr.trendstage.apipublic.web.DuplicateSubmissionException;
 import kr.trendstage.apipublic.web.ItemClosedException;
@@ -49,16 +50,16 @@ class SubmissionQuotaIntegrationTest extends AbstractIntegrationTest {
     void l0GetsTwoPerWeekRefundOnVoidAndRefillOnMonday() {   // #12
         clock.set(MONDAY);
         UUID u = fx.user();
-        SubmissionMineResponse first = service.create(u, req(unique()));
-        service.create(u, req(unique()));
-        assertThatThrownBy(() -> service.create(u, req(unique()))).isInstanceOf(QuotaExhaustedException.class);
+        SubmissionMineResponse first = service.create(u, req(unique()), SubmissionOrigin.NONE);
+        service.create(u, req(unique()), SubmissionOrigin.NONE);
+        assertThatThrownBy(() -> service.create(u, req(unique()), SubmissionOrigin.NONE)).isInstanceOf(QuotaExhaustedException.class);
 
         fx.voidSubmission(first.id(), MONDAY.plusSeconds(60));   // 이번 주 VOID → 한 장 반환
-        service.create(u, req(unique()));
-        assertThatThrownBy(() -> service.create(u, req(unique()))).isInstanceOf(QuotaExhaustedException.class);
+        service.create(u, req(unique()), SubmissionOrigin.NONE);
+        assertThatThrownBy(() -> service.create(u, req(unique()), SubmissionOrigin.NONE)).isInstanceOf(QuotaExhaustedException.class);
 
         clock.set(ZonedDateTime.of(2026, 9, 28, 0, 0, 0, 0, KST).toInstant());   // 다음 월요일 00:00 KST — 리필
-        service.create(u, req(unique()));
+        service.create(u, req(unique()), SubmissionOrigin.NONE);
         assertThat(quota.of(u, clock.instant()).used()).isEqualTo(1);
     }
 
@@ -67,8 +68,8 @@ class SubmissionQuotaIntegrationTest extends AbstractIntegrationTest {
         clock.set(MONDAY);
         UUID u = fx.user();
         String name = unique();
-        service.create(u, req(name));
-        assertThatThrownBy(() -> service.create(u, req(name))).isInstanceOf(DuplicateSubmissionException.class);
+        service.create(u, req(name), SubmissionOrigin.NONE);
+        assertThatThrownBy(() -> service.create(u, req(name), SubmissionOrigin.NONE)).isInstanceOf(DuplicateSubmissionException.class);
         fx.seedSubmission(u, fx.item(MONDAY), MONDAY);
 
         assertThat(quota.of(u, MONDAY).used()).isEqualTo(1);
@@ -78,7 +79,7 @@ class SubmissionQuotaIntegrationTest extends AbstractIntegrationTest {
     void concurrentSubmissionsCannotExceedLimit() throws Exception {   // #13
         clock.set(MONDAY);
         UUID u = fx.user();
-        service.create(u, req(unique()));   // 남은 제보권 1
+        service.create(u, req(unique()), SubmissionOrigin.NONE);   // 남은 제보권 1
 
         ExecutorService pool = Executors.newFixedThreadPool(2);
         CountDownLatch go = new CountDownLatch(1);
@@ -88,7 +89,7 @@ class SubmissionQuotaIntegrationTest extends AbstractIntegrationTest {
             results.add(pool.submit(() -> {
                 go.await();
                 try {
-                    service.create(u, req(name));
+                    service.create(u, req(name), SubmissionOrigin.NONE);
                     return true;
                 } catch (QuotaExhaustedException e) {
                     return false;
@@ -107,28 +108,28 @@ class SubmissionQuotaIntegrationTest extends AbstractIntegrationTest {
     void closedItemsRejectWithoutCharge() {   // #6(제보 쪽)
         clock.set(MONDAY);
         String name = unique();
-        SubmissionMineResponse opener = service.create(fx.user(), req(name));   // first_seen = MONDAY, 마감 = +14일
+        SubmissionMineResponse opener = service.create(fx.user(), req(name), SubmissionOrigin.NONE);   // first_seen = MONDAY, 마감 = +14일
 
         clock.set(MONDAY.plus(Duration.ofDays(14)).minusSeconds(1));
-        service.create(fx.user(), req(name));   // 마감 직전은 받는다
+        service.create(fx.user(), req(name), SubmissionOrigin.NONE);   // 마감 직전은 받는다
 
         clock.set(MONDAY.plus(Duration.ofDays(14)));
         UUID late = fx.user();
-        assertThatThrownBy(() -> service.create(late, req(name))).isInstanceOf(ItemClosedException.class);
+        assertThatThrownBy(() -> service.create(late, req(name), SubmissionOrigin.NONE)).isInstanceOf(ItemClosedException.class);
         assertThat(quota.of(late, clock.instant()).used()).isZero();
 
         UUID item = jdbc.queryForObject("SELECT trend_item_id FROM submissions WHERE id = ?", UUID.class, opener.id());
         judge.closeDue(clock.instant());
         judge.judge(item, clock.instant());
-        assertThatThrownBy(() -> service.create(fx.user(), req(name))).isInstanceOf(ItemClosedException.class);
+        assertThatThrownBy(() -> service.create(fx.user(), req(name), SubmissionOrigin.NONE)).isInstanceOf(ItemClosedException.class);
     }
 
     @Test
     void quotaExhaustedIsProblem422WithType() throws Exception {
         clock.set(MONDAY);
         UUID u = fx.user();
-        service.create(u, req(unique()));
-        service.create(u, req(unique()));
+        service.create(u, req(unique()), SubmissionOrigin.NONE);
+        service.create(u, req(unique()), SubmissionOrigin.NONE);
 
         mvc.perform(post("/v1/submissions")
                         .with(authentication(new UsernamePasswordAuthenticationToken(u, null, List.of())))

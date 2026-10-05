@@ -147,14 +147,16 @@ backend/
 |---|---|
 | `users` | status enum. 앱/콘솔 공용 |
 | `trend_items` | `canonical_name`, `aliases text[]`, `first_seen_at`, `state`, `version`(낙관적 락), `merged_into`(tombstone). `normalized_key` 전체 UNIQUE(`V24`, `watches`가 FK 참조) — MERGED 항목이 키를 점유하므로 완전일치 조회가 `merged_into`를 따라가야 한다(**미구현(SP2)**) |
-| `submissions` | `confidence`(10/30/50), `order_rank`는 **저장 안 함**(파생, §5.3 — 뷰에서 VOID·시딩 제외), `disclosure`, `voided_at`(VOID 시각 = 제보권 반환 기준, result=VOID와 함께만 — CHECK), `resolved_at`(처음 HIT/MISS 판정 시각 = TI 180일 창 기준) — V28 |
+| `submissions` | `confidence`(10/30/50), `order_rank`는 **저장 안 함**(파생, §5.3 — 뷰에서 VOID·시딩 제외), `disclosure`, `voided_at`(VOID 시각 = 제보권 반환 기준, result=VOID와 함께만 — CHECK), `resolved_at`(처음 HIT/MISS 판정 시각 = TI 180일 창 기준) — V28. SP4: `platform`(VARCHAR(20), 11개 코드 CHECK)·`device_hash`·`ip_hash`(VARCHAR(64), 소문자 hex CHECK, nullable)·`source_platform` NOT NULL 해제(보관용) — `V31`(컬럼 추가) → `V31_1`(Java, 기존 행 `evidence_url`로 `platform` 백필) → `V31_2`(NOT NULL + CHECK 확정) |
 | `endorsements` | 유저 단위 dedup. 현행 저장만(점수·판정 미반영) |
 | `merge_queue` | **미구현(SP2)**: `assigned_to`·`claimed_at`(15분 클레임, 03 §6 M5), `hold_count`, `decision_key UNIQUE`(멱등키) — 현재 스키마(`V15`)는 `status`·`similarity`·`resolved_by`뿐이고 클레임 컬럼 자체가 없다 |
 | `verdicts` | **append-only**. `supersedes`, `evidence_json`(`VerdictEvidence` — 선점 순위·`TrendSignal`·판정 파라미터 동결). `(trend_item_id) WHERE supersedes IS NULL` 부분 UNIQUE(`V4` — `verdict_one_original_per_item`), `(supersedes) WHERE supersedes IS NOT NULL` 부분 UNIQUE(`V28` — `verdict_superseded_once`, 재판정 체인 분기 방지) |
 | `score_ledger` | **append-only**. `reason`, `kind`(HIT/MISS/VOID/ADJ). `delta`는 감쇠 없는 원값(§5.2). `halflife_days`·`decay_anchor_at`(행별 감쇠 기준, O11 = (b), V28). `(verdict_id, submission_id)` UNIQUE(`V28`, 판정 멱등). `approved_by`(`users(id)` FK, 관리자를 못 가리키는 잔재)는 쓰지 않는다 — SP3에서 `approved_by_admin_id`(`admin_accounts` FK)를 추가해 승인 실행 ADJ 행에 채운다(`ledger_approval_pair` CHECK, V30) |
 | `user_grades` | 스냅샷(파생). 주간 재계산 |
 | `abuse_flags` | 플래그만. 제재 아님 |
-| `appeals`, `sanctions`, `votes`, `admin_audit_log`, `parameter_drafts` | §7·§8 참조 |
+| `backtest_datasets` | SP4 신설(`V31`). `id`·`name`·`sha256`(UNIQUE, 소문자 hex CHECK)·`case_count`·`payload`(JSONB)·`uploaded_by`·`created_at`. **불변** — 애플리케이션은 INSERT만, DELETE는 트리거로 막는다 |
+| `parameter_drafts` | SP4: `backtest_result`(JSONB, nullable) 추가(`V31`) — 값 수정 시 시뮬레이션 결과와 함께 지운다. 그 외 §7·§8 참조 |
+| `appeals`, `sanctions`, `votes`, `admin_audit_log` | §7·§8 참조 |
 
 **append-only 강제**: `score_ledger`, `verdicts`에 `BEFORE UPDATE OR DELETE` 트리거 → `RAISE EXCEPTION`. Flyway 마이그레이션으로 관리. R2를 DB가 물리적으로 보장.
 
@@ -314,6 +316,7 @@ GET  /v1/leaderboard            상위 10(동의자 한정) — 미구현: 컨�
 ## 12. 환경 · DevOps
 
 - 로컬: `infra/docker-compose`(Postgres+pgvector, 임베딩 TEI). Redis는 Phase 2에 추가(§2.5). DB 기본 호스트는 `localhost:5433` (다른 호스트는 `DB_URL` 환경변수).
+- 환경변수(SP4): `SIGNAL_HASH_SECRET`(필수 — 기기·IP 해시용 HMAC 비밀값, 비어 있으면 기동 실패. `infra/.env`로 주입, 로컬 `bootRun`은 `application-local.yml`나 환경변수). `SERVER_FORWARD_HEADERS_STRATEGY`(기본 `none` — 리버스 프록시 뒤에 배포할 때만 `native`로 바꿔 `X-Forwarded-For`를 신뢰).
 - CI: 백엔드(Gradle test), 앱/콘솔(typecheck·lint·build), OpenAPI 계약 검증.
 - 환경 분리: local/staging/prod 프로파일. Firebase 서비스 계정 키는 시크릿 매니저. 로컬 오버라이드는 `application-local.yml`(gitignore).
 - 배포: 백엔드 컨테이너, 앱 EAS Build+OTA, 콘솔 정적 호스팅(내부망/VPN).

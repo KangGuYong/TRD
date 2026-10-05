@@ -15,7 +15,7 @@ class TrendSignalTest {
 
     @Test void 시딩은_제보자_수와_플랫폼_수에서_빠지고_유효_제보_수에는_남는다() {
         UUID a = UUID.randomUUID(), b = UUID.randomUUID(), seed = UUID.randomUUID();
-        TrendSignal s = new TrendSignal(T, List.of(
+        TrendSignal s = TrendSignal.of(T, List.of(
                 entry(a, false, "X"), entry(a, false, "X"), entry(b, false, "INSTAGRAM"), entry(seed, true, "YOUTUBE")));
         assertEquals(4, s.validCount());
         assertEquals(2, s.distinctSubmitters());
@@ -23,6 +23,6 @@ class TrendSignalTest {
     }
 
     static TrendSignal.Entry entry(UUID user, boolean seed, String platform) {
-        return new TrendSignal.Entry(UUID.randomUUID(), user, seed, T, platform, T);
+        return TrendSignal.Entry.legacy(UUID.randomUUID(), user, seed, T, platform, T);
     }
 }

@@ -3,13 +3,13 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-
 import { useMeSummary, useMySubmissions, useSubmit } from "../api/hooks";
 import type { Category } from "../api/types";
 import { Card, H1, Muted, Screen, StateView } from "../components/ui";
+import { platformLabel } from "../platform";
 import { C, STAGE_COLOR } from "../theme";
 
 const CATS: { key: Category; label: string }[] = [
   { key: "MEME", label: "밈" }, { key: "PRODUCT", label: "상품" }, { key: "PERSON_CHANNEL", label: "인물·채널" },
   { key: "CHALLENGE", label: "챌린지" }, { key: "SLANG", label: "슬랭" }, { key: "ETC", label: "기타" },
 ];
-const PLATS = ["디시", "더쿠", "X", "인스타", "유튜브", "기타"];
 const CONFS: (10 | 30 | 50)[] = [10, 30, 50];
 const CONF_LABEL: Record<number, string> = { 10: "가볍게", 30: "꽤 확실", 50: "확신함" };
 
@@ -36,7 +36,6 @@ function NewSubmission() {
   const submit = useSubmit();
   const [name, setName] = useState("");
   const [cat, setCat] = useState<Category | null>(null);
-  const [plat, setPlat] = useState<string | null>(null);
   const [url, setUrl] = useState("");
   const [conf, setConf] = useState<10 | 30 | 50>(30);
   const [disc, setDisc] = useState(false);
@@ -46,13 +45,13 @@ function NewSubmission() {
   const remaining = summary.data ? Math.max(0, summary.data.quotaMax - summary.data.quotaUsed) : null;
   const exhausted = remaining === 0;
 
-  const ready = name.trim() && cat && plat && url.trim().length > 3 && oneLine.trim() && !exhausted;
+  const ready = name.trim() && cat && url.trim().length > 3 && oneLine.trim() && !exhausted;
 
   const onSubmit = () => {
     if (!ready) return;
     submit.mutate(
-      { name: name.trim(), category: cat!, platform: plat!, evidenceUrl: url.trim(), confidence: conf, disclosure: disc, oneLine: oneLine.trim() },
-      { onSuccess: () => { setName(""); setCat(null); setPlat(null); setUrl(""); setConf(30); setDisc(false); setOneLine(""); } }
+      { name: name.trim(), category: cat!, evidenceUrl: url.trim(), confidence: conf, disclosure: disc, oneLine: oneLine.trim() },
+      { onSuccess: () => { setName(""); setCat(null); setUrl(""); setConf(30); setDisc(false); setOneLine(""); } }
     );
   };
 
@@ -64,13 +63,14 @@ function NewSubmission() {
         <Chips items={CATS.map((c) => c.label)} selected={cat ? CATS.find((c) => c.key === cat)!.label : null} onPick={(l) => setCat(CATS.find((c) => c.label === l)!.key)} />
       </Field>
 
-      <Field label="최초 목격 플랫폼">
-        <Chips items={PLATS} selected={plat} onPick={setPlat} />
-      </Field>
-
       <Field label="한 줄 설명"><TextInput value={oneLine} onChangeText={setOneLine} placeholder="뜻을 한 줄로" placeholderTextColor="rgba(20,19,15,0.35)" style={s.input} /></Field>
 
       <Field label="근거 URL"><TextInput value={url} onChangeText={setUrl} placeholder="https://" placeholderTextColor="rgba(20,19,15,0.35)" autoCapitalize="none" style={s.input} /></Field>
+      {url.trim().length > 8 && (
+        <Muted style={{ marginTop: -10, fontSize: 12.5 }}>
+          {platformLabel(url) === "기타" ? "기타 사이트 제보로 기록돼요" : `${platformLabel(url)} 제보로 기록돼요`}
+        </Muted>
+      )}
 
       <View>
         <Text style={s.fieldLabel}>확신도 · 걸수록 크게 벌고 크게 잃습니다</Text>
@@ -106,7 +106,7 @@ function NewSubmission() {
 
       <Pressable onPress={onSubmit} disabled={!ready || submit.isPending} style={[s.submit, { backgroundColor: ready ? C.ink : "rgba(20,19,15,0.1)" }]}>
         <Text style={{ color: ready ? "#fff" : "rgba(20,19,15,0.35)", fontWeight: "600", fontSize: 15.5 }}>
-          {submit.isPending ? "제보 중…" : exhausted ? "이번 주 제보권 소진" : ready ? `제보하기 · 확신도 ${conf} 걸기` : "항목명 · 카테고리 · 플랫폼 · URL 필요"}
+          {submit.isPending ? "제보 중…" : exhausted ? "이번 주 제보권 소진" : ready ? `제보하기 · 확신도 ${conf} 걸기` : "항목명 · 카테고리 · URL 필요"}
         </Text>
       </Pressable>
     </View>
