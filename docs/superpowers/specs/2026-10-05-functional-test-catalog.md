@@ -104,18 +104,18 @@
 
 | ID | 케이스 | 기대 | 근거·비고 | 상태 |
 |---|---|---|---|---|
-| ADM-ME-01 | `GET /admin/me` (4개 역할 각각) | 200, `{id, loginId, displayName, role}`이 세션 값 | — | TODO |
-| ADM-ACC-01 | `GET /admin/accounts` 역할: ADMIN·AUDITOR 200 / REVIEWER·OPERATOR 403 | — | 02 §1.1 | TODO |
-| ADM-ACC-02 | 비활성화: ADMIN이 다른 계정을 비활성화 | 200, `disabledAt` 채워짐, 감사 `ACCOUNT_DISABLE` 1행, 그 계정의 다음 요청 401 `session-revoked` | — | TODO |
-| ADM-ACC-03 | 비활성화: 자기 자신 → 403 / 없는 계정 → 422 / OPERATOR가 호출 → 403 | — | — | TODO |
+| ADM-ME-01 | `GET /admin/me` (4개 역할 각각) | 200, `{id, loginId, displayName, role}`이 세션 값 | — | PASS |
+| ADM-ACC-01 | `GET /admin/accounts` 역할: ADMIN·AUDITOR 200 / REVIEWER·OPERATOR 403 | — | 02 §1.1 | PASS |
+| ADM-ACC-02 | 비활성화: ADMIN이 다른 계정을 비활성화 | 200, `disabledAt` 채워짐, 감사 `ACCOUNT_DISABLE` 1행, 그 계정의 다음 요청 401 `session-revoked` | — | PASS |
+| ADM-ACC-03 | 비활성화: 자기 자신 → 403 / 없는 계정 → 422 / OPERATOR가 호출 → 403 | — | — | PASS |
 
 ### ADM-BAT 배치 수동 실행 — `AdminBatchTest`
 
 | ID | 케이스 | 기대 | 근거·비고 | 상태 |
 |---|---|---|---|---|
-| ADM-BAT-01 | OPERATOR가 `cluster-merge/run` (임베딩 서비스 없음) | 200, `autoMerged=queued=separated=0`, `failed=candidates`. 감사 `CLUSTER_MERGE_MANUAL_TRIGGER` 1행 증가. 내 후보 항목의 `merge_checked_at`은 NULL 유지 | 설계 §2.1의 `embedding.service.url` 고정 | TODO |
-| ADM-BAT-02 | `shedlock`의 `cluster_merge` 잠금을 미래로 설정 후 실행 | 409, 감사 행 증가 없음. 끝나면 잠금 해제 | ADM-900 "실행 중이면 409" | TODO |
-| ADM-BAT-03 | REVIEWER·AUDITOR → 403 | — | — | TODO |
+| ADM-BAT-01 | OPERATOR가 `cluster-merge/run` (임베딩 서비스 없음) | 200, `autoMerged=queued=separated=0`, `failed=candidates`. 감사 `CLUSTER_MERGE_MANUAL_TRIGGER` 1행 증가. 내 후보 항목의 `merge_checked_at`은 NULL 유지 | 설계 §2.1의 `embedding.service.url` 고정 | PASS |
+| ADM-BAT-02 | `shedlock`의 `cluster_merge` 잠금을 미래로 설정 후 실행 | 409, 감사 행 증가 없음. 끝나면 잠금 해제 | ADM-900 "실행 중이면 409" | PASS |
+| ADM-BAT-03 | REVIEWER·AUDITOR → 403 | — | — | PASS |
 
 ### ADM-MQ 병합 큐 — `AdminMergeQueueTest`
 
