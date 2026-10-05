@@ -67,7 +67,7 @@
 | USR-RPT-05 | `GET /v1/reports/received` — 관리자가 내 제보를 지정해 소명 요청한 신고 | 그 신고가 보임, 신고자 id는 응답에 없음. 제보 없는 유저는 빈 목록 | — | PASS |
 | USR-RPT-06 | 소명 제출: 지정된 제보자 + `EXPLAINING` | 200, `explanation_text` 저장 | — | PASS |
 | USR-RPT-07 | 소명: 없는 신고 → 404 / 지정된 제보자가 아님·`submission_id` 없음 → 403 / `DECIDED` → 409(OPEN은 지정 제보가 없어 403이 먼저) / `text` 빈값·2001자 → 400 | — | — | PASS |
-| USR-RPT-08 | 소명: 마감(요청 + 48h) 지난 제출 / 마감 전 재제출 | 409 / 200(덮어씀) | D3 — 현재 마감 후도 200 | BUG-5 |
+| USR-RPT-08 | 소명: 마감(요청 + 48h) 지난 제출 / 마감 전 재제출 | 409 / 200(덮어씀) | D3 — 현재 마감 후도 200 | PASS(BUG-5 수정) |
 
 ### USR-RD / USR-WCH 읽음·워치 — `UserReadWatchTest`
 
@@ -220,7 +220,7 @@
 | BUG-2 | USR-TRD-15 | 같은 유저의 투표·인정 동시 첫 요청이 UNIQUE 위반으로 500 | `TrendInteractionService.vote/endorse` — **수정됨**(INSERT … ON CONFLICT) |
 | BUG-3 | USR-TRD-11 | 비공개(TEMP_HIDDEN·PERMANENT_HIDDEN) 항목에도 투표·인정이 된다(D1: 404) | `TrendInteractionService` 항목 조회 — MERGED만 거름 — **수정됨**(비공개도 404) |
 | BUG-4 | USR-TRD-14 | 제보자 본인이 자기 항목을 인정할 수 있다(D2: 409) | `TrendInteractionService.endorse` — **수정됨**(유효 제보가 있으면 409) |
-| BUG-5 | USR-RPT-08 | 소명 기한(요청+48h) 미검사 — 마감 후 제출도 200(D3: 409) | `ReportService` 소명 제출 |
+| BUG-5 | USR-RPT-08 | 소명 기한(요청+48h) 미검사 — 마감 후 제출도 200(D3: 409) | `ReportService` 소명 제출 — **수정됨**(기한 지나면 409, 제출 시각도 주입 Clock) |
 | BUG-6 | ADM-PRM-09 | REVIEW(승인 대기) 드래프트도 simulate가 `sim_result`를 덮어씀(D4: 409) | `ParamStudioService.simulate` |
 | BUG-7 | ADM-PRM-04 | `hitThreshold` 범위 미검증(D5: `0 < t ≤ 1` 밖이면 422) | `ParamStudioService` 드래프트 수정 |
 | BUG-8 | ADM-VRD-08 | 유예 연장이 MERGED·VOID 항목에도 된다(D8: PENDING·JUDGING만) | `VerdictAdminService.extendGrace` |

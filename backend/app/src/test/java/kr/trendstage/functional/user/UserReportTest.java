@@ -151,7 +151,6 @@ class UserReportTest extends FunctionalTestBase {
     }
 
     @Test
-    @org.junit.jupiter.api.Disabled("BUG-5: 소명 기한(explanation_deadline, 요청+48h)을 검사하지 않아 마감 후 제출도 200(D3 결정: 409)")
     @DisplayName("USR-RPT-08 소명: 마감 전 재제출은 덮어쓰고(200), 마감(요청+48h) 후 제출은 409 (D3)")
     void explanationDeadline() throws Exception {
         clock.set(T0);
