@@ -16,6 +16,10 @@ public record DraftValues(int targetFloor, double targetRatio, int activeWindowD
             throw new IllegalArgumentException("targetFloor: 1 이상이어야 합니다 (입력 " + targetFloor + ")");
         }
         SignalAxes.unit("hitThreshold", hitThreshold);
+        // 0이면 T ≥ 0인 모든 항목이 HIT가 된다 — 임계값은 0 초과(D5: 0 < t ≤ 1)
+        if (hitThreshold <= 0.0) {
+            throw new IllegalArgumentException("hitThreshold: 0보다 커야 합니다 (입력 " + hitThreshold + ")");
+        }
         new SignalAxes(targetRatio, activeWindowDays, persistenceFloor, persistenceFullDays,
                 diversityFloor, diversityFullPlatforms, independenceMode);   // 나머지 범위 검증
     }

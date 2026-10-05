@@ -30,11 +30,11 @@
 | USR-SUB-07 | 마감(D+14) 지난 항목 / JUDGING 항목에 제보 | 422 `type=item-closed`, 제보권 차감 없음 | 경계값은 기존 `#closedItemsRejectWithoutCharge`. HTTP 매핑만 확인 | PASS |
 | USR-SUB-08 | 병합된 이름(MERGED 툼스톤)으로 제보 | 201, 생존 항목 id | 기존: `TombstoneJoinTest#submissionOnMergedNameJoinsSurvivor` — 링크 | PASS(기존) |
 | USR-SUB-09 | `GET /v1/submissions/me` | 200, 최신순, 다른 유저 제보 없음, PENDING이면 `judgeInDays` 있음 | — | PASS |
-| USR-SUB-10 | 판정 끝난 제보의 `GET /v1/submissions/me` | `status`=HIT/MISS, `delta`·`reachLevel`·`note`(산정 근거) 채워짐, `judgeInDays=null` | OpenAPI SubmissionMine — 현재 세 필드 항상 null. `JourneyTest`에 둠 | BUG-10 |
+| USR-SUB-10 | 판정 끝난 제보의 `GET /v1/submissions/me` | `status`=HIT/MISS, `delta`·`reachLevel`·`note`(산정 근거) 채워짐, `judgeInDays=null` | OpenAPI SubmissionMine — 현재 세 필드 항상 null. `JourneyTest`에 둠 | PASS(BUG-10 수정) |
 | USR-SUB-11 | NFD로 분해된 한글 이름(macOS 입력) 제보 → NFC 이름 항목 | 같은 항목에 합류 | `NameNormalizer` NFC | PASS |
 | USR-SUB-12 | 같은 유저가 같은 새 이름을 동시에 두 번 제보(네트워크 재시도) | 201 1건 + 409 1건, 500 없음, 제보 1행 | — | PASS |
 | USR-SUB-13 | 이름 정확히 120자 | 201 (121자는 400 — USR-SUB-05) | 경계값 | PASS |
-| USR-SUB-14 | 생성 응답의 `orderRank` | 1위, 이어서 2위 | OpenAPI "판정 전에는 파생 잠정값" — 현재 항상 null(flush 전 뷰 조회). USR-SUB-01·02는 순위를 `GET /v1/submissions/me`로 확인 | BUG-9 |
+| USR-SUB-14 | 생성 응답의 `orderRank` | 1위, 이어서 2위 | OpenAPI "판정 전에는 파생 잠정값" — 현재 항상 null(flush 전 뷰 조회). USR-SUB-01·02는 순위를 `GET /v1/submissions/me`로 확인 | PASS(BUG-9 수정) |
 
 ### USR-TRD 트렌드 조회·투표·인정 — `UserTrendTest`
 
@@ -43,18 +43,18 @@
 | USR-TRD-01 | `GET /v1/trends` | 200, PENDING·JUDGING이고 PUBLIC인 내 항목이 포함되고, MERGED·RESOLVED·TEMP_HIDDEN 항목은 빠짐 | 전역 목록 — 내 id 포함·제외만 단언 | PASS |
 | USR-TRD-02 | 단계(stage) 계산: 플랫폼 1·2·4·6종 제보 | SEED·RISING·PEAK·FADING | 기존 단위 `ReadModelTest` — HTTP는 1개 대표값만 | PASS |
 | USR-TRD-03 | 로그인 + `daily=true` | 200, 최대 5개. 두 번 호출하면 같은 목록. `daily_selections`에 (user, 오늘) 행 | 선호 카테고리 우선은 기존 `DailySelectionPickerTest` | PASS |
-| USR-TRD-04 | 오늘의 5개 선정 후 그중 한 항목이 TEMP_HIDDEN 또는 MERGED가 됨 → 다시 조회 | 그 항목이 빠짐 | 설계 §5 — 지금은 계속 노출 | BUG-1 |
+| USR-TRD-04 | 오늘의 5개 선정 후 그중 한 항목이 TEMP_HIDDEN 또는 MERGED가 됨 → 다시 조회 | 그 항목이 빠짐 | 설계 §5 — 지금은 계속 노출 | PASS(BUG-1 수정) |
 | USR-TRD-05 | `GET /v1/trends/{id}` 정상 | 200, `meaning`=가장 이른 제보의 oneLine, `pathText`, `reachedCount`, 투표 0이면 `voteCount=null` | — | PASS |
 | USR-TRD-06 | 상세: 없는 id / MERGED / TEMP_HIDDEN / PERMANENT_HIDDEN | 404 | — | PASS |
 | USR-TRD-07 | 상세: 판정된 항목 | `verdict`="적중했어요"/"빗나갔어요", `reachLevel`(HIT) — `verdictWhy`는 미검증 | JRN-01·02에서 확인 | PASS |
 | USR-TRD-08 | 상세: 내가 워치한 항목 | `watched=true`(다른 유저 시점에서는 false) | — | PASS |
 | USR-TRD-09 | 투표 `{willTrend:true}` → 다시 `{willTrend:false}` | 둘 다 200, `votes` 1행 유지·값 토글, `voteCount` 문구 갱신 | — | PASS |
 | USR-TRD-10 | 투표: `willTrend` 누락 → 400 / 없는 항목·MERGED → 404 | — | — | PASS |
-| USR-TRD-11 | 투표·인정: TEMP_HIDDEN·PERMANENT_HIDDEN 항목 | 404 | D1(결정: 상세와 일치) — 현재 200/201 | BUG-3 |
+| USR-TRD-11 | 투표·인정: TEMP_HIDDEN·PERMANENT_HIDDEN 항목 | 404 | D1(결정: 상세와 일치) — 현재 200/201 | PASS(BUG-3 수정) |
 | USR-TRD-12 | 인정 첫 요청 → 201(바디 없음), 두 번째 → 409 | `endorsements` 1행 | — | PASS |
 | USR-TRD-13 | 인정: 없는 항목·MERGED → 404 | — | — | PASS |
-| USR-TRD-14 | 인정: 그 항목에 제보한 유저 | 409 | D2(결정: OpenAPI대로) — 현재 201 | BUG-4 |
-| USR-TRD-15 | 같은 유저의 투표 2건·인정 2건 동시 첫 요청 | 500 없음. 투표는 1행, 인정은 201 1건 + 409 1건 | 설계 §5 | BUG-2 |
+| USR-TRD-14 | 인정: 그 항목에 제보한 유저 | 409 | D2(결정: OpenAPI대로) — 현재 201 | PASS(BUG-4 수정) |
+| USR-TRD-15 | 같은 유저의 투표 2건·인정 2건 동시 첫 요청 | 500 없음. 투표는 1행, 인정은 201 1건 + 409 1건 | 설계 §5 | PASS(BUG-2 수정) |
 
 ### USR-RPT 신고·소명 — `UserReportTest`
 
@@ -67,7 +67,7 @@
 | USR-RPT-05 | `GET /v1/reports/received` — 관리자가 내 제보를 지정해 소명 요청한 신고 | 그 신고가 보임, 신고자 id는 응답에 없음. 제보 없는 유저는 빈 목록 | — | PASS |
 | USR-RPT-06 | 소명 제출: 지정된 제보자 + `EXPLAINING` | 200, `explanation_text` 저장 | — | PASS |
 | USR-RPT-07 | 소명: 없는 신고 → 404 / 지정된 제보자가 아님·`submission_id` 없음 → 403 / `DECIDED` → 409(OPEN은 지정 제보가 없어 403이 먼저) / `text` 빈값·2001자 → 400 | — | — | PASS |
-| USR-RPT-08 | 소명: 마감(요청 + 48h) 지난 제출 / 마감 전 재제출 | 409 / 200(덮어씀) | D3 — 현재 마감 후도 200 | BUG-5 |
+| USR-RPT-08 | 소명: 마감(요청 + 48h) 지난 제출 / 마감 전 재제출 | 409 / 200(덮어씀) | D3 — 현재 마감 후도 200 | PASS(BUG-5 수정) |
 
 ### USR-RD / USR-WCH 읽음·워치 — `UserReadWatchTest`
 
@@ -133,19 +133,19 @@
 
 ### ADM-PRM 파라미터 스튜디오 — `AdminParamStudioTest`
 
-전역 드래프트 1개 — 클래스가 `@BeforeEach`·`@AfterEach`에서 DRAFT·REVIEW 드래프트를 지우고 딸린 PENDING 승인 요청을 REJECTED로 닫는다.
+전역 드래프트 1개 — 클래스가 `@BeforeEach`·`@AfterEach`에서 DRAFT·REVIEW 드래프트를 지우고 딸린 PENDING 승인 요청을 REJECTED로 닫는다. SP4(#9) 이후 편집 값은 9개 필수(`targetFloor`·`targetRatio`·…·`independenceMode`)이고 승인 요청에 시뮬레이션과 백테스트가 모두 필요하다 — 테스트는 백테스트 결과만 채운다(실행은 SP4 `BacktestApiTest`).
 
 | ID | 케이스 | 기대 | 근거·비고 | 상태 |
 |---|---|---|---|---|
 | ADM-PRM-01 | OPERATOR `GET /admin/params/draft` (드래프트 없음) | 200, 드래프트 생성(DRAFT), `current*` 값 = 현재 파라미터 | AUDITOR는 기존 `RoleMatrixTest`(생성 안 함) | PASS |
-| ADM-PRM-02 | PUT `{submitterTarget:25, hitThreshold:0.25}` | 200, 값 반영, `simResult` 비워짐, 감사 `PARAM_DRAFT_UPDATE` | — | PASS |
-| ADM-PRM-03 | PUT `submitterTarget=0` → 422 | — | — | PASS |
-| ADM-PRM-04 | PUT `hitThreshold=-0.1` / `1.5` / `0` | 422 (`0 < hitThreshold ≤ 1`만 허용) | D5 — 현재 200 | BUG-7 |
+| ADM-PRM-02 | PUT 9개 값(`targetFloor:25`, `hitThreshold:0.25`) | 200, `values.*` 반영, `simResult` 비워짐, 감사 `PARAM_DRAFT_UPDATE` | — | PASS |
+| ADM-PRM-03 | PUT `targetFloor=0` → 422 | — | — | PASS |
+| ADM-PRM-04 | PUT `hitThreshold=-0.1` / `1.5` / `0` | 422 (`0 < hitThreshold ≤ 1`만 허용), `1.0`은 200 | D5 — 현재 200 | PASS(BUG-7 수정) |
 | ADM-PRM-05 | simulate | 200, `simResult{changed,total,missToHit,hitToMiss,reachChanged}`, 감사 `PARAM_SIMULATE` | — | PASS |
 | ADM-PRM-06 | 시뮬레이션 없이 승인 요청 → 422 / PUT 후(시뮬레이션 지워짐) 승인 요청 → 422 | CLAUDE.md "시뮬레이션 없이 승인 요청 불가" | PASS |
-| ADM-PRM-07 | 시뮬레이션 후 승인 요청(사유 있음) | 200 `status=REVIEW`, `approval_requests` PARAM_APPLY 1행, 감사 `APPROVAL_REQUEST` | 승인 이후는 기존 `ApprovalFlowTest` | PASS |
+| ADM-PRM-07 | 시뮬레이션·백테스트 후 승인 요청(사유 있음) | 200 `status=REVIEW`, `approval_requests` PARAM_APPLY 1행, 감사 `APPROVAL_REQUEST` | 승인 이후는 기존 `ApprovalFlowTest` | PASS |
 | ADM-PRM-08 | 승인 요청: 사유 빈값 → 422 / REVIEW 중 다시 요청 → 409 / REVIEW 중 PUT → 409 | — | — | PASS |
-| ADM-PRM-09 | REVIEW 중 simulate | 409, `sim_result` 그대로 | D4 — 현재 200·덮어씀 | BUG-6 |
+| ADM-PRM-09 | REVIEW 중 simulate | 409, `sim_result` 그대로 | D4 — 현재 200·덮어씀 | PASS(BUG-6 수정) |
 | ADM-PRM-10 | 역할: REVIEWER는 GET·PUT·simulate·request-approval 모두 403 / AUDITOR는 PUT·simulate·request-approval 403 | — | — | PASS |
 
 ### ADM-RPT 신고 대상 제보 목록 — `AdminReportSubmissionsTest`
@@ -187,7 +187,7 @@
 | ADM-VRD-05 | `days=0`·`8` → 422 / 판정된 항목 → 422 / 없는 항목 → 422 | 1~7일(02와 코드. 05 문서의 "1~90일"은 오류) | PASS |
 | ADM-VRD-06 | JUDGING 항목을 연장해 새 마감이 미래 | 200, 항목 PENDING 복귀 | — | PASS |
 | ADM-VRD-07 | 사유 없이 연장 | 200(서버가 사유 요구 안 함 — 02 §사유 입력) | 현재 동작 고정 | PASS |
-| ADM-VRD-08 | MERGED·VOID 항목 연장 | 422, override 변화 없음 | D8(PENDING·JUDGING만) — 현재 200 | BUG-8 |
+| ADM-VRD-08 | MERGED·VOID 항목 연장 | 422, override 변화 없음 | D8(PENDING·JUDGING만) — 현재 200 | PASS(BUG-8 수정) |
 | ADM-VRD-09 | 역할: REVIEWER·AUDITOR 연장 → 403 | — | — | PASS |
 
 ---
@@ -212,17 +212,17 @@
 
 ## BUG 목록
 
-테스트가 드러낸 설계·계약과 다른 동작. 각 테스트는 `@Disabled("BUG-n: …")`로 남아 있다 — 수정 시 `@Disabled`를 지우면 그대로 회귀 테스트가 된다. 수정은 별도 승인 후.
+테스트가 드러낸 설계·계약과 다른 동작. **10건 모두 수정됨(2026-10-05, 브랜치 `bugfix-1-2-10`)** — 각 테스트의 `@Disabled`를 지워 실패를 확인한 뒤 고쳤고, 이제 회귀 테스트로 동작한다.
 
 | BUG | TC | 현상 | 관련 코드 |
 |---|---|---|---|
-| BUG-1 | USR-TRD-04 | 오늘의 5개가 선정 후 비공개·병합된 항목을 그날 계속 노출(명예훼손 대응 비공개 무력화) | `TrendQueryService` 오늘의 5개 재조회 — 저장된 선정을 상태·공개 여부 재확인 없이 반환 |
-| BUG-2 | USR-TRD-15 | 같은 유저의 투표·인정 동시 첫 요청이 UNIQUE 위반으로 500 | `TrendInteractionService.vote/endorse` |
-| BUG-3 | USR-TRD-11 | 비공개(TEMP_HIDDEN·PERMANENT_HIDDEN) 항목에도 투표·인정이 된다(D1: 404) | `TrendInteractionService` 항목 조회 — MERGED만 거름 |
-| BUG-4 | USR-TRD-14 | 제보자 본인이 자기 항목을 인정할 수 있다(D2: 409) | `TrendInteractionService.endorse` |
-| BUG-5 | USR-RPT-08 | 소명 기한(요청+48h) 미검사 — 마감 후 제출도 200(D3: 409) | `ReportService` 소명 제출 |
-| BUG-6 | ADM-PRM-09 | REVIEW(승인 대기) 드래프트도 simulate가 `sim_result`를 덮어씀(D4: 409) | `ParamStudioService.simulate` |
-| BUG-7 | ADM-PRM-04 | `hitThreshold` 범위 미검증(D5: `0 < t ≤ 1` 밖이면 422) | `ParamStudioService` 드래프트 수정 |
-| BUG-8 | ADM-VRD-08 | 유예 연장이 MERGED·VOID 항목에도 된다(D8: PENDING·JUDGING만) | `VerdictAdminService.extendGrace` |
-| BUG-9 | USR-SUB-14 | 제보 생성 응답의 `orderRank`가 항상 null — `save()` 후 flush 없이 순위 뷰 조회 | `SubmissionService.create/toResponse` |
-| BUG-10 | USR-SUB-10 | 판정 끝난 제보의 `delta`·`reachLevel`·`note`(산정 근거)가 항상 null | `SubmissionService.toResponse` |
+| BUG-1 | USR-TRD-04 | 오늘의 5개가 선정 후 비공개·병합된 항목을 그날 계속 노출(명예훼손 대응 비공개 무력화) | `TrendQueryService` 오늘의 5개 재조회 — 저장된 선정을 상태·공개 여부 재확인 없이 반환 — **수정됨**(읽을 때 PUBLIC·비병합만) |
+| BUG-2 | USR-TRD-15 | 같은 유저의 투표·인정 동시 첫 요청이 UNIQUE 위반으로 500 | `TrendInteractionService.vote/endorse` — **수정됨**(INSERT … ON CONFLICT) |
+| BUG-3 | USR-TRD-11 | 비공개(TEMP_HIDDEN·PERMANENT_HIDDEN) 항목에도 투표·인정이 된다(D1: 404) | `TrendInteractionService` 항목 조회 — MERGED만 거름 — **수정됨**(비공개도 404) |
+| BUG-4 | USR-TRD-14 | 제보자 본인이 자기 항목을 인정할 수 있다(D2: 409) | `TrendInteractionService.endorse` — **수정됨**(유효 제보가 있으면 409) |
+| BUG-5 | USR-RPT-08 | 소명 기한(요청+48h) 미검사 — 마감 후 제출도 200(D3: 409) | `ReportService` 소명 제출 — **수정됨**(기한 지나면 409, 제출 시각도 주입 Clock) |
+| BUG-6 | ADM-PRM-09 | REVIEW(승인 대기) 드래프트도 simulate가 `sim_result`를 덮어씀(D4: 409) | `ParamStudioService.simulate` — **수정됨**(REVIEW면 409) |
+| BUG-7 | ADM-PRM-04 | `hitThreshold` 범위 미검증(D5: `0 < t ≤ 1` 밖이면 422) | `ParamStudioService` 드래프트 수정 — **수정됨**(0 < t ≤ 1 밖이면 422) |
+| BUG-8 | ADM-VRD-08 | 유예 연장이 MERGED·VOID 항목에도 된다(D8: PENDING·JUDGING만) | `VerdictAdminService.extendGrace` — **수정됨**(PENDING·JUDGING 외 422) |
+| BUG-9 | USR-SUB-14 | 제보 생성 응답의 `orderRank`가 항상 null — `save()` 후 flush 없이 순위 뷰 조회 | `SubmissionService.create/toResponse` — **수정됨**(뷰 엔티티에 @Synchronize("submissions") — 조회 전 자동 flush) |
+| BUG-10 | USR-SUB-10 | 판정 끝난 제보의 `delta`·`reachLevel`·`note`(산정 근거)가 항상 null | `SubmissionService.toResponse` — **수정됨**(원장 합·현재 판정 reach·T+원 산정식+조정 합계) |

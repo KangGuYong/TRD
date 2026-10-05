@@ -127,6 +127,10 @@ public class VerdictAdminService {
         }
         TrendItem item = trendItems.findById(trendItemId)
                 .orElseThrow(() -> new AdminValidationException("존재하지 않는 항목입니다"));
+        // 유예는 판정을 기다리는 항목에만 의미가 있다 — 병합 흔적(MERGED)·VOID 등은 거부(D8)
+        if (item.getState() != TrendState.PENDING && item.getState() != TrendState.JUDGING) {
+            throw new AdminValidationException("판정 대기(PENDING·JUDGING) 항목만 유예 연장할 수 있습니다: " + item.getState());
+        }
 
         Instant originalDeadline = item.getFirstSeenAt().plus(Duration.ofDays(JUDGE_WINDOW_DAYS));
         Instant currentDeadline = item.getJudgmentDeadlineOverride() != null

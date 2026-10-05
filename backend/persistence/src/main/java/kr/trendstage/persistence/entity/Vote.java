@@ -39,9 +39,4 @@ public class Vote {
     public UUID getId() { return id; }
     public UUID getTrendItemId() { return trendItemId; }
     public boolean isWillTrend() { return willTrend; }
-
-    public void toggleTo(boolean willTrend) {
-        this.willTrend = willTrend;
-        this.updatedAt = Instant.now();
-    }
 }

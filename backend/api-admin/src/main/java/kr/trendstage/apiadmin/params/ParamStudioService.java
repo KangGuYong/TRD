@@ -106,6 +106,10 @@ public class ParamStudioService {
     @Transactional
     public ParameterDraft simulate(UUID actorId, AdminRole actorRole) {
         ParameterDraft draft = getOrCreateActiveDraft(actorId);
+        // 승인자가 보는 시뮬레이션은 요청 시점 결과로 고정한다 — 수정(PUT)과 같은 잠금(D4)
+        if (draft.getStatus() == ParamStatus.REVIEW) {
+            throw new DraftLockedException("승인 대기 중인 드래프트는 다시 시뮬레이션할 수 없습니다");
+        }
         ParameterSet draftParams = draft.toParameterSet(objectMapper);
 
         Instant since = clock.instant().minus(Duration.ofDays(SIM_WINDOW_DAYS));

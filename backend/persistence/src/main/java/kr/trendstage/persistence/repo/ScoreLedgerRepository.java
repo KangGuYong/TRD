@@ -11,6 +11,9 @@ public interface ScoreLedgerRepository extends JpaRepository<ScoreLedgerEntry, U
 
     List<ScoreLedgerEntry> findByUserIdOrderByCreatedAtDesc(UUID userId);
 
+    /** 내 제보 목록의 점수·산정 근거 — 원 판정 행이 먼저, 재판정·VOID 조정(ADJ)이 뒤. */
+    List<ScoreLedgerEntry> findBySubmissionIdOrderByCreatedAtAsc(UUID submissionId);
+
     /** ADM-200 재판정/VOID 시 기존 판정분을 상쇄하기 위한 조회. */
     List<ScoreLedgerEntry> findByVerdictId(UUID verdictId);
 

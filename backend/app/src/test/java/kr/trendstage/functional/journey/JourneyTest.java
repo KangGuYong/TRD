@@ -85,17 +85,25 @@ class JourneyTest extends FunctionalTestBase {
     }
 
     @Test
-    @org.junit.jupiter.api.Disabled("BUG-10: 판정 끝난 제보의 내 제보 목록에 delta·reachLevel·note(산정 근거)가 항상 null — "
-            + "SubmissionService.toResponse가 세 필드를 null로 고정(OpenAPI SubmissionMine은 판정 후 값을 정의)")
-    @DisplayName("USR-SUB-10 판정 끝난 제보: 내 제보 목록에 delta(+60)·reachLevel(L1)·note(산정 근거) 채워짐")
+    @DisplayName("USR-SUB-10 판정 끝난 제보: 내 제보 목록에 delta(+60)·reachLevel(L1)·note(T + 원장 산정식), 판정 전은 셋 다 null")
     void judgedSubmissionShowsScoreAndBasis() throws Exception {
-        Hit h = hitJourney();
+        clock.set(T0);
+        UUID pendingUser = fx.user();
+        submit(pendingUser, uniq("pending note"), 30);
+        String pending = getOk("/v1/submissions/me", asUser(pendingUser));
+        for (String field : new String[]{"delta", "reachLevel", "note"}) {
+            assertThat((Object) read(pending, "$[0]." + field)).as(field).isNull();
+        }
 
+        Hit h = hitJourney();
         String json = getOk("/v1/submissions/me", asUser(h.users().get(0)));
 
         assertThat(doubles(json, "$[*].delta")).containsExactly(60.0);
         assertThat((List<String>) read(json, "$[*].reachLevel")).containsExactly("L1");
-        assertThat((List<String>) read(json, "$[*].note")).doesNotContainNull();
+        assertThat((String) read(json, "$[0].note"))
+                .startsWith("T=0.2")
+                .contains("HIT L1 · 확신도 50 × 선점 1위(1.0) × 확산 ×1.2 = +60.0")
+                .doesNotContain("조정 후 합계");
     }
 
     @Test
@@ -230,6 +238,11 @@ class JourneyTest extends FunctionalTestBase {
                 java.math.BigDecimal.class, aSub).doubleValue()).isCloseTo(60.0, within(0.0001));
         assertThat(fx.ledgerRows(h.item())).isGreaterThan(rowsBefore);
         mvc.perform(get("/v1/trends/{id}", h.item())).andExpect(jsonPath("$.verdict").value("빗나갔어요"));
+        // 내 제보 목록(USR-SUB-10): 재판정 반영 합계, MISS라 reachLevel 없음, 원 산정식 + 조정 후 합계
+        String mine = getOk("/v1/submissions/me", asUser(a));
+        assertThat(doubles(mine, "$[*].delta")).containsExactly(-25.0);
+        assertThat((Object) read(mine, "$[0].reachLevel")).isNull();
+        assertThat((String) read(mine, "$[0].note")).contains("HIT L1").endsWith(" · 조정 후 합계 -25.0");
     }
 
     @Test
@@ -249,6 +262,9 @@ class JourneyTest extends FunctionalTestBase {
         assertThat(jdbc.queryForObject("SELECT delta FROM score_ledger WHERE submission_id = ? AND kind = 'HIT'",
                 java.math.BigDecimal.class, h.submissions().get(0)).doubleValue()).isCloseTo(60.0, within(0.0001));
         mvc.perform(get("/v1/submissions/me").with(asUser(a))).andExpect(jsonPath("$[0].status").value("VOID"));
+        String mine = getOk("/v1/submissions/me", asUser(a));
+        assertThat(doubles(mine, "$[*].delta")).containsExactly(0.0);
+        assertThat((String) read(mine, "$[0].note")).endsWith(" · 조정 후 합계 +0.0");
         String g = grade(a);
         assertThat((Integer) read(g, "$.judgedCount")).isZero();
         assertThat(((Number) read(g, "$.activeScore")).doubleValue()).isCloseTo(0.0, within(0.001));

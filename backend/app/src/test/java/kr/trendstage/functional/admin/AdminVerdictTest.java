@@ -109,7 +109,6 @@ class AdminVerdictTest extends FunctionalTestBase {
     }
 
     @Test
-    @org.junit.jupiter.api.Disabled("BUG-8: 유예 연장이 MERGED·VOID 항목에도 된다(D8 결정: PENDING·JUDGING만, 그 외 422)")
     @DisplayName("ADM-VRD-08 MERGED·VOID 항목 연장은 422, override 변화 없음 (D8)")
     void extendRejectsMergedAndVoid() throws Exception {
         clock.set(T0);

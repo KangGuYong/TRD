@@ -29,7 +29,7 @@ class UserSubmissionTest extends FunctionalTestBase {
         String res = submit(fx.user(), name, 30);
 
         assertThat((String) read(res, "$.status")).isEqualTo("PENDING");
-        // 생성 응답의 orderRank는 USR-SUB-14(BUG-9)
+        // 생성 응답의 orderRank는 USR-SUB-14에서 검증
         assertThat(((Number) read(res, "$.judgeInDays")).longValue()).isEqualTo(14);
         assertThat((String) read(res, "$.word")).isEqualTo(name);
         UUID item = itemOf(res);
@@ -57,8 +57,6 @@ class UserSubmissionTest extends FunctionalTestBase {
     }
 
     @Test
-    @org.junit.jupiter.api.Disabled("BUG-9: 제보 생성 응답의 orderRank가 항상 null — save() 후 flush 없이 submission_order_rank 뷰를 조회해 "
-            + "방금 넣은 제보가 안 보인다(SubmissionService.toResponse)")
     @DisplayName("USR-SUB-14 제보 생성 응답의 orderRank는 파생 순위(1위, 이어서 2위)")
     void createResponseCarriesDerivedRank() throws Exception {
         clock.set(T0);

@@ -72,7 +72,6 @@ class UserTrendTest extends FunctionalTestBase {
     }
 
     @Test
-    @org.junit.jupiter.api.Disabled("BUG-1: 오늘의 5개가 선정 후 비공개·병합된 항목을 그날 계속 노출 — TrendQueryService가 저장된 선정을 상태·공개 여부 재확인 없이 반환")
     @DisplayName("USR-TRD-04 오늘의 5개 선정 후 비공개·병합된 항목은 다시 조회하면 빠진다")
     void dailySelectionDropsHiddenOrMergedItems() throws Exception {
         clock.set(T0);
@@ -173,7 +172,6 @@ class UserTrendTest extends FunctionalTestBase {
     }
 
     @Test
-    @org.junit.jupiter.api.Disabled("BUG-3: 비공개 항목에도 투표·인정이 된다(D1 결정: 404)")
     @DisplayName("USR-TRD-11 비공개(TEMP_HIDDEN·PERMANENT_HIDDEN) 항목 투표·인정은 404 (D1)")
     void hiddenItemInteractionsAre404() throws Exception {
         clock.set(T0);
@@ -215,7 +213,6 @@ class UserTrendTest extends FunctionalTestBase {
     }
 
     @Test
-    @org.junit.jupiter.api.Disabled("BUG-4: 제보자 본인이 자기 항목을 인정할 수 있다(D2 결정: 409)")
     @DisplayName("USR-TRD-14 그 항목에 제보한 유저의 인정은 409 (D2)")
     void submitterCannotEndorseOwnItem() throws Exception {
         clock.set(T0);
@@ -226,7 +223,6 @@ class UserTrendTest extends FunctionalTestBase {
     }
 
     @Test
-    @org.junit.jupiter.api.Disabled("BUG-2: 같은 유저의 투표·인정 동시 첫 요청이 UNIQUE 위반으로 500")
     @DisplayName("USR-TRD-15 같은 유저 투표·인정 동시 첫 요청: 500 없음, 투표 1행, 인정 201+409")
     void concurrentFirstVoteAndEndorse() throws Exception {
         clock.set(T0);

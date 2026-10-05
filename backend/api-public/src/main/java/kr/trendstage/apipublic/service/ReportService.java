@@ -18,6 +18,7 @@ import kr.trendstage.persistence.type.TrendState;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -32,11 +33,13 @@ public class ReportService {
     private final ReportRepository reports;
     private final TrendItemRepository trends;
     private final SubmissionRepository submissions;
+    private final Clock clock;
 
-    public ReportService(ReportRepository reports, TrendItemRepository trends, SubmissionRepository submissions) {
+    public ReportService(ReportRepository reports, TrendItemRepository trends, SubmissionRepository submissions, Clock clock) {
         this.reports = reports;
         this.trends = trends;
         this.submissions = submissions;
+        this.clock = clock;
     }
 
     @Transactional
@@ -76,7 +79,12 @@ public class ReportService {
         if (report.getStatus() != ReportStatus.EXPLAINING) {
             throw new ExplanationConflictException("소명을 제출할 수 있는 상태가 아닙니다: " + report.getStatus());
         }
-        report.submitExplanation(text, Instant.now());
+        // 소명 기한(요청 + 48h, ReportAdminService)이 지나면 받지 않는다(D3). 기한 전 재제출은 덮어쓴다.
+        Instant now = clock.instant();
+        if (report.getExplanationDeadline() != null && !now.isBefore(report.getExplanationDeadline())) {
+            throw new ExplanationConflictException("소명 기한이 지났습니다: " + report.getExplanationDeadline());
+        }
+        report.submitExplanation(text, now);
     }
 
     private boolean isOwnedBy(UUID submissionId, UUID userId) {
