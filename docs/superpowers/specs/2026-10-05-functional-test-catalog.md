@@ -46,7 +46,7 @@
 | USR-TRD-04 | 오늘의 5개 선정 후 그중 한 항목이 TEMP_HIDDEN 또는 MERGED가 됨 → 다시 조회 | 그 항목이 빠짐 | 설계 §5 — 지금은 계속 노출 | BUG-1 |
 | USR-TRD-05 | `GET /v1/trends/{id}` 정상 | 200, `meaning`=가장 이른 제보의 oneLine, `pathText`, `reachedCount`, 투표 0이면 `voteCount=null` | — | PASS |
 | USR-TRD-06 | 상세: 없는 id / MERGED / TEMP_HIDDEN / PERMANENT_HIDDEN | 404 | — | PASS |
-| USR-TRD-07 | 상세: 판정된 항목 | `verdict`="적중했어요"/"빗나갔어요", `verdictWhy`, `reachLevel` | JRN-01·02에서 확인 | PASS |
+| USR-TRD-07 | 상세: 판정된 항목 | `verdict`="적중했어요"/"빗나갔어요", `reachLevel`(HIT) — `verdictWhy`는 미검증 | JRN-01·02에서 확인 | PASS |
 | USR-TRD-08 | 상세: 내가 워치한 항목 | `watched=true`(다른 유저 시점에서는 false) | — | PASS |
 | USR-TRD-09 | 투표 `{willTrend:true}` → 다시 `{willTrend:false}` | 둘 다 200, `votes` 1행 유지·값 토글, `voteCount` 문구 갱신 | — | PASS |
 | USR-TRD-10 | 투표: `willTrend` 누락 → 400 / 없는 항목·MERGED → 404 | — | — | PASS |
@@ -66,7 +66,7 @@
 | USR-RPT-04 | `GET /v1/reports/me` | 내 신고만, 최신순 | — | PASS |
 | USR-RPT-05 | `GET /v1/reports/received` — 관리자가 내 제보를 지정해 소명 요청한 신고 | 그 신고가 보임, 신고자 id는 응답에 없음. 제보 없는 유저는 빈 목록 | — | PASS |
 | USR-RPT-06 | 소명 제출: 지정된 제보자 + `EXPLAINING` | 200, `explanation_text` 저장 | — | PASS |
-| USR-RPT-07 | 소명: 없는 신고 → 404 / 지정된 제보자가 아님·`submission_id` 없음 → 403 / `OPEN`·`DECIDED` → 409 / `text` 빈값·2001자 → 400 | — | — | PASS |
+| USR-RPT-07 | 소명: 없는 신고 → 404 / 지정된 제보자가 아님·`submission_id` 없음 → 403 / `DECIDED` → 409(OPEN은 지정 제보가 없어 403이 먼저) / `text` 빈값·2001자 → 400 | — | — | PASS |
 | USR-RPT-08 | 소명: 마감(요청 + 48h) 지난 제출 / 마감 전 재제출 | 409 / 200(덮어씀) | D3 — 현재 마감 후도 200 | BUG-5 |
 
 ### USR-RD / USR-WCH 읽음·워치 — `UserReadWatchTest`
@@ -122,7 +122,7 @@
 | ID | 케이스 | 기대 | 근거·비고 | 상태 |
 |---|---|---|---|---|
 | ADM-MQ-01 | `GET /admin/merge-queue` (4개 역할) | 200, 내 PENDING 행이 `similarity`·`newName`·`oldName`·`orderPreview`와 함께 있음. 시딩은 "시딩 handle"로 표시 | — | PASS |
-| ADM-MQ-02 | `GET …/{id}/preview` | 200, 생존=first_seen이 이른 쪽, `orderRank` 전후, `firstSeenAtBefore/After`, `deadlineBefore/After`, `dedupVoidedHandles`, `quotaRefundHandles`(시딩 제외) | 계산 규칙은 기존 `MergeRecomputeTest` | PASS |
+| ADM-MQ-02 | `GET …/{id}/preview` | 200, 같은 유저 중복이 `dedupVoidedHandles`·`quotaRefundHandles`(시딩 제외)에, `orderRank`에서 시딩은 순위 없음·다른 유저는 병합 후 2위 — 생존 항목·`firstSeenAt*`·`deadline*` 계산은 기존 `MergeRecomputeTest` | — | PASS |
 | ADM-MQ-03 | 미리보기: 없는 id·이미 처리된 항목 → 422 | — | — | PASS |
 | ADM-MQ-04 | 병합 역할: REVIEWER·OPERATOR 200 / AUDITOR 403 | — | 기존은 ADMIN만 | PASS |
 | ADM-MQ-05 | 같은 `Idempotency-Key`로 병합 두 번 | 두 번째 200 `replayed=true`, 감사 `MERGE` 1행 | 기존 서비스 수준 `MergeIdempotencyTest` — HTTP 매핑만 | PASS |
@@ -133,7 +133,7 @@
 
 ### ADM-PRM 파라미터 스튜디오 — `AdminParamStudioTest`
 
-모든 테스트는 `finally`에서 드래프트를 지운다(전역 1개).
+전역 드래프트 1개 — 클래스가 `@BeforeEach`·`@AfterEach`에서 DRAFT·REVIEW 드래프트를 지우고 딸린 PENDING 승인 요청을 REJECTED로 닫는다.
 
 | ID | 케이스 | 기대 | 근거·비고 | 상태 |
 |---|---|---|---|---|
@@ -171,8 +171,8 @@
 
 | ID | 케이스 | 기대 | 근거·비고 | 상태 |
 |---|---|---|---|---|
-| ADM-ITM-01 | `GET /admin/trend-items` | 내 항목(MERGED 포함)이 `submitterCount`(시딩·VOID 제외)·`currentResult`와 함께 있음 | 개수 규칙은 기존 `TrendItemListCountTest` | PASS |
-| ADM-ITM-02 | 상세: 미판정 항목 | 200, `deadline`·`daysLeft`·`distinctSubmitters`·`distinctPlatforms`(시딩 제외)·`endorseCount`, `preview*` 채워짐, `submissions[].orderRank`(시딩 null) | — | PASS |
+| ADM-ITM-01 | `GET /admin/trend-items` | 내 항목(MERGED 포함)이 `submitterCount`(시딩·VOID 제외)와 함께 있음(MERGED는 `state`) | 개수 규칙은 기존 `TrendItemListCountTest` | PASS |
+| ADM-ITM-02 | 상세: 미판정 항목 | 200, `deadline`·`daysLeft`·`distinctSubmitters`·`distinctPlatforms`(시딩 제외)·`endorseCount`, `preview*` 채워짐, 첫 제보자 `submissions[].orderRank`=1 | — | PASS |
 | ADM-ITM-03 | 상세: 판정된 항목 | `current*` 채워짐, `preview*` 없음 | — | PASS |
 | ADM-ITM-04 | 상세: 없는 id → 422 | — | — | PASS |
 

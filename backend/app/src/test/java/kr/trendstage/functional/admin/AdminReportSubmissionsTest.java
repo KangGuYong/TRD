@@ -29,7 +29,8 @@ class AdminReportSubmissionsTest extends FunctionalTestBase {
         String json = getOk("/admin/reports/{id}/submissions", asAdmin(fx.admin("REVIEWER"), AdminRole.REVIEWER), report);
 
         assertThat((List<String>) read(json, "$[*].submissionId")).containsExactly(first.toString(), seed.toString());
-        assertThat(json).doesNotContain("reporterId");
+        UUID reporter = jdbc.queryForObject("SELECT reporter_id FROM reports WHERE id = ?", UUID.class, report);
+        assertThat(json).doesNotContain("reporterId").doesNotContain(reporter.toString());
     }
 
     @Test
