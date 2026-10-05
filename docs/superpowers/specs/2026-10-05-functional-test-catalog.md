@@ -40,21 +40,21 @@
 
 | ID | 케이스 | 기대 | 근거·비고 | 상태 |
 |---|---|---|---|---|
-| USR-TRD-01 | `GET /v1/trends` | 200, PENDING·JUDGING이고 PUBLIC인 내 항목이 포함되고, MERGED·RESOLVED·TEMP_HIDDEN 항목은 빠짐 | 전역 목록 — 내 id 포함·제외만 단언 | TODO |
-| USR-TRD-02 | 단계(stage) 계산: 플랫폼 1·2·4·6종 제보 | SEED·RISING·PEAK·FADING | 기존 단위 `ReadModelTest` — HTTP는 1개 대표값만 | TODO |
-| USR-TRD-03 | 로그인 + `daily=true` | 200, 최대 5개. 두 번 호출하면 같은 목록. `daily_selections`에 (user, 오늘) 행 | 선호 카테고리 우선은 기존 `DailySelectionPickerTest` | TODO |
-| USR-TRD-04 | 오늘의 5개 선정 후 그중 한 항목이 TEMP_HIDDEN 또는 MERGED가 됨 → 다시 조회 | 그 항목이 빠짐 | 설계 §5 — 지금은 계속 노출 | TODO(BUG 예상) |
-| USR-TRD-05 | `GET /v1/trends/{id}` 정상 | 200, `meaning`=가장 이른 제보의 oneLine, `pathText`, `reachedCount`, 투표 0이면 `voteCount=null` | — | TODO |
-| USR-TRD-06 | 상세: 없는 id / MERGED / TEMP_HIDDEN / PERMANENT_HIDDEN | 404 | — | TODO |
+| USR-TRD-01 | `GET /v1/trends` | 200, PENDING·JUDGING이고 PUBLIC인 내 항목이 포함되고, MERGED·RESOLVED·TEMP_HIDDEN 항목은 빠짐 | 전역 목록 — 내 id 포함·제외만 단언 | PASS |
+| USR-TRD-02 | 단계(stage) 계산: 플랫폼 1·2·4·6종 제보 | SEED·RISING·PEAK·FADING | 기존 단위 `ReadModelTest` — HTTP는 1개 대표값만 | PASS |
+| USR-TRD-03 | 로그인 + `daily=true` | 200, 최대 5개. 두 번 호출하면 같은 목록. `daily_selections`에 (user, 오늘) 행 | 선호 카테고리 우선은 기존 `DailySelectionPickerTest` | PASS |
+| USR-TRD-04 | 오늘의 5개 선정 후 그중 한 항목이 TEMP_HIDDEN 또는 MERGED가 됨 → 다시 조회 | 그 항목이 빠짐 | 설계 §5 — 지금은 계속 노출 | BUG-1 |
+| USR-TRD-05 | `GET /v1/trends/{id}` 정상 | 200, `meaning`=가장 이른 제보의 oneLine, `pathText`, `reachedCount`, 투표 0이면 `voteCount=null` | — | PASS |
+| USR-TRD-06 | 상세: 없는 id / MERGED / TEMP_HIDDEN / PERMANENT_HIDDEN | 404 | — | PASS |
 | USR-TRD-07 | 상세: 판정된 항목 | `verdict`="적중했어요"/"빗나갔어요", `verdictWhy`, `reachLevel` | JRN-01·02에서 확인 | TODO |
-| USR-TRD-08 | 상세: 내가 워치한 항목 | `watched=true`(다른 유저 시점에서는 false) | — | TODO |
-| USR-TRD-09 | 투표 `{willTrend:true}` → 다시 `{willTrend:false}` | 둘 다 200, `votes` 1행 유지·값 토글, `voteCount` 문구 갱신 | — | TODO |
-| USR-TRD-10 | 투표: `willTrend` 누락 → 400 / 없는 항목·MERGED → 404 | — | — | TODO |
-| USR-TRD-11 | 투표·인정: TEMP_HIDDEN·PERMANENT_HIDDEN 항목 | 404 | D1(결정: 상세와 일치) — 현재 200/201 | TODO(BUG 예상) |
-| USR-TRD-12 | 인정 첫 요청 → 201(바디 없음), 두 번째 → 409 | `endorsements` 1행 | — | TODO |
-| USR-TRD-13 | 인정: 없는 항목·MERGED → 404 | — | — | TODO |
-| USR-TRD-14 | 인정: 그 항목에 제보한 유저 | 409 | D2(결정: OpenAPI대로) — 현재 201 | TODO(BUG 예상) |
-| USR-TRD-15 | 같은 유저의 투표 2건·인정 2건 동시 첫 요청 | 500 없음. 투표는 1행, 인정은 201 1건 + 409 1건 | 설계 §5 | TODO(BUG 예상) |
+| USR-TRD-08 | 상세: 내가 워치한 항목 | `watched=true`(다른 유저 시점에서는 false) | — | PASS |
+| USR-TRD-09 | 투표 `{willTrend:true}` → 다시 `{willTrend:false}` | 둘 다 200, `votes` 1행 유지·값 토글, `voteCount` 문구 갱신 | — | PASS |
+| USR-TRD-10 | 투표: `willTrend` 누락 → 400 / 없는 항목·MERGED → 404 | — | — | PASS |
+| USR-TRD-11 | 투표·인정: TEMP_HIDDEN·PERMANENT_HIDDEN 항목 | 404 | D1(결정: 상세와 일치) — 현재 200/201 | BUG-3 |
+| USR-TRD-12 | 인정 첫 요청 → 201(바디 없음), 두 번째 → 409 | `endorsements` 1행 | — | PASS |
+| USR-TRD-13 | 인정: 없는 항목·MERGED → 404 | — | — | PASS |
+| USR-TRD-14 | 인정: 그 항목에 제보한 유저 | 409 | D2(결정: OpenAPI대로) — 현재 201 | BUG-4 |
+| USR-TRD-15 | 같은 유저의 투표 2건·인정 2건 동시 첫 요청 | 500 없음. 투표는 1행, 인정은 201 1건 + 409 1건 | 설계 §5 | BUG-2 |
 
 ### USR-RPT 신고·소명 — `UserReportTest`
 
