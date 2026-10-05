@@ -60,25 +60,25 @@
 
 | ID | 케이스 | 기대 | 근거·비고 | 상태 |
 |---|---|---|---|---|
-| USR-RPT-01 | 신고 접수 | 201, `status=OPEN`, `decision=null`. `reports` 1행 | — | TODO |
-| USR-RPT-02 | 신고: `reason` 누락·잘못된 값, `detail` 1001자 → 400 / 없는 항목·MERGED → 404 | — | — | TODO |
-| USR-RPT-03 | 비공개 항목 신고 | 201 | 비공개 항목도 신고 가능(현재 동작 고정) | TODO |
-| USR-RPT-04 | `GET /v1/reports/me` | 내 신고만, 최신순 | — | TODO |
-| USR-RPT-05 | `GET /v1/reports/received` — 관리자가 내 제보를 지정해 소명 요청한 신고 | 그 신고가 보임, 신고자 id는 응답에 없음. 제보 없는 유저는 빈 목록 | — | TODO |
-| USR-RPT-06 | 소명 제출: 지정된 제보자 + `EXPLAINING` | 200, `explanation_text` 저장 | — | TODO |
-| USR-RPT-07 | 소명: 없는 신고 → 404 / 지정된 제보자가 아님·`submission_id` 없음 → 403 / `OPEN`·`DECIDED` → 409 / `text` 빈값·2001자 → 400 | — | — | TODO |
-| USR-RPT-08 | 소명: 마감(요청 + 48h) 지난 제출 / 마감 전 재제출 | 409 / 200(덮어씀) | D3 — 현재 마감 후도 200 | TODO(BUG 예상) |
+| USR-RPT-01 | 신고 접수 | 201, `status=OPEN`, `decision=null`. `reports` 1행 | — | PASS |
+| USR-RPT-02 | 신고: `reason` 누락·잘못된 값, `detail` 1001자 → 400 / 없는 항목·MERGED → 404 | — | — | PASS |
+| USR-RPT-03 | 비공개 항목 신고 | 201 | 비공개 항목도 신고 가능(현재 동작 고정) | PASS |
+| USR-RPT-04 | `GET /v1/reports/me` | 내 신고만, 최신순 | — | PASS |
+| USR-RPT-05 | `GET /v1/reports/received` — 관리자가 내 제보를 지정해 소명 요청한 신고 | 그 신고가 보임, 신고자 id는 응답에 없음. 제보 없는 유저는 빈 목록 | — | PASS |
+| USR-RPT-06 | 소명 제출: 지정된 제보자 + `EXPLAINING` | 200, `explanation_text` 저장 | — | PASS |
+| USR-RPT-07 | 소명: 없는 신고 → 404 / 지정된 제보자가 아님·`submission_id` 없음 → 403 / `OPEN`·`DECIDED` → 409 / `text` 빈값·2001자 → 400 | — | — | PASS |
+| USR-RPT-08 | 소명: 마감(요청 + 48h) 지난 제출 / 마감 전 재제출 | 409 / 200(덮어씀) | D3 — 현재 마감 후도 200 | BUG-5 |
 
 ### USR-RD / USR-WCH 읽음·워치 — `UserReadWatchTest`
 
 | ID | 케이스 | 기대 | 근거·비고 | 상태 |
 |---|---|---|---|---|
-| USR-RD-01 | 읽음 기록 2번 → 목록 | 204 두 번(멱등), `GET /v1/me/reads`에 id 1개 | — | TODO |
-| USR-RD-02 | 없는 항목 읽음 → 404 / `trendId` 누락 → 400 | — | — | TODO |
-| USR-WCH-01 | 존재하는 항목 이름으로 워치 → 목록 | 201, 목록에 `{keyword, stage}` | — | TODO |
-| USR-WCH-02 | 같은 키워드(대소문자만 다름) 다시 워치 | 201, 목록 1개, 처음 입력한 `keyword` 유지 | — | TODO |
-| USR-WCH-03 | 존재하지 않는 키워드 워치 → 404 / `keyword` 빈값 → 400 | — | FK `watches.normalized_key` | TODO |
-| USR-WCH-04 | 워치 해제(있는 것·없는 것) | 둘 다 204, 목록에서 빠짐 | — | TODO |
+| USR-RD-01 | 읽음 기록 2번 → 목록 | 204 두 번(멱등), `GET /v1/me/reads`에 id 1개 | — | PASS |
+| USR-RD-02 | 없는 항목 읽음 → 404 / `trendId` 누락 → 400 | — | — | PASS |
+| USR-WCH-01 | 존재하는 항목 이름으로 워치 → 목록 | 201, 목록에 `{keyword, stage}` | — | PASS |
+| USR-WCH-02 | 같은 키워드(대소문자만 다름) 다시 워치 | 201, 목록 1개, 처음 입력한 `keyword` 유지 | — | PASS |
+| USR-WCH-03 | 존재하지 않는 키워드 워치 → 404 / `keyword` 빈값 → 400 | — | FK `watches.normalized_key` | PASS |
+| USR-WCH-04 | 워치 해제(있는 것·없는 것) | 둘 다 204, 목록에서 빠짐 | — | PASS |
 | USR-WCH-05 | 병합된 키워드 워치 | 생존 항목 단계 표시 | 기존: `TombstoneJoinTest#watchOnMergedChainShowsSurvivorStage` — 링크 | PASS(기존) |
 
 ### USR-ME 내 정보 — `UserMeTest`
