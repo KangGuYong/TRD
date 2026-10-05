@@ -1,6 +1,10 @@
 package kr.trendstage.apiadmin.verdict;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import kr.trendstage.apiadmin.auth.AdminPrincipal;
+import kr.trendstage.domain.signal.TBreakdown;
+import kr.trendstage.judge.VerdictEvidence;
 import kr.trendstage.persistence.entity.TrendItem;
 import kr.trendstage.persistence.entity.Verdict;
 import kr.trendstage.persistence.repo.TrendItemRepository;
@@ -37,17 +41,19 @@ public class VerdictController {
     private final VerdictRepository verdicts;
     private final VerdictAdminService verdictAdminService;
     private final Clock clock;
+    private final ObjectMapper objectMapper;
 
     public VerdictController(TrendItemRepository trendItems, VerdictRepository verdicts,
-                              VerdictAdminService verdictAdminService, Clock clock) {
+                              VerdictAdminService verdictAdminService, Clock clock, ObjectMapper objectMapper) {
         this.trendItems = trendItems;
         this.verdicts = verdicts;
         this.verdictAdminService = verdictAdminService;
         this.clock = clock;
+        this.objectMapper = objectMapper;
     }
 
     public record JudgedItem(String trendItemId, String canonicalName, String result, String reachLevel,
-                              String scoreT, String judgedAt, boolean superseded) {}
+                              String scoreT, String judgedAt, boolean superseded, String tExplain) {}
     public record ImminentItem(String trendItemId, String canonicalName, String firstSeenAt, String deadline,
                                 long daysLeft, boolean graceExtended) {}
     public record VerdictListResponse(List<JudgedItem> judged, List<ImminentItem> imminent) {}
@@ -105,7 +111,17 @@ public class VerdictController {
                 current == null || current.getReachLevel() == null ? null : current.getReachLevel().name(),
                 current == null || current.getScoreT() == null ? null : current.getScoreT().toPlainString(),
                 current == null ? null : DISPLAY_FORMAT.format(current.getJudgedAt()),
-                superseded);
+                superseded, current == null ? null : explain(current));
+    }
+
+    /** 산정 근거(CLAUDE.md) — SP4 이전 판정·VOID는 분해가 없어 null. */
+    private String explain(Verdict v) {
+        try {
+            TBreakdown b = objectMapper.readValue(v.getEvidenceJson(), VerdictEvidence.class).tBreakdown();
+            return b == null ? null : b.describe();
+        } catch (JsonProcessingException e) {
+            return null;
+        }
     }
 
     private ImminentItem toImminentItem(TrendItem item, Instant now) {

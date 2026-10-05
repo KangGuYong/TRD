@@ -133,17 +133,17 @@
 
 ### ADM-PRM 파라미터 스튜디오 — `AdminParamStudioTest`
 
-전역 드래프트 1개 — 클래스가 `@BeforeEach`·`@AfterEach`에서 DRAFT·REVIEW 드래프트를 지우고 딸린 PENDING 승인 요청을 REJECTED로 닫는다.
+전역 드래프트 1개 — 클래스가 `@BeforeEach`·`@AfterEach`에서 DRAFT·REVIEW 드래프트를 지우고 딸린 PENDING 승인 요청을 REJECTED로 닫는다. SP4(#9) 이후 편집 값은 9개 필수(`targetFloor`·`targetRatio`·…·`independenceMode`)이고 승인 요청에 시뮬레이션과 백테스트가 모두 필요하다 — 테스트는 백테스트 결과만 채운다(실행은 SP4 `BacktestApiTest`).
 
 | ID | 케이스 | 기대 | 근거·비고 | 상태 |
 |---|---|---|---|---|
 | ADM-PRM-01 | OPERATOR `GET /admin/params/draft` (드래프트 없음) | 200, 드래프트 생성(DRAFT), `current*` 값 = 현재 파라미터 | AUDITOR는 기존 `RoleMatrixTest`(생성 안 함) | PASS |
-| ADM-PRM-02 | PUT `{submitterTarget:25, hitThreshold:0.25}` | 200, 값 반영, `simResult` 비워짐, 감사 `PARAM_DRAFT_UPDATE` | — | PASS |
-| ADM-PRM-03 | PUT `submitterTarget=0` → 422 | — | — | PASS |
+| ADM-PRM-02 | PUT 9개 값(`targetFloor:25`, `hitThreshold:0.25`) | 200, `values.*` 반영, `simResult` 비워짐, 감사 `PARAM_DRAFT_UPDATE` | — | PASS |
+| ADM-PRM-03 | PUT `targetFloor=0` → 422 | — | — | PASS |
 | ADM-PRM-04 | PUT `hitThreshold=-0.1` / `1.5` / `0` | 422 (`0 < hitThreshold ≤ 1`만 허용), `1.0`은 200 | D5 — 현재 200 | PASS(BUG-7 수정) |
 | ADM-PRM-05 | simulate | 200, `simResult{changed,total,missToHit,hitToMiss,reachChanged}`, 감사 `PARAM_SIMULATE` | — | PASS |
 | ADM-PRM-06 | 시뮬레이션 없이 승인 요청 → 422 / PUT 후(시뮬레이션 지워짐) 승인 요청 → 422 | CLAUDE.md "시뮬레이션 없이 승인 요청 불가" | PASS |
-| ADM-PRM-07 | 시뮬레이션 후 승인 요청(사유 있음) | 200 `status=REVIEW`, `approval_requests` PARAM_APPLY 1행, 감사 `APPROVAL_REQUEST` | 승인 이후는 기존 `ApprovalFlowTest` | PASS |
+| ADM-PRM-07 | 시뮬레이션·백테스트 후 승인 요청(사유 있음) | 200 `status=REVIEW`, `approval_requests` PARAM_APPLY 1행, 감사 `APPROVAL_REQUEST` | 승인 이후는 기존 `ApprovalFlowTest` | PASS |
 | ADM-PRM-08 | 승인 요청: 사유 빈값 → 422 / REVIEW 중 다시 요청 → 409 / REVIEW 중 PUT → 409 | — | — | PASS |
 | ADM-PRM-09 | REVIEW 중 simulate | 409, `sim_result` 그대로 | D4 — 현재 200·덮어씀 | PASS(BUG-6 수정) |
 | ADM-PRM-10 | 역할: REVIEWER는 GET·PUT·simulate·request-approval 모두 403 / AUDITOR는 PUT·simulate·request-approval 403 | — | — | PASS |

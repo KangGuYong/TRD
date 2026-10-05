@@ -41,7 +41,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
         "jobs.cluster-merge.cron=-",
         "jobs.grade-recalc.cron=-",
         // 로컬에 임베딩 서비스(TEI, 기본 :6000)가 떠 있어도 붙지 않게 — cluster_merge 수동 실행 결과를 결정적으로.
-        "embedding.service.url=http://127.0.0.1:1"
+        "embedding.service.url=http://127.0.0.1:1",
+        // 제보 기기·IP 해시 비밀값(SP4 §4) — 비어 있으면 기동 실패
+        "signal.hash-secret=test-signal-secret",
 })
 @AutoConfigureMockMvc
 @Import(TestClockConfig.class)

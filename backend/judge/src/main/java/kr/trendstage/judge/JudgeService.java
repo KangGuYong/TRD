@@ -32,8 +32,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -104,7 +106,7 @@ public class JudgeService {
             return false;
         }
         ParameterSet p = params.resolve();
-        Inputs in = collect(item, deadline);
+        Inputs in = collect(item, deadline, activeAt(deadline, p));
         VerdictPlan plan = VerdictComputation.run(in.signal(), in.refs(), p);
 
         Verdict verdict = verdicts.saveAndFlush(new Verdict(itemId, plan.result(), plan.reach(), scoreT(plan),
@@ -133,7 +135,7 @@ public class JudgeService {
             throw new JudgeConflictException("이미 VOID 처리된 항목은 다시 판정할 수 없습니다");
         }
         Chain chain = chainOf(itemId);
-        Inputs in = collect(item, deadlineOf(item));
+        Inputs in = collect(item, deadlineOf(item), chain.activeSubmitters());
         VerdictPlan plan = VerdictComputation.run(in.signal(), in.refs(), chain.params());
         Map<UUID, Diff> diffs = diffs(chain, plan.ledgerLines());
         BigDecimal total = total(diffs);
@@ -178,7 +180,7 @@ public class JudgeService {
         if (current.isPresent()) {
             Verdict next = supersede(new Verdict(itemId, VerdictResult.VOID, null, null, now,
                     write(new VerdictEvidence("VOID", null, null, null, null, null, 0, 0, Map.of(),
-                            current.get().getId(), reason)),
+                            current.get().getId(), reason, null)),
                     current.get().getId()));
             writeAdjustments(diffs, chain, next, "VOID · " + (reason == null ? "" : reason), policy);
             voided = Optional.of(next);
@@ -187,18 +189,20 @@ public class JudgeService {
         return new JudgeOutcome.Applied(voided, total);
     }
 
-    /** 판정 체인 — 원본의 파라미터·판정 시각이 재판정·VOID 차액의 기준이다(J1·J2). */
-    record Chain(List<UUID> verdictIds, ParameterSet params, Instant anchor) {}
+    /** 판정 체인 — 원본의 파라미터·판정 시각·활성 제보자 수가 재판정·VOID 차액의 기준이다(J1·J2, SP4 S2). */
+    record Chain(List<UUID> verdictIds, ParameterSet params, Instant anchor, Integer activeSubmitters) {}
 
     private Chain chainOf(UUID itemId) {
         List<Verdict> all = verdicts.findByTrendItemIdOrderByCreatedAtAsc(itemId);
         Verdict original = all.stream().filter(v -> v.getSupersedes() == null).findFirst()
                 .orElseThrow(() -> new IllegalStateException("원본 판정이 없습니다: " + itemId));
-        ParamsSnapshot frozen = read(original).params();
-        if (frozen == null) {
+        VerdictEvidence ev = read(original);
+        if (ev.params() == null) {
             throw new IllegalStateException("원본 판정 근거에 파라미터가 없습니다: " + original.getId());
         }
-        return new Chain(all.stream().map(Verdict::getId).toList(), frozen.toParameterSet(), original.getJudgedAt());
+        Integer active = ev.signal() == null ? null : ev.signal().activeSubmitters();
+        return new Chain(all.stream().map(Verdict::getId).toList(), ev.params().toParameterSet(),
+                original.getJudgedAt(), active);
     }
 
     /** 제보 단위 차액 한 줄. */
@@ -264,8 +268,10 @@ public class JudgeService {
     public Preview preview(UUID itemId) {
         TrendItem item = trendItems.findById(itemId)
                 .orElseThrow(() -> new JudgeRejectedException("존재하지 않는 항목입니다"));
-        Inputs in = collect(item, deadlineOf(item));
-        return new Preview(in.signal(), VerdictComputation.run(in.signal(), in.refs(), params.resolve()));
+        ParameterSet p = params.resolve();
+        Instant deadline = deadlineOf(item);
+        Inputs in = collect(item, deadline, activeAt(deadline, p));
+        return new Preview(in.signal(), VerdictComputation.run(in.signal(), in.refs(), p));
     }
 
     public record Preview(TrendSignal signal, VerdictPlan plan) {}
@@ -281,8 +287,17 @@ public class JudgeService {
         return DeadlineWindow.effectiveDeadline(item.getFirstSeenAt(), item.getJudgmentDeadlineOverride());
     }
 
-    /** 관측 마감 전 비VOID 제보 → 판정 신호·점수 입력. 선점 순위는 시딩을 뺀 뷰(J3). */
-    Inputs collect(TrendItem item, Instant deadline) {
+    /** 상대 목표치 입력(S2) — 관측 마감 직전 activeWindowDays일 동안 비VOID·비시딩 제보를 한 서로 다른 유저 수. */
+    int activeAt(Instant deadline, ParameterSet p) {
+        return (int) submissions.countActiveSubmitters(
+                deadline.minus(Duration.ofDays(p.axes.activeWindowDays())), deadline, SubmissionResult.VOID);
+    }
+
+    /**
+     * 관측 마감 전 비VOID 제보 → 판정 신호·점수 입력. 선점 순위는 시딩을 뺀 뷰(J3).
+     * 기기·IP는 해시 대신 이 판정 안에서만 의미 있는 그룹 번호(제출 순 1, 2, …)로 넘긴다(S7).
+     */
+    Inputs collect(TrendItem item, Instant deadline, Integer activeSubmitters) {
         List<Submission> subs = submissions.findByTrendItemIdAndResultNot(item.getId(), SubmissionResult.VOID).stream()
                 .filter(s -> s.getCreatedAt().isBefore(deadline))
                 .sorted(Comparator.comparing(Submission::getCreatedAt))
@@ -292,20 +307,26 @@ public class JudgeService {
         Map<UUID, Integer> ranks = orderRanks.findByTrendItemId(item.getId()).stream()
                 .collect(Collectors.toMap(SubmissionOrderRank::getSubmissionId, SubmissionOrderRank::getOrderRank));
 
+        Map<String, Integer> deviceGroups = new HashMap<>();
+        Map<String, Integer> ipGroups = new HashMap<>();
         List<TrendSignal.Entry> entries = subs.stream().map(s -> new TrendSignal.Entry(
-                s.getId(), s.getUserId(), s.isSeed(), s.getCreatedAt(), s.getSourcePlatform(),
-                joinedAt.get(s.getUserId()))).toList();
+                s.getId(), s.getUserId(), s.isSeed(), s.getCreatedAt(), null, joinedAt.get(s.getUserId()),
+                s.getPlatform(), group(deviceGroups, s.getDeviceHash()), group(ipGroups, s.getIpHash()))).toList();
         List<SubmissionRef> refs = subs.stream().map(s -> new SubmissionRef(
                 s.getId(), s.getUserId(), s.getConfidence(),
                 ranks.getOrDefault(s.getId(), Integer.MAX_VALUE), s.isSeed())).toList();
-        return new Inputs(new TrendSignal(deadline, entries), refs, subs, ranks);
+        return new Inputs(new TrendSignal(deadline, entries, activeSubmitters), refs, subs, ranks);
+    }
+
+    private static Integer group(Map<String, Integer> groups, String hash) {
+        return hash == null ? null : groups.computeIfAbsent(hash, h -> groups.size() + 1);
     }
 
     String evidence(VerdictPlan plan, Inputs in, ParameterSet p, UUID supersededVerdictId, String adminReason) {
         return write(new VerdictEvidence(plan.result().name(), plan.reach() == null ? null : plan.reach().name(),
                 scoreT(plan), in.signal().deadline(), ParamsSnapshot.of(p), in.signal(),
                 in.signal().distinctSubmitters(), in.signal().distinctPlatforms(), in.ranks(),
-                supersededVerdictId, adminReason));
+                supersededVerdictId, adminReason, plan.breakdown()));
     }
 
     String write(VerdictEvidence ev) {

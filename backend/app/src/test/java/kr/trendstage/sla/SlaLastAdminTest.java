@@ -27,7 +27,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringBootTest(properties = {
         "logging.level.org.hibernate.SQL=WARN",
         "logging.level.org.hibernate.orm.jdbc.bind=WARN",
-        "jobs.sla-watch.cron=-"
+        "jobs.sla-watch.cron=-",
+        "signal.hash-secret=test-signal-secret"
 })
 @AutoConfigureMockMvc
 @Import(TestClockConfig.class)
