@@ -23,6 +23,9 @@ dependencies {
     testImplementation("org.testcontainers:postgresql")
     testImplementation("org.testcontainers:junit-jupiter")
     testImplementation("jakarta.servlet:jakarta.servlet-api")
+    // SchemaV31Test가 db.migration.V31_1__backfill_submission_platform(BaseJavaMigration)을 직접 부른다.
+    // persistence는 flyway-core를 implementation으로만 갖고 있어 전파되지 않는다.
+    testImplementation("org.flywaydb:flyway-core")
 }
 
 // 단일 실행 파일(모듈러 모놀리스). api-public/api-admin은 필터체인으로만 분리(04 §2.2).

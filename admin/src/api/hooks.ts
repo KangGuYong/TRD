@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, ApiError, USE_FIXTURES } from "./client";
 import * as fx from "../fixtures";
-import type { ActionResult, AdminAccountSummary, ApprovalRequestView, AdminUserDetail, AuditEntry, AuditFilter, AuditPage, ClusterMergeResult, CreateAccountResponse, MergeCandidate, MergeDecisionResponse, MergePreview, ParameterDraftView, QueueSummary, ReportQueueItem, ReportSubmissionCandidate, SeedAccuracyRow, SeedSubmissionRequest, SeedSubmissionResult, TrendItemSummary, TrendItemDetail, UserHit, VerdictListResponse } from "./types";
+import type { ActionResult, AdminAccountSummary, ApprovalRequestView, AdminUserDetail, AuditEntry, AuditFilter, AuditPage, BacktestDatasetSummary, ClusterMergeResult, CreateAccountResponse, DraftValues, MergeCandidate, MergeDecisionResponse, MergePreview, ParameterDraftView, QueueSummary, ReportQueueItem, ReportSubmissionCandidate, SeedAccuracyRow, SeedSubmissionRequest, SeedSubmissionResult, TrendItemSummary, TrendItemDetail, UserHit, VerdictListResponse } from "./types";
 
 /** 픽스처 on이면 즉시 픽스처, off면 실 API. 동일 훅으로 백엔드 전환. */
 function useData<T>(key: unknown[], path: string, fixture: T) {
@@ -82,7 +82,7 @@ export const fetchMergePreview = (id: string) =>
 export const useParamDraft = () =>
   useData<ParameterDraftView>(["admin", "param-draft"], "/admin/params/draft", fx.fxParamDraft);
 
-export const updateParamDraft = (body: { submitterTarget: number; hitThreshold: number }) =>
+export const updateParamDraft = (body: DraftValues) =>
   api.put<ParameterDraftView>("/admin/params/draft", body);
 
 export const simulateParamDraft = () =>
@@ -90,6 +90,18 @@ export const simulateParamDraft = () =>
 
 export const requestParamApproval = (reason: string) =>
   api.post<ParameterDraftView>("/admin/params/draft/request-approval", { reason });
+
+export const useBacktestDatasets = () =>
+  useData<BacktestDatasetSummary[]>(["admin", "backtest-datasets"], "/admin/params/backtest-datasets", fx.fxBacktestDatasets);
+
+export const uploadBacktestDataset = (rawJson: string) =>
+  api.postRaw<BacktestDatasetSummary>("/admin/params/backtest-datasets", rawJson);
+
+export const fetchBacktestExample = () =>
+  api.get<unknown>("/admin/params/backtest-datasets/example");
+
+export const runBacktest = (datasetId: string) =>
+  api.post<ParameterDraftView>("/admin/params/draft/backtest", { datasetId });
 
 export const useVerdicts = () =>
   useData<VerdictListResponse>(["admin", "verdicts"], "/admin/verdicts", fx.fxVerdicts);

@@ -24,7 +24,8 @@ import static org.assertj.core.api.Assertions.assertThat;
         "ADMIN_BOOTSTRAP_PASSWORD=bootstrap-pw-1234",
         "logging.level.org.hibernate.SQL=WARN",
         "logging.level.org.hibernate.orm.jdbc.bind=WARN",
-        "jobs.sla-watch.cron=-"
+        "jobs.sla-watch.cron=-",
+        "signal.hash-secret=test-signal-secret"
 })
 class AdminAccountBootstrapTest {
 

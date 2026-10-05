@@ -31,7 +31,7 @@ export function Btn({ children, onClick, disabled, tone = "default", title }: {
   const border = tone === "default" && !disabled ? "1px solid rgba(20,19,15,0.14)" : "none";
   return (
     <button onClick={onClick} disabled={disabled} title={title}
-      style={{ padding: "10px 16px", borderRadius: 10, border, background: bg, color: fg, cursor: disabled ? "not-allowed" : "pointer", font: "600 12.5px Pretendard, system-ui, sans-serif" }}>
+      style={{ padding: "10px 16px", borderRadius: 10, border, background: bg, color: fg, cursor: disabled ? "not-allowed" : "pointer", font: "600 12.5px Pretendard, system-ui, sans-serif", whiteSpace: "nowrap" }}>
       {children}
     </button>
   );

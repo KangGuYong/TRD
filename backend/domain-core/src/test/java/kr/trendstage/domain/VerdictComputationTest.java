@@ -54,7 +54,7 @@ class VerdictComputationTest {
     }
 
     @Test void 유효_제보가_0건이면_VOID() {
-        VerdictPlan plan = VerdictComputation.run(new TrendSignal(T, List.of()), List.of(), p);
+        VerdictPlan plan = VerdictComputation.run(TrendSignal.of(T, List.of()), List.of(), p);
         assertEquals(VerdictResult.VOID, plan.result());
         assertTrue(plan.ledgerLines().isEmpty());
     }
@@ -68,7 +68,7 @@ class VerdictComputationTest {
     }
 
     private static TrendSignal signal(List<SubmissionRef> refs) {
-        return new TrendSignal(T, refs.stream()
-                .map(r -> new TrendSignal.Entry(r.submissionId(), r.userId(), r.seed(), T, "X", T)).toList());
+        return TrendSignal.of(T, refs.stream()
+                .map(r -> TrendSignal.Entry.legacy(r.submissionId(), r.userId(), r.seed(), T, "X", T)).toList());
     }
 }

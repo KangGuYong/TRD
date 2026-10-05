@@ -74,7 +74,7 @@ class ParamSimulationTest {
 
     private static TrendSignal signalOf(int distinctSubmitters) {
         Instant t = Instant.parse("2026-09-01T00:00:00Z");
-        return new TrendSignal(t, IntStream.range(0, distinctSubmitters)
-                .mapToObj(i -> new TrendSignal.Entry(UUID.randomUUID(), UUID.randomUUID(), false, t, "X", t)).toList());
+        return TrendSignal.of(t, IntStream.range(0, distinctSubmitters)
+                .mapToObj(i -> TrendSignal.Entry.legacy(UUID.randomUUID(), UUID.randomUUID(), false, t, "X", t)).toList());
     }
 }

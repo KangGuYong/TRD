@@ -119,6 +119,9 @@ export default function TrendDetailScreen({ trendItemId, onBack }: { trendItemId
         {detail.previewResult ? (
           <div style={{ marginTop: 18, padding: "14px 16px", borderRadius: 10, background: "rgba(223,164,0,0.08)", border: "1px solid rgba(223,164,0,0.24)" }}>
             <span style={{ font: "600 12.5px Pretendard" }}>현재 T = {detail.previewScoreT} → 예상 판정: {detail.previewResult}{detail.previewReachLevel ? ` / ${detail.previewReachLevel}` : ""}</span>
+            {detail.previewExplain && (
+              <div style={{ font: "500 11px ui-monospace, monospace", color: C.sub, marginTop: 6 }}>{detail.previewExplain}</div>
+            )}
             <div style={{ font: "500 11px Pretendard", color: C.faint, marginTop: 6 }}>※ 확정 아님. D+14 시점 재계산됩니다.</div>
           </div>
         ) : detail.currentResult ? (

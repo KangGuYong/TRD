@@ -2,6 +2,7 @@ package kr.trendstage.apiadmin.trend;
 
 import kr.trendstage.apiadmin.auth.AdminValidationException;
 import kr.trendstage.domain.score.VerdictPlan;
+import kr.trendstage.domain.signal.Platform;
 import kr.trendstage.domain.verdict.DeadlineWindow;
 import kr.trendstage.judge.JudgeService;
 import kr.trendstage.persistence.entity.Submission;
@@ -80,7 +81,7 @@ public class TrendItemAdminService {
             String firstSeenAt, String deadline, long daysLeft, boolean graceExtended,
             int distinctSubmitters, int distinctPlatforms, long endorseCount,
             String currentResult, String currentReachLevel, String currentScoreT, String currentJudgedAt,
-            String previewResult, String previewReachLevel, String previewScoreT,
+            String previewResult, String previewReachLevel, String previewScoreT, String previewExplain,
             List<SubmissionRow> submissions) {}
 
     @Transactional(readOnly = true)
@@ -125,7 +126,7 @@ public class TrendItemAdminService {
                         userGrades.findTopByUserIdOrderByComputedAtDesc(s.getUserId())
                                 .map(g -> g.getTrustIndex().doubleValue()).orElse(null),
                         DISPLAY_FORMAT.format(s.getCreatedAt()),
-                        s.getSourcePlatform(), s.getOneLine(), s.getEvidenceUrl()))
+                        Platform.labelOf(s.getPlatform()), s.getOneLine(), s.getEvidenceUrl()))
                 .toList();
 
         Instant deadline = DeadlineWindow.effectiveDeadline(item.getFirstSeenAt(), item.getJudgmentDeadlineOverride());
@@ -142,6 +143,7 @@ public class TrendItemAdminService {
                 plan == null ? null : plan.result().name(),
                 plan == null || plan.reach() == null ? null : plan.reach().name(),
                 plan == null ? null : BigDecimal.valueOf(plan.t()).setScale(4, RoundingMode.HALF_UP).toPlainString(),
+                plan == null || plan.breakdown() == null ? null : plan.breakdown().describe(),
                 rows);
     }
 }

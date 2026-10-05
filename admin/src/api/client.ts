@@ -15,6 +15,11 @@ function readCookie(name: string): string | null {
   return match ? decodeURIComponent(match.slice(name.length + 1)) : null;
 }
 
+/** 이미 JSON 문자열인 본문 — 다시 stringify하지 않는다(사례 파일은 바이트 그대로 보내야 같은 파일이 같은 해시가 된다). */
+class RawJson {
+  constructor(public text: string) {}
+}
+
 async function request<T>(method: string, path: string, body?: unknown, extraHeaders?: Record<string, string>): Promise<T> {
   const headers: Record<string, string> = { "Content-Type": "application/json", ...extraHeaders };
   if (method !== "GET") {
@@ -26,7 +31,7 @@ async function request<T>(method: string, path: string, body?: unknown, extraHea
     method,
     credentials: "include",
     headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body: body === undefined ? undefined : body instanceof RawJson ? body.text : JSON.stringify(body),
   });
   if (!res.ok) {
     let detail = res.statusText;
@@ -53,6 +58,7 @@ export const api = {
   get: <T>(p: string) => request<T>("GET", p),
   post: <T>(p: string, b?: unknown, h?: Record<string, string>) => request<T>("POST", p, b, h),
   put: <T>(p: string, b?: unknown) => request<T>("PUT", p, b),
+  postRaw: <T>(p: string, rawJson: string) => request<T>("POST", p, new RawJson(rawJson)),
 };
 
 /** SPA 부팅·로그인 직전에 호출 — XSRF-TOKEN 쿠키를 받아 둔다. */

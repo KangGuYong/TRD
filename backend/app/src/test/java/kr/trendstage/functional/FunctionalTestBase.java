@@ -50,10 +50,16 @@ public abstract class FunctionalTestBase extends AbstractIntegrationTest {
         return prefix + "-" + UUID.randomUUID().toString().substring(0, 8);
     }
 
+    /** platform은 라벨("디시"·"인스타" 등). SP4부터 서버가 근거 링크 도메인으로 플랫폼을 판별하므로 링크를 그에 맞춘다. */
     protected static String submissionBody(String name, int confidence, String platform, String category, String oneLine) {
+        String evidenceUrl = switch (platform) {
+            case "디시" -> "https://gall.dcinside.com/board/view/1";
+            case "인스타" -> "https://www.instagram.com/p/1";
+            default -> "https://example.com/e";   // 기타(ETC)
+        };
         return """
-                {"name":"%s","category":"%s","platform":"%s","evidenceUrl":"https://example.com/e",\
-                "confidence":%d,"disclosure":false,"oneLine":"%s"}""".formatted(name, category, platform, confidence, oneLine);
+                {"name":"%s","category":"%s","platform":"%s","evidenceUrl":"%s",\
+                "confidence":%d,"disclosure":false,"oneLine":"%s"}""".formatted(name, category, platform, evidenceUrl, confidence, oneLine);
     }
 
     protected ResultActions postSubmission(UUID user, String body) throws Exception {

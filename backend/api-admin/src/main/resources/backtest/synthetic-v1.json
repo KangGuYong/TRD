@@ -1,0 +1,142 @@
+{
+  "formatVersion": 1,
+  "name": "합성 시나리오 v1",
+  "note": "라벨은 이 설계가 의도한 판정이지 실측이 아니다 — 형식 견본·로직 검증용(SP4 §5.5). 예시 보정값: targetFloor 8, targetRatio 0.10, activeWindowDays 28, hitThreshold 0.30, persistenceFloor 0.5, persistenceFullDays 4, diversityFloor 0.5, diversityFullPlatforms 3, independenceMode DEVICE.",
+  "cases": [
+    {
+      "caseId": "c01", "title": "자연 확산 — 여러 날·여러 플랫폼", "label": "HIT", "labelReach": "L4",
+      "deadline": "2026-06-15T00:00:00Z", "activeSubmitters": 60,
+      "submissions": [
+        { "submitter": "u1", "at": "2026-06-01T03:00:00Z", "evidenceUrl": "https://gall.dcinside.com/board/view/?id=trend&no=101", "device": "d1", "ip": "i1" },
+        { "submitter": "u2", "at": "2026-06-01T05:00:00Z", "evidenceUrl": "https://x.com/user/status/102", "device": "d2", "ip": "i2" },
+        { "submitter": "u3", "at": "2026-06-02T03:00:00Z", "evidenceUrl": "https://www.instagram.com/p/c103/", "device": "d3", "ip": "i3" },
+        { "submitter": "u4", "at": "2026-06-02T05:00:00Z", "evidenceUrl": "https://gall.dcinside.com/board/view/?id=trend&no=104", "device": "d4", "ip": "i4" },
+        { "submitter": "u5", "at": "2026-06-03T03:00:00Z", "evidenceUrl": "https://x.com/user/status/105", "device": "d5", "ip": "i5" },
+        { "submitter": "u6", "at": "2026-06-05T03:00:00Z", "evidenceUrl": "https://www.instagram.com/p/c106/", "device": "d6", "ip": "i6" },
+        { "submitter": "u7", "at": "2026-06-05T05:00:00Z", "evidenceUrl": "https://gall.dcinside.com/board/view/?id=trend&no=107", "device": "d7", "ip": "i7" },
+        { "submitter": "u8", "at": "2026-06-07T03:00:00Z", "evidenceUrl": "https://x.com/user/status/108", "device": "d8", "ip": "i8" }
+      ]
+    },
+    {
+      "caseId": "c02", "title": "하루 몰림 — 단톡방 몰아주기", "label": "MISS",
+      "deadline": "2026-06-15T00:00:00Z", "activeSubmitters": 60,
+      "submissions": [
+        { "submitter": "u1", "at": "2026-06-03T01:00:00Z", "evidenceUrl": "https://gall.dcinside.com/board/view/?id=trend&no=201", "device": "d1", "ip": "i1" },
+        { "submitter": "u2", "at": "2026-06-03T02:00:00Z", "evidenceUrl": "https://x.com/user/status/202", "device": "d2", "ip": "i2" },
+        { "submitter": "u3", "at": "2026-06-03T03:00:00Z", "evidenceUrl": "https://gall.dcinside.com/board/view/?id=trend&no=203", "device": "d3", "ip": "i3" },
+        { "submitter": "u4", "at": "2026-06-03T04:00:00Z", "evidenceUrl": "https://x.com/user/status/204", "device": "d4", "ip": "i4" },
+        { "submitter": "u5", "at": "2026-06-03T05:00:00Z", "evidenceUrl": "https://gall.dcinside.com/board/view/?id=trend&no=205", "device": "d5", "ip": "i5" }
+      ]
+    },
+    {
+      "caseId": "c03", "title": "한 플랫폼 몰림 — 디시 안에서만", "label": "MISS",
+      "deadline": "2026-06-15T00:00:00Z", "activeSubmitters": 60,
+      "submissions": [
+        { "submitter": "u1", "at": "2026-06-01T03:00:00Z", "evidenceUrl": "https://gall.dcinside.com/board/view/?id=trend&no=301", "device": "d1", "ip": "i1" },
+        { "submitter": "u2", "at": "2026-06-02T03:00:00Z", "evidenceUrl": "https://gall.dcinside.com/board/view/?id=trend&no=302", "device": "d2", "ip": "i2" },
+        { "submitter": "u3", "at": "2026-06-04T03:00:00Z", "evidenceUrl": "https://m.dcinside.com/board/trend/303", "device": "d3", "ip": "i3" },
+        { "submitter": "u4", "at": "2026-06-06T03:00:00Z", "evidenceUrl": "https://gall.dcinside.com/board/view/?id=trend&no=304", "device": "d4", "ip": "i4" }
+      ]
+    },
+    {
+      "caseId": "c04", "title": "같은 기기 무리 — 계정 6개, 기기 2대", "label": "MISS",
+      "deadline": "2026-06-15T00:00:00Z", "activeSubmitters": 60,
+      "submissions": [
+        { "submitter": "u1", "at": "2026-06-01T03:00:00Z", "evidenceUrl": "https://gall.dcinside.com/board/view/?id=trend&no=401", "device": "d1", "ip": "i1" },
+        { "submitter": "u2", "at": "2026-06-02T03:00:00Z", "evidenceUrl": "https://x.com/user/status/402", "device": "d1", "ip": "i2" },
+        { "submitter": "u3", "at": "2026-06-03T03:00:00Z", "evidenceUrl": "https://www.instagram.com/p/c403/", "device": "d1", "ip": "i3" },
+        { "submitter": "u4", "at": "2026-06-04T03:00:00Z", "evidenceUrl": "https://gall.dcinside.com/board/view/?id=trend&no=404", "device": "d1", "ip": "i4" },
+        { "submitter": "u5", "at": "2026-06-05T03:00:00Z", "evidenceUrl": "https://x.com/user/status/405", "device": "d1", "ip": "i5" },
+        { "submitter": "u6", "at": "2026-06-06T03:00:00Z", "evidenceUrl": "https://www.instagram.com/p/c406/", "device": "d2", "ip": "i6" }
+      ]
+    },
+    {
+      "caseId": "c05", "title": "공유 IP의 정상 유저 — DEVICE_OR_IP 오탐 사례", "label": "HIT",
+      "deadline": "2026-06-15T00:00:00Z", "activeSubmitters": 60,
+      "submissions": [
+        { "submitter": "u1", "at": "2026-06-01T03:00:00Z", "evidenceUrl": "https://gall.dcinside.com/board/view/?id=trend&no=501", "device": "d1", "ip": "i1" },
+        { "submitter": "u2", "at": "2026-06-02T03:00:00Z", "evidenceUrl": "https://x.com/user/status/502", "device": "d2", "ip": "i1" },
+        { "submitter": "u3", "at": "2026-06-03T03:00:00Z", "evidenceUrl": "https://www.instagram.com/p/c503/", "device": "d3", "ip": "i1" },
+        { "submitter": "u4", "at": "2026-06-05T03:00:00Z", "evidenceUrl": "https://gall.dcinside.com/board/view/?id=trend&no=504", "device": "d4", "ip": "i1" },
+        { "submitter": "u5", "at": "2026-06-07T03:00:00Z", "evidenceUrl": "https://x.com/user/status/505", "device": "d5", "ip": "i1" },
+        { "submitter": "u6", "at": "2026-06-09T03:00:00Z", "evidenceUrl": "https://www.instagram.com/p/c506/", "device": "d6", "ip": "i1" }
+      ]
+    },
+    {
+      "caseId": "c06", "title": "소규모지만 며칠·여러 곳", "label": "HIT", "labelReach": "L2",
+      "deadline": "2026-06-15T00:00:00Z", "activeSubmitters": 60,
+      "submissions": [
+        { "submitter": "u1", "at": "2026-06-01T03:00:00Z", "evidenceUrl": "https://gall.dcinside.com/board/view/?id=trend&no=601", "device": "d1", "ip": "i1" },
+        { "submitter": "u2", "at": "2026-06-03T03:00:00Z", "evidenceUrl": "https://x.com/user/status/602", "device": "d2", "ip": "i2" },
+        { "submitter": "u3", "at": "2026-06-05T03:00:00Z", "evidenceUrl": "https://www.instagram.com/p/c603/", "device": "d3", "ip": "i3" },
+        { "submitter": "u4", "at": "2026-06-08T03:00:00Z", "evidenceUrl": "https://gall.dcinside.com/board/view/?id=trend&no=604", "device": "d4", "ip": "i4" }
+      ]
+    },
+    {
+      "caseId": "c07", "title": "큰 커뮤니티 대비 소수 — 상대 목표치", "label": "MISS",
+      "deadline": "2026-06-15T00:00:00Z", "activeSubmitters": 400,
+      "submissions": [
+        { "submitter": "u1", "at": "2026-06-01T03:00:00Z", "evidenceUrl": "https://gall.dcinside.com/board/view/?id=trend&no=701", "device": "d1", "ip": "i1" },
+        { "submitter": "u2", "at": "2026-06-01T05:00:00Z", "evidenceUrl": "https://x.com/user/status/702", "device": "d2", "ip": "i2" },
+        { "submitter": "u3", "at": "2026-06-02T03:00:00Z", "evidenceUrl": "https://www.instagram.com/p/c703/", "device": "d3", "ip": "i3" },
+        { "submitter": "u4", "at": "2026-06-02T05:00:00Z", "evidenceUrl": "https://gall.dcinside.com/board/view/?id=trend&no=704", "device": "d4", "ip": "i4" },
+        { "submitter": "u5", "at": "2026-06-03T03:00:00Z", "evidenceUrl": "https://x.com/user/status/705", "device": "d5", "ip": "i5" },
+        { "submitter": "u6", "at": "2026-06-03T05:00:00Z", "evidenceUrl": "https://www.instagram.com/p/c706/", "device": "d6", "ip": "i6" },
+        { "submitter": "u7", "at": "2026-06-04T03:00:00Z", "evidenceUrl": "https://gall.dcinside.com/board/view/?id=trend&no=707", "device": "d7", "ip": "i7" },
+        { "submitter": "u8", "at": "2026-06-04T05:00:00Z", "evidenceUrl": "https://x.com/user/status/708", "device": "d8", "ip": "i8" },
+        { "submitter": "u9", "at": "2026-06-05T03:00:00Z", "evidenceUrl": "https://www.instagram.com/p/c709/", "device": "d9", "ip": "i9" },
+        { "submitter": "u10", "at": "2026-06-05T05:00:00Z", "evidenceUrl": "https://gall.dcinside.com/board/view/?id=trend&no=710", "device": "d10", "ip": "i10" }
+      ]
+    },
+    {
+      "caseId": "c08", "title": "시딩만 있는 항목", "label": "MISS",
+      "deadline": "2026-06-15T00:00:00Z", "activeSubmitters": 60,
+      "submissions": [
+        { "submitter": "s1", "at": "2026-06-01T03:00:00Z", "evidenceUrl": "https://gall.dcinside.com/board/view/?id=trend&no=801", "seed": true },
+        { "submitter": "s2", "at": "2026-06-02T03:00:00Z", "evidenceUrl": "https://x.com/user/status/802", "seed": true },
+        { "submitter": "s3", "at": "2026-06-03T03:00:00Z", "evidenceUrl": "https://www.instagram.com/p/c803/", "seed": true }
+      ]
+    },
+    {
+      "caseId": "c09", "title": "경계 HIT — 3명이지만 3일·3곳", "label": "HIT", "labelReach": "L1",
+      "deadline": "2026-06-15T00:00:00Z", "activeSubmitters": 60,
+      "submissions": [
+        { "submitter": "u1", "at": "2026-06-01T03:00:00Z", "evidenceUrl": "https://gall.dcinside.com/board/view/?id=trend&no=901", "device": "d1", "ip": "i1" },
+        { "submitter": "u2", "at": "2026-06-03T03:00:00Z", "evidenceUrl": "https://x.com/user/status/902", "device": "d2", "ip": "i2" },
+        { "submitter": "u3", "at": "2026-06-05T03:00:00Z", "evidenceUrl": "https://www.instagram.com/p/c903/", "device": "d3", "ip": "i3" }
+      ]
+    },
+    {
+      "caseId": "c10", "title": "경계 MISS — 2명·2일·2곳", "label": "MISS",
+      "deadline": "2026-06-15T00:00:00Z", "activeSubmitters": 60,
+      "submissions": [
+        { "submitter": "u1", "at": "2026-06-02T03:00:00Z", "evidenceUrl": "https://gall.dcinside.com/board/view/?id=trend&no=1001", "device": "d1", "ip": "i1" },
+        { "submitter": "u2", "at": "2026-06-04T03:00:00Z", "evidenceUrl": "https://x.com/user/status/1002", "device": "d2", "ip": "i2" }
+      ]
+    },
+    {
+      "caseId": "c11", "title": "활성 제보자 값 없음 — 목표치는 하한", "label": "HIT",
+      "deadline": "2026-06-15T00:00:00Z",
+      "submissions": [
+        { "submitter": "u1", "at": "2026-06-01T03:00:00Z", "evidenceUrl": "https://gall.dcinside.com/board/view/?id=trend&no=1101", "device": "d1", "ip": "i1" },
+        { "submitter": "u2", "at": "2026-06-02T03:00:00Z", "evidenceUrl": "https://x.com/user/status/1102", "device": "d2", "ip": "i2" },
+        { "submitter": "u3", "at": "2026-06-04T03:00:00Z", "evidenceUrl": "https://www.instagram.com/p/c1103/", "device": "d3", "ip": "i3" },
+        { "submitter": "u4", "at": "2026-06-06T03:00:00Z", "evidenceUrl": "https://gall.dcinside.com/board/view/?id=trend&no=1104", "device": "d4", "ip": "i4" },
+        { "submitter": "u5", "at": "2026-06-06T05:00:00Z", "evidenceUrl": "https://x.com/user/status/1105", "device": "d5", "ip": "i5" },
+        { "submitter": "u6", "at": "2026-06-08T03:00:00Z", "evidenceUrl": "https://www.instagram.com/p/c1106/", "device": "d6", "ip": "i6" }
+      ]
+    },
+    {
+      "caseId": "c12", "title": "기기·IP 정보 없음 — 옛 앱 빌드", "label": "HIT",
+      "deadline": "2026-06-15T00:00:00Z", "activeSubmitters": 60,
+      "submissions": [
+        { "submitter": "u1", "at": "2026-06-01T03:00:00Z", "evidenceUrl": "https://gall.dcinside.com/board/view/?id=trend&no=1201" },
+        { "submitter": "u2", "at": "2026-06-02T03:00:00Z", "evidenceUrl": "https://x.com/user/status/1202" },
+        { "submitter": "u3", "at": "2026-06-04T03:00:00Z", "evidenceUrl": "https://www.instagram.com/p/c1203/" },
+        { "submitter": "u4", "at": "2026-06-06T03:00:00Z", "evidenceUrl": "https://gall.dcinside.com/board/view/?id=trend&no=1204" },
+        { "submitter": "u5", "at": "2026-06-06T05:00:00Z", "evidenceUrl": "https://x.com/user/status/1205" },
+        { "submitter": "u6", "at": "2026-06-08T03:00:00Z", "evidenceUrl": "https://www.instagram.com/p/c1206/" }
+      ]
+    }
+  ]
+}

@@ -6,6 +6,7 @@ import kr.trendstage.apiadmin.merge.IdempotencyKeyRequiredException;
 import kr.trendstage.apiadmin.merge.MergeDecisionService;
 import kr.trendstage.apiadmin.merge.MergeDecisionService.Decision;
 import kr.trendstage.apiadmin.merge.MergeDecisionService.Outcome;
+import kr.trendstage.domain.signal.Platform;
 import kr.trendstage.merge.MergeComputation;
 import kr.trendstage.merge.MergeService;
 import kr.trendstage.persistence.entity.*;
@@ -181,7 +182,7 @@ public class MergeQueueController {
         List<KV> newRows = new ArrayList<>();
         newRows.add(new KV("카테고리", newItem.getCategory().name()));
         submissions.findFirstByTrendItemIdOrderByCreatedAtAsc(newItem.getId()).ifPresent(founding -> {
-            newRows.add(new KV("플랫폼", founding.getSourcePlatform()));
+            newRows.add(new KV("플랫폼", Platform.labelOf(founding.getPlatform())));
             String submitter = handleOf(founding.getUserId());
             String gradeInfo = userGrades.findTopByUserIdOrderByComputedAtDesc(founding.getUserId())
                     .map(g -> "TI %.2f / %s".formatted(g.getTrustIndex().doubleValue(), g.getGrade()))
