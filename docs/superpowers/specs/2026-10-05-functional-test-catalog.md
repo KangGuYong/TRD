@@ -34,7 +34,7 @@
 | USR-SUB-11 | NFD로 분해된 한글 이름(macOS 입력) 제보 → NFC 이름 항목 | 같은 항목에 합류 | `NameNormalizer` NFC | PASS |
 | USR-SUB-12 | 같은 유저가 같은 새 이름을 동시에 두 번 제보(네트워크 재시도) | 201 1건 + 409 1건, 500 없음, 제보 1행 | — | PASS |
 | USR-SUB-13 | 이름 정확히 120자 | 201 (121자는 400 — USR-SUB-05) | 경계값 | PASS |
-| USR-SUB-14 | 생성 응답의 `orderRank` | 1위, 이어서 2위 | OpenAPI "판정 전에는 파생 잠정값" — 현재 항상 null(flush 전 뷰 조회). USR-SUB-01·02는 순위를 `GET /v1/submissions/me`로 확인 | BUG-9 |
+| USR-SUB-14 | 생성 응답의 `orderRank` | 1위, 이어서 2위 | OpenAPI "판정 전에는 파생 잠정값" — 현재 항상 null(flush 전 뷰 조회). USR-SUB-01·02는 순위를 `GET /v1/submissions/me`로 확인 | PASS(BUG-9 수정) |
 
 ### USR-TRD 트렌드 조회·투표·인정 — `UserTrendTest`
 
@@ -224,5 +224,5 @@
 | BUG-6 | ADM-PRM-09 | REVIEW(승인 대기) 드래프트도 simulate가 `sim_result`를 덮어씀(D4: 409) | `ParamStudioService.simulate` |
 | BUG-7 | ADM-PRM-04 | `hitThreshold` 범위 미검증(D5: `0 < t ≤ 1` 밖이면 422) | `ParamStudioService` 드래프트 수정 |
 | BUG-8 | ADM-VRD-08 | 유예 연장이 MERGED·VOID 항목에도 된다(D8: PENDING·JUDGING만) | `VerdictAdminService.extendGrace` |
-| BUG-9 | USR-SUB-14 | 제보 생성 응답의 `orderRank`가 항상 null — `save()` 후 flush 없이 순위 뷰 조회 | `SubmissionService.create/toResponse` |
+| BUG-9 | USR-SUB-14 | 제보 생성 응답의 `orderRank`가 항상 null — `save()` 후 flush 없이 순위 뷰 조회 | `SubmissionService.create/toResponse` — **수정됨**(뷰 엔티티에 @Synchronize("submissions") — 조회 전 자동 flush) |
 | BUG-10 | USR-SUB-10 | 판정 끝난 제보의 `delta`·`reachLevel`·`note`(산정 근거)가 항상 null | `SubmissionService.toResponse` — **수정됨**(원장 합·현재 판정 reach·T+원 산정식+조정 합계) |

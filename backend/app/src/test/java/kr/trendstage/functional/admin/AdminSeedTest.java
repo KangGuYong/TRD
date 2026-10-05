@@ -82,7 +82,7 @@ class AdminSeedTest extends FunctionalTestBase {
         String res = submit(u, name, 30);
 
         assertThat(itemOf(res)).isEqualTo(item);
-        // 생성 응답의 orderRank는 BUG-9로 null — 순위는 내 제보 목록에서 확인
+        // 시딩은 순위에서 빠진다 — 커밋 뒤 내 제보 목록으로 확인
         assertThat((Integer) read(getOk("/v1/submissions/me", asUser(u)), "$[0].orderRank")).isEqualTo(1);
     }
 
