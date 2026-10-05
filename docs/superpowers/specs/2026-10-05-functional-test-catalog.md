@@ -85,14 +85,14 @@
 
 | ID | 케이스 | 기대 | 근거·비고 | 상태 |
 |---|---|---|---|---|
-| USR-ME-01 | 신규 유저 `GET /v1/me/grade` | 200, `grade=L0`, `trustIndex=0.4`, `judgedCount=0`, `nextGrade=L1`, `requirements` 3개(판정 수·TI·AS)에 `current`·`required`·`met`·`basis` | 신규 TI 0.4(CLAUDE.md) | TODO |
-| USR-ME-02 | 신규 유저 `GET /v1/me/ledger` | 200, `items=[]` | — | TODO |
-| USR-ME-03 | 원장: 관리자 수동 ADJ(제보 없음) 1행 | `word="계정 조정"`, `kind=ADJ` | — | TODO |
-| USR-ME-04 | `GET /v1/me/summary` — 제보 1건 후 | `quotaUsed=1`, `quotaMax=2` | — | TODO |
-| USR-ME-05 | 요약: 투표 정확도 — 판정 HIT 항목에 `true` 투표 1, MISS 항목에 `true` 투표 1, 미판정 항목 투표 1 | `votesTotal=2`, `votesCorrect=1` | 미판정 투표는 집계 제외 | TODO |
-| USR-ME-06 | 선호 조회: 온보딩 전 | 404 | — | TODO |
-| USR-ME-07 | 선호 저장 → 조회 | PUT 200(요청 그대로), GET 동일 | — | TODO |
-| USR-ME-08 | 선호 저장: `categories=[]` / `notifyHour=24` / `-1` / 잘못된 카테고리 | 400 | — | TODO |
+| USR-ME-01 | 신규 유저 `GET /v1/me/grade` | 200, `grade=L0`, `trustIndex=0.4`, `judgedCount=0`, `nextGrade`="제보자"(L1 표시명 — OpenAPI는 string만 정함, 코드값 아님), `requirements` 3개(판정 수·TI·AS)에 `current`·`required`·`met`·`basis` | 신규 TI 0.4(CLAUDE.md) | PASS |
+| USR-ME-02 | 신규 유저 `GET /v1/me/ledger` | 200, `items=[]` | — | PASS |
+| USR-ME-03 | 원장: 관리자 수동 ADJ(제보 없음) 1행 | `word="계정 조정"`, `kind=ADJ` | — | PASS |
+| USR-ME-04 | `GET /v1/me/summary` — 제보 1건 후 | `quotaUsed=1`, `quotaMax=2` | — | PASS |
+| USR-ME-05 | 요약: 투표 정확도 — 판정 HIT 항목에 `true` 투표 1, MISS 항목에 `true` 투표 1, 미판정 항목 투표 1 | `votesTotal=2`, `votesCorrect=1` | 미판정 투표는 집계 제외 | PASS |
+| USR-ME-06 | 선호 조회: 온보딩 전 | 404 | — | PASS |
+| USR-ME-07 | 선호 저장 → 조회 | PUT 200(요청 그대로), GET 동일 | — | PASS |
+| USR-ME-08 | 선호 저장: `categories=[]` / `notifyHour=24` / `-1` / 잘못된 카테고리 | 400 | — | PASS |
 
 ---
 

@@ -164,11 +164,11 @@ public class Fixtures {
                 userId, String.join(",", categories));
     }
 
-    /** 현행 판정 행만 만든다(상태는 그대로). result = HIT(L1) | MISS. */
+    /** 현행 판정 행만 만든다(상태는 그대로). result = HIT(L1) | MISS. judged_at은 2000년 — 신호 없는 근거가 파라미터 시뮬레이션 창(최근 180일)에 들어가지 않게. */
     public void verdict(UUID itemId, String result) {
         String values = "HIT".equals(result) ? "'HIT', 'L1', 0.2" : "'MISS', NULL, 0.1";
         jdbc.update("INSERT INTO verdicts (trend_item_id, result, reach_level, score_t, judged_at, evidence_json) "
-                + "VALUES (?, " + values + ", now(), '{}'::jsonb)", itemId);
+                + "VALUES (?, " + values + ", TIMESTAMPTZ '2000-01-01 00:00:00+00', '{}'::jsonb)", itemId);
     }
 
     // ── 병합(SP2) ─────────────────────────────────────────────
@@ -192,10 +192,10 @@ public class Fixtures {
         jdbc.update("UPDATE trend_items SET state = ?::trend_state WHERE id = ?", state, itemId);
     }
 
-    /** 상태는 그대로 두고 현행 판정 행만 만든다(상태·판정 행 불일치 가드 테스트용). */
+    /** 상태는 그대로 두고 현행 판정 행만 만든다(상태·판정 행 불일치 가드 테스트용). judged_at은 2000년 — 시뮬레이션 창 밖. */
     public void verdictRow(UUID itemId) {
         jdbc.update("INSERT INTO verdicts (trend_item_id, result, score_t, judged_at, evidence_json) "
-                + "VALUES (?, 'MISS', 0.1, now(), '{}'::jsonb)", itemId);
+                + "VALUES (?, 'MISS', 0.1, TIMESTAMPTZ '2000-01-01 00:00:00+00', '{}'::jsonb)", itemId);
     }
 
     public String key(UUID itemId) {
