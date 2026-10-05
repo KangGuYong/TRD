@@ -103,12 +103,13 @@ class UserReportTest extends FunctionalTestBase {
         clock.set(T0);
         UUID s = fx.user();
         String sub = submit(s, uniq("recv"), 30);
-        UUID report = fileReport(fx.user(), itemOf(sub));
+        UUID reporter = fx.user();
+        UUID report = fileReport(reporter, itemOf(sub));
         requestExplanation(report, uuid(sub, "$.id"));
 
         String json = getOk("/v1/reports/received", asUser(s));
         assertThat((List<String>) read(json, "$[*].id")).containsExactly(report.toString());
-        assertThat(json).doesNotContain("reporterId");
+        assertThat(json).doesNotContain("reporterId").doesNotContain(reporter.toString());   // 지목된 제보자는 신고자를 알 수 없다(어떤 필드명으로도)
         mvc.perform(get("/v1/reports/received").with(asUser(fx.user()))).andExpect(jsonPath("$.length()").value(0));
     }
 

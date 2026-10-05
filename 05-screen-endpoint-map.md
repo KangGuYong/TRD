@@ -103,7 +103,7 @@
 |---|---|:--:|:--:|---|
 | 큐 로드(판정 완료 목록 + D+14 임박 30건) | `GET /admin/verdicts` | 🔶 | ✅ | R 불가 · O/A/Au · 스펙엔 이 목록 조회 자체가 없음(추가 필요) |
 | VOID / 재판정 | `POST /admin/verdicts/{id}/void` · `…/rejudge` | 🔶 | ✅ | **O/A** · 사유 **서버 필수**(`VerdictAdminService.requireReason`, 없으면 예외) · `JudgeService` 경유 — 재판정은 원 판정 파라미터·제보 단위 ADJ, VOID는 항목 VOID(원장 전액 상쇄). 이미 VOID된 항목은 409 · 재판정·VOID의 ADJ 합계(제보별 변동 절댓값 합) >100 → `ApprovalGate`가 쓰기 전에 막아 202(`PENDING_APPROVAL`, action `VERDICT_REJUDGE`/`ITEM_VOID`, **구현됨, SP3**), ≤100은 200 즉시 반영. 같은 항목에 이미 대기 중인 요청이 있으면 금액과 무관하게 409(`approval-pending`) · 스펙은 여전히 구경로 `POST /admin/trends/{id}/exceptions`(type 파라미터로 VOID/EXTEND/REJUDGE 분기) 하나만 정의 — 치환 필요 |
-| 유예연장 | `POST /admin/verdicts/{id}/extend-grace` | 🔶 | ✅ | **O/A** · 사유는 **서버가 요구하지 않는다** — `VerdictAdminService.extendGrace`는 `requireReason`을 호출하지 않고, `reason`이 null이면 빈 문자열로 감사 로그에만 남긴다. 1~90일(`MAX_GRACE_DAYS`) 범위·최대 유예 도달 여부만 검증. 위와 동일한 스펙 불일치 |
+| 유예연장 | `POST /admin/verdicts/{id}/extend-grace` | 🔶 | ✅ | **O/A** · 사유는 **서버가 요구하지 않는다** — `VerdictAdminService.extendGrace`는 `requireReason`을 호출하지 않고, `reason`이 null이면 빈 문자열로 감사 로그에만 남긴다. 1~7일(`MAX_GRACE_DAYS`, 누적 상한 최초 제보 + 21일) 범위·최대 유예 도달 여부만 검증. 위와 동일한 스펙 불일치 |
 | ~~HIT/MISS 변경·T 수동입력·verdict 삭제~~ | **엔드포인트 없음** | — | — | 금지기능(R1) |
 
 ### ADM-300 · 어뷰징 플래그 큐
