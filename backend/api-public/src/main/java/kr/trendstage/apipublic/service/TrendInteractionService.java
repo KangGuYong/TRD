@@ -3,9 +3,7 @@ package kr.trendstage.apipublic.service;
 import kr.trendstage.apipublic.web.EndorseConflictException;
 import kr.trendstage.apipublic.web.TrendNotFoundException;
 import kr.trendstage.apipublic.web.VoteResultResponse;
-import kr.trendstage.persistence.entity.Endorsement;
 import kr.trendstage.persistence.entity.TrendItem;
-import kr.trendstage.persistence.entity.Vote;
 import kr.trendstage.persistence.repo.EndorsementRepository;
 import kr.trendstage.persistence.repo.TrendItemRepository;
 import kr.trendstage.persistence.repo.VoteRepository;
@@ -30,12 +28,7 @@ public class TrendInteractionService {
     @Transactional
     public VoteResultResponse vote(UUID trendItemId, UUID userId, boolean willTrend) {
         requireExists(trendItemId);
-        Vote v = votes.findByUserIdAndTrendItemId(userId, trendItemId).orElse(null);
-        if (v == null) {
-            votes.save(new Vote(userId, trendItemId, willTrend));
-        } else {
-            v.toggleTo(willTrend);
-        }
+        votes.upsert(userId, trendItemId, willTrend);
         long yes = votes.countByTrendItemIdAndWillTrend(trendItemId, true);
         long no = votes.countByTrendItemIdAndWillTrend(trendItemId, false);
         long total = yes + no;
@@ -47,10 +40,9 @@ public class TrendInteractionService {
     @Transactional
     public void endorse(UUID trendItemId, UUID userId) {
         requireExists(trendItemId);
-        if (endorsements.existsByTrendItemIdAndUserId(trendItemId, userId)) {
+        if (endorsements.insertIfAbsent(trendItemId, userId) == 0) {
             throw new EndorseConflictException("이미 동의한 항목입니다");
         }
-        endorsements.save(new Endorsement(trendItemId, userId, null));
     }
 
     private void requireExists(UUID trendItemId) {

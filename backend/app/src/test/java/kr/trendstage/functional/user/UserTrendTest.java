@@ -225,7 +225,6 @@ class UserTrendTest extends FunctionalTestBase {
     }
 
     @Test
-    @org.junit.jupiter.api.Disabled("BUG-2: 같은 유저의 투표·인정 동시 첫 요청이 UNIQUE 위반으로 500")
     @DisplayName("USR-TRD-15 같은 유저 투표·인정 동시 첫 요청: 500 없음, 투표 1행, 인정 201+409")
     void concurrentFirstVoteAndEndorse() throws Exception {
         clock.set(T0);
