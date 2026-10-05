@@ -33,6 +33,22 @@ class UserTrendTest extends FunctionalTestBase {
     }
 
     @Test
+    @DisplayName("USR-TRD-21 홈 카드 경로 문구는 플랫폼을 처음 본 순서대로(APP-7)")
+    void pathTextIsChronological() throws Exception {
+        clock.set(T0);
+        String name = uniq("path");
+        UUID item = itemOf(submit(fx.user(), name, 30, "인스타"));
+        clock.set(T0.plusSeconds(60));
+        submit(fx.user(), name, 30, "디시");
+        clock.set(T0.plusSeconds(120));
+        submit(fx.user(), name, 30, "X");   // 그 외 링크 → 기타
+
+        List<String> path = read(getOk("/v1/trends", ANON), "$.items[?(@.id == '" + item + "')].pathText");
+
+        assertThat(path).containsExactly("인스타 → 디시 → 기타");
+    }
+
+    @Test
     @DisplayName("USR-TRD-16 검색: 이름에 검색어가 들어간 항목만(APP-2)")
     void searchMatchesContainedName() throws Exception {
         clock.set(T0);

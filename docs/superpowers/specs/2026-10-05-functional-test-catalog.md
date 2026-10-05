@@ -35,6 +35,7 @@
 | USR-SUB-12 | 같은 유저가 같은 새 이름을 동시에 두 번 제보(네트워크 재시도) | 201 1건 + 409 1건, 500 없음, 제보 1행 | — | PASS |
 | USR-SUB-13 | 이름 정확히 120자 | 201 (121자는 400 — USR-SUB-05) | 경계값 | PASS |
 | USR-SUB-14 | 생성 응답의 `orderRank` | 1위, 이어서 2위 | OpenAPI "판정 전에는 파생 잠정값" — 현재 항상 null(flush 전 뷰 조회). USR-SUB-01·02는 순위를 `GET /v1/submissions/me`로 확인 | PASS(BUG-9 수정) |
+| USR-SUB-15 | 판정 전에 VOID된 제보의 `note` | 항목 T 없이 "VOID · 점수 변동 없음" | APP-6(실사용 테스트) — T는 이 제보가 판정에 들어간 HIT·MISS만 | PASS |
 
 ### USR-TRD 트렌드 조회·투표·인정 — `UserTrendTest`
 
@@ -60,6 +61,7 @@
 | USR-TRD-18 | 검색 대상 상태 | RESOLVED 포함, MERGED·VOID·비공개 제외 | APP-2 — "이거 아직 써도 돼?"는 판정된 항목이 핵심 | PASS |
 | USR-TRD-19 | 별칭(병합돼 사라진 이름) 검색 | 생존 항목 | APP-2 | PASS |
 | USR-TRD-20 | 결과 없음 / `%`·`_` | 빈 목록 / 와일드카드 아님 | APP-2 | PASS |
+| USR-TRD-21 | 홈 카드 경로 문구 순서 | 플랫폼을 처음 본 순서(인스타 → 디시 → 기타) | APP-7(실사용 테스트) — distinct만 써 순서가 보장되지 않던 것 | PASS |
 
 ### USR-RPT 신고·소명 — `UserReportTest`
 
