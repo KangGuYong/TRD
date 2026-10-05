@@ -3,7 +3,7 @@ import { Text } from "react-native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { C } from "../theme";
-import type { HomeStackParamList, MeStackParamList } from "./types";
+import type { HomeStackParamList, MeStackParamList, SearchStackParamList } from "./types";
 import HomeScreen from "../screens/HomeScreen";
 import DetailScreen from "../screens/DetailScreen";
 import SearchScreen from "../screens/SearchScreen";
@@ -17,6 +17,7 @@ const GatedSubmit = () => <AuthGate><SubmitScreen /></AuthGate>;
 const GatedWatch = () => <AuthGate><WatchScreen /></AuthGate>;
 
 const Stack = createNativeStackNavigator<HomeStackParamList>();
+const SearchStackNav = createNativeStackNavigator<SearchStackParamList>();
 const MeStackNav = createNativeStackNavigator<MeStackParamList>();
 const Tab = createBottomTabNavigator();
 
@@ -26,6 +27,16 @@ function HomeStack() {
       <Stack.Screen name="Home" component={HomeScreen} />
       <Stack.Screen name="Detail" component={DetailScreen} options={{ headerShown: true, title: "", headerBackTitle: "오늘의 5개", headerStyle: { backgroundColor: C.bg }, headerShadowVisible: false }} />
     </Stack.Navigator>
+  );
+}
+
+/** 검색 결과 → 상세 → 뒤로가면 검색으로(APP-3: 검색 탭에 Detail이 없어 결과를 눌러도 이동하지 않았다). */
+function SearchStack() {
+  return (
+    <SearchStackNav.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: C.bg } }}>
+      <SearchStackNav.Screen name="Search" component={SearchScreen} />
+      <SearchStackNav.Screen name="Detail" component={DetailScreen} options={{ headerShown: true, title: "", headerBackTitle: "검색", headerStyle: { backgroundColor: C.bg }, headerShadowVisible: false }} />
+    </SearchStackNav.Navigator>
   );
 }
 
@@ -53,7 +64,7 @@ export default function RootNavigator() {
       }}
     >
       <Tab.Screen name="홈" component={HomeStack} options={{ tabBarIcon: icon("⌂") }} />
-      <Tab.Screen name="검색" component={SearchScreen} options={{ tabBarIcon: icon("⌕") }} />
+      <Tab.Screen name="검색" component={SearchStack} options={{ tabBarIcon: icon("⌕") }} />
       <Tab.Screen name="제보" component={GatedSubmit} options={{ tabBarIcon: icon("＋") }} />
       <Tab.Screen name="워치" component={GatedWatch} options={{ tabBarIcon: icon("◉") }} />
       <Tab.Screen name="나" component={GatedMe} options={{ tabBarIcon: icon("☺") }} />
