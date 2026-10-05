@@ -213,7 +213,6 @@ class UserTrendTest extends FunctionalTestBase {
     }
 
     @Test
-    @org.junit.jupiter.api.Disabled("BUG-4: 제보자 본인이 자기 항목을 인정할 수 있다(D2 결정: 409)")
     @DisplayName("USR-TRD-14 그 항목에 제보한 유저의 인정은 409 (D2)")
     void submitterCannotEndorseOwnItem() throws Exception {
         clock.set(T0);

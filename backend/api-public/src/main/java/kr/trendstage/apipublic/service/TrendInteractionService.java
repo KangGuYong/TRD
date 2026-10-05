@@ -5,8 +5,10 @@ import kr.trendstage.apipublic.web.TrendNotFoundException;
 import kr.trendstage.apipublic.web.VoteResultResponse;
 import kr.trendstage.persistence.entity.TrendItem;
 import kr.trendstage.persistence.repo.EndorsementRepository;
+import kr.trendstage.persistence.repo.SubmissionRepository;
 import kr.trendstage.persistence.repo.TrendItemRepository;
 import kr.trendstage.persistence.repo.VoteRepository;
+import kr.trendstage.persistence.type.SubmissionResult;
 import kr.trendstage.persistence.type.TrendState;
 import kr.trendstage.persistence.type.TrendVisibility;
 import org.springframework.stereotype.Service;
@@ -21,9 +23,11 @@ public class TrendInteractionService {
     private final TrendItemRepository trends;
     private final VoteRepository votes;
     private final EndorsementRepository endorsements;
+    private final SubmissionRepository submissions;
 
-    public TrendInteractionService(TrendItemRepository trends, VoteRepository votes, EndorsementRepository endorsements) {
-        this.trends = trends; this.votes = votes; this.endorsements = endorsements;
+    public TrendInteractionService(TrendItemRepository trends, VoteRepository votes, EndorsementRepository endorsements,
+                                   SubmissionRepository submissions) {
+        this.trends = trends; this.votes = votes; this.endorsements = endorsements; this.submissions = submissions;
     }
 
     @Transactional
@@ -41,7 +45,9 @@ public class TrendInteractionService {
     @Transactional
     public void endorse(UUID trendItemId, UUID userId) {
         requireExists(trendItemId);
-        if (endorsements.insertIfAbsent(trendItemId, userId) == 0) {
+        // 이미 이 항목에 제보한 유저(VOID 제외)는 동의할 수 없다 — OpenAPI 409 "이미 동의/제보한 유저"(D2)
+        if (submissions.existsByTrendItemIdAndUserIdAndResultNot(trendItemId, userId, SubmissionResult.VOID)
+                || endorsements.insertIfAbsent(trendItemId, userId) == 0) {
             throw new EndorseConflictException("이미 동의한 항목입니다");
         }
     }
