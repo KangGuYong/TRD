@@ -95,9 +95,12 @@ public class TrendQueryService {
         }
         Map<UUID, TrendItem> byId = trends.findAllById(ids).stream()
                 .collect(Collectors.toMap(TrendItem::getId, it -> it));
+        // 선정 뒤 비공개(신고 대응)·병합된 항목은 그날이라도 빼고, 빈자리는 채우지 않는다(하루 같은 목록).
+        // 판정된(RESOLVED) 항목은 결과를 보여줄 수 있게 남긴다.
         return ids.stream()
                 .map(byId::get)
                 .filter(Objects::nonNull)
+                .filter(it -> it.getVisibility() == TrendVisibility.PUBLIC && it.getState() != TrendState.MERGED)
                 .map(this::toSummary)
                 .toList();
     }

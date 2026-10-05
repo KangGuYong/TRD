@@ -43,7 +43,7 @@
 | USR-TRD-01 | `GET /v1/trends` | 200, PENDING·JUDGING이고 PUBLIC인 내 항목이 포함되고, MERGED·RESOLVED·TEMP_HIDDEN 항목은 빠짐 | 전역 목록 — 내 id 포함·제외만 단언 | PASS |
 | USR-TRD-02 | 단계(stage) 계산: 플랫폼 1·2·4·6종 제보 | SEED·RISING·PEAK·FADING | 기존 단위 `ReadModelTest` — HTTP는 1개 대표값만 | PASS |
 | USR-TRD-03 | 로그인 + `daily=true` | 200, 최대 5개. 두 번 호출하면 같은 목록. `daily_selections`에 (user, 오늘) 행 | 선호 카테고리 우선은 기존 `DailySelectionPickerTest` | PASS |
-| USR-TRD-04 | 오늘의 5개 선정 후 그중 한 항목이 TEMP_HIDDEN 또는 MERGED가 됨 → 다시 조회 | 그 항목이 빠짐 | 설계 §5 — 지금은 계속 노출 | BUG-1 |
+| USR-TRD-04 | 오늘의 5개 선정 후 그중 한 항목이 TEMP_HIDDEN 또는 MERGED가 됨 → 다시 조회 | 그 항목이 빠짐 | 설계 §5 — 지금은 계속 노출 | PASS(BUG-1 수정) |
 | USR-TRD-05 | `GET /v1/trends/{id}` 정상 | 200, `meaning`=가장 이른 제보의 oneLine, `pathText`, `reachedCount`, 투표 0이면 `voteCount=null` | — | PASS |
 | USR-TRD-06 | 상세: 없는 id / MERGED / TEMP_HIDDEN / PERMANENT_HIDDEN | 404 | — | PASS |
 | USR-TRD-07 | 상세: 판정된 항목 | `verdict`="적중했어요"/"빗나갔어요", `reachLevel`(HIT) — `verdictWhy`는 미검증 | JRN-01·02에서 확인 | PASS |
@@ -216,7 +216,7 @@
 
 | BUG | TC | 현상 | 관련 코드 |
 |---|---|---|---|
-| BUG-1 | USR-TRD-04 | 오늘의 5개가 선정 후 비공개·병합된 항목을 그날 계속 노출(명예훼손 대응 비공개 무력화) | `TrendQueryService` 오늘의 5개 재조회 — 저장된 선정을 상태·공개 여부 재확인 없이 반환 |
+| BUG-1 | USR-TRD-04 | 오늘의 5개가 선정 후 비공개·병합된 항목을 그날 계속 노출(명예훼손 대응 비공개 무력화) | `TrendQueryService` 오늘의 5개 재조회 — 저장된 선정을 상태·공개 여부 재확인 없이 반환 — **수정됨**(읽을 때 PUBLIC·비병합만) |
 | BUG-2 | USR-TRD-15 | 같은 유저의 투표·인정 동시 첫 요청이 UNIQUE 위반으로 500 | `TrendInteractionService.vote/endorse` |
 | BUG-3 | USR-TRD-11 | 비공개(TEMP_HIDDEN·PERMANENT_HIDDEN) 항목에도 투표·인정이 된다(D1: 404) | `TrendInteractionService` 항목 조회 — MERGED만 거름 |
 | BUG-4 | USR-TRD-14 | 제보자 본인이 자기 항목을 인정할 수 있다(D2: 409) | `TrendInteractionService.endorse` |

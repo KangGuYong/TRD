@@ -72,7 +72,6 @@ class UserTrendTest extends FunctionalTestBase {
     }
 
     @Test
-    @org.junit.jupiter.api.Disabled("BUG-1: 오늘의 5개가 선정 후 비공개·병합된 항목을 그날 계속 노출 — TrendQueryService가 저장된 선정을 상태·공개 여부 재확인 없이 반환")
     @DisplayName("USR-TRD-04 오늘의 5개 선정 후 비공개·병합된 항목은 다시 조회하면 빠진다")
     void dailySelectionDropsHiddenOrMergedItems() throws Exception {
         clock.set(T0);
