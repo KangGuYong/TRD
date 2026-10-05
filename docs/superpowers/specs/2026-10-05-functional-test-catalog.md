@@ -187,7 +187,7 @@
 | ADM-VRD-05 | `days=0`·`8` → 422 / 판정된 항목 → 422 / 없는 항목 → 422 | 1~7일(02와 코드. 05 문서의 "1~90일"은 오류) | PASS |
 | ADM-VRD-06 | JUDGING 항목을 연장해 새 마감이 미래 | 200, 항목 PENDING 복귀 | — | PASS |
 | ADM-VRD-07 | 사유 없이 연장 | 200(서버가 사유 요구 안 함 — 02 §사유 입력) | 현재 동작 고정 | PASS |
-| ADM-VRD-08 | MERGED·VOID 항목 연장 | 422, override 변화 없음 | D8(PENDING·JUDGING만) — 현재 200 | BUG-8 |
+| ADM-VRD-08 | MERGED·VOID 항목 연장 | 422, override 변화 없음 | D8(PENDING·JUDGING만) — 현재 200 | PASS(BUG-8 수정) |
 | ADM-VRD-09 | 역할: REVIEWER·AUDITOR 연장 → 403 | — | — | PASS |
 
 ---
@@ -212,7 +212,7 @@
 
 ## BUG 목록
 
-테스트가 드러낸 설계·계약과 다른 동작. 각 테스트는 `@Disabled("BUG-n: …")`로 남아 있다 — 수정 시 `@Disabled`를 지우면 그대로 회귀 테스트가 된다. 수정은 별도 승인 후.
+테스트가 드러낸 설계·계약과 다른 동작. **10건 모두 수정됨(2026-10-05, 브랜치 `bugfix-1-2-10`)** — 각 테스트의 `@Disabled`를 지워 실패를 확인한 뒤 고쳤고, 이제 회귀 테스트로 동작한다.
 
 | BUG | TC | 현상 | 관련 코드 |
 |---|---|---|---|
@@ -223,6 +223,6 @@
 | BUG-5 | USR-RPT-08 | 소명 기한(요청+48h) 미검사 — 마감 후 제출도 200(D3: 409) | `ReportService` 소명 제출 — **수정됨**(기한 지나면 409, 제출 시각도 주입 Clock) |
 | BUG-6 | ADM-PRM-09 | REVIEW(승인 대기) 드래프트도 simulate가 `sim_result`를 덮어씀(D4: 409) | `ParamStudioService.simulate` — **수정됨**(REVIEW면 409) |
 | BUG-7 | ADM-PRM-04 | `hitThreshold` 범위 미검증(D5: `0 < t ≤ 1` 밖이면 422) | `ParamStudioService` 드래프트 수정 — **수정됨**(0 < t ≤ 1 밖이면 422) |
-| BUG-8 | ADM-VRD-08 | 유예 연장이 MERGED·VOID 항목에도 된다(D8: PENDING·JUDGING만) | `VerdictAdminService.extendGrace` |
+| BUG-8 | ADM-VRD-08 | 유예 연장이 MERGED·VOID 항목에도 된다(D8: PENDING·JUDGING만) | `VerdictAdminService.extendGrace` — **수정됨**(PENDING·JUDGING 외 422) |
 | BUG-9 | USR-SUB-14 | 제보 생성 응답의 `orderRank`가 항상 null — `save()` 후 flush 없이 순위 뷰 조회 | `SubmissionService.create/toResponse` — **수정됨**(뷰 엔티티에 @Synchronize("submissions") — 조회 전 자동 flush) |
 | BUG-10 | USR-SUB-10 | 판정 끝난 제보의 `delta`·`reachLevel`·`note`(산정 근거)가 항상 null | `SubmissionService.toResponse` — **수정됨**(원장 합·현재 판정 reach·T+원 산정식+조정 합계) |
