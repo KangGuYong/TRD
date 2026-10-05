@@ -171,24 +171,24 @@
 
 | ID | 케이스 | 기대 | 근거·비고 | 상태 |
 |---|---|---|---|---|
-| ADM-ITM-01 | `GET /admin/trend-items` | 내 항목(MERGED 포함)이 `submitterCount`(시딩·VOID 제외)·`currentResult`와 함께 있음 | 개수 규칙은 기존 `TrendItemListCountTest` | TODO |
-| ADM-ITM-02 | 상세: 미판정 항목 | 200, `deadline`·`daysLeft`·`distinctSubmitters`·`distinctPlatforms`(시딩 제외)·`endorseCount`, `preview*` 채워짐, `submissions[].orderRank`(시딩 null) | — | TODO |
-| ADM-ITM-03 | 상세: 판정된 항목 | `current*` 채워짐, `preview*` 없음 | — | TODO |
-| ADM-ITM-04 | 상세: 없는 id → 422 | — | — | TODO |
+| ADM-ITM-01 | `GET /admin/trend-items` | 내 항목(MERGED 포함)이 `submitterCount`(시딩·VOID 제외)·`currentResult`와 함께 있음 | 개수 규칙은 기존 `TrendItemListCountTest` | PASS |
+| ADM-ITM-02 | 상세: 미판정 항목 | 200, `deadline`·`daysLeft`·`distinctSubmitters`·`distinctPlatforms`(시딩 제외)·`endorseCount`, `preview*` 채워짐, `submissions[].orderRank`(시딩 null) | — | PASS |
+| ADM-ITM-03 | 상세: 판정된 항목 | `current*` 채워짐, `preview*` 없음 | — | PASS |
+| ADM-ITM-04 | 상세: 없는 id → 422 | — | — | PASS |
 
 ### ADM-VRD 판정 목록·유예 연장 — `AdminVerdictTest`
 
 | ID | 케이스 | 기대 | 근거·비고 | 상태 |
 |---|---|---|---|---|
-| ADM-VRD-01 | `GET /admin/verdicts` | 판정된 내 항목은 `judged`에, 마감 임박 내 항목은 `imminent`에(`daysLeft` 오름차순) | `imminent`는 최대 30개 — 마감을 가장 가깝게 잡아 포함시킴 | TODO |
-| ADM-VRD-02 | 역할: OPERATOR·ADMIN·AUDITOR 200 / REVIEWER 403 | — | — | TODO |
-| ADM-VRD-03 | 유예 연장 3일 (PENDING) | 200, 마감 = D+14+3일, 감사 `VERDICT_GRACE_EXTEND` | 02 ADM-200 | TODO |
-| ADM-VRD-04 | 연장 누적이 D+21을 넘음(예: D+20에서 7일) | 200, 마감 = D+21(잘림). 이미 D+21에서 연장 → 422 | 상한 D+21 | TODO |
-| ADM-VRD-05 | `days=0`·`8` → 422 / 판정된 항목 → 422 / 없는 항목 → 422 | 1~7일(02와 코드. 05 문서의 "1~90일"은 오류) | TODO |
-| ADM-VRD-06 | JUDGING 항목을 연장해 새 마감이 미래 | 200, 항목 PENDING 복귀 | — | TODO |
-| ADM-VRD-07 | 사유 없이 연장 | 200(서버가 사유 요구 안 함 — 02 §사유 입력) | 현재 동작 고정 | TODO |
-| ADM-VRD-08 | MERGED·VOID 항목 연장 | 422, override 변화 없음 | D8(PENDING·JUDGING만) — 현재 200 | TODO(BUG 예상) |
-| ADM-VRD-09 | 역할: REVIEWER·AUDITOR 연장 → 403 | — | — | TODO |
+| ADM-VRD-01 | `GET /admin/verdicts` | 판정된 내 항목은 `judged`에, 마감 임박 내 항목은 `imminent`에(`daysLeft` 오름차순) | `imminent`는 최대 30개 — 마감을 가장 가깝게 잡아 포함시킴 | PASS |
+| ADM-VRD-02 | 역할: OPERATOR·ADMIN·AUDITOR 200 / REVIEWER 403 | — | — | PASS |
+| ADM-VRD-03 | 유예 연장 3일 (PENDING) | 200, 마감 = D+14+3일, 감사 `VERDICT_GRACE_EXTEND` | 02 ADM-200 | PASS |
+| ADM-VRD-04 | 연장 누적이 D+21을 넘음(예: D+20에서 7일) | 200, 마감 = D+21(잘림). 이미 D+21에서 연장 → 422 | 상한 D+21 | PASS |
+| ADM-VRD-05 | `days=0`·`8` → 422 / 판정된 항목 → 422 / 없는 항목 → 422 | 1~7일(02와 코드. 05 문서의 "1~90일"은 오류) | PASS |
+| ADM-VRD-06 | JUDGING 항목을 연장해 새 마감이 미래 | 200, 항목 PENDING 복귀 | — | PASS |
+| ADM-VRD-07 | 사유 없이 연장 | 200(서버가 사유 요구 안 함 — 02 §사유 입력) | 현재 동작 고정 | PASS |
+| ADM-VRD-08 | MERGED·VOID 항목 연장 | 422, override 변화 없음 | D8(PENDING·JUDGING만) — 현재 200 | BUG-8 |
+| ADM-VRD-09 | 역할: REVIEWER·AUDITOR 연장 → 403 | — | — | PASS |
 
 ---
 
