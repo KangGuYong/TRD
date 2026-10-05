@@ -36,7 +36,11 @@ public class TrendController {
     /** 홈 "오늘의 5개" / 목록. daily=true면 5개로 끝(더 보기 없음).
      * 로그인 유저는 그날(KST) 안에서 고정된 개인화 5개, 비로그인은 실시간 전체 top-5. */
     @GetMapping
-    public TrendListResponse list(@RequestParam(name = "daily", defaultValue = "false") boolean daily, Authentication auth) {
+    public TrendListResponse list(@RequestParam(name = "daily", defaultValue = "false") boolean daily,
+                                  @RequestParam(name = "q", required = false) String q, Authentication auth) {
+        if (q != null && !q.isBlank()) {
+            return new TrendListResponse(service.search(q), null);   // 검색은 daily와 무관(APP-2)
+        }
         UUID viewerId = auth != null ? (UUID) auth.getPrincipal() : null;
         return new TrendListResponse(service.home(daily, viewerId), null);
     }

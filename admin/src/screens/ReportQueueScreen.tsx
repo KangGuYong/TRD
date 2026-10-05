@@ -25,7 +25,7 @@ export default function ReportQueueScreen() {
   return (
     <div style={{ maxWidth: 900 }}>
       <div style={{ marginBottom: 16, font: "500 12px Pretendard", color: C.sub }}>
-        4시간 자동 임시비공개 없음 — 사람이 판단하기 전까지 절대 비공개되지 않습니다.
+        접수(OPEN) 후 4시간 안에 처리하지 않으면 공개 중인 항목을 자동으로 임시 비공개합니다(되돌릴 수 있음). 영구 비공개·복원 확정은 사람이 합니다.
       </div>
       <StateView query={q}>
         {(list) => list.length === 0 ? (
@@ -74,7 +74,11 @@ function ReportCard({ report }: { report: ReportQueueItem }) {
     }
   };
 
-  const refresh = () => qc.invalidateQueries({ queryKey: ["admin", "reports"] });
+  // 사이드바 배지·오늘의 작업 타일도 같이 — 큐 요약이 따로 캐시돼 처리 후에도 배지가 남았다(ADM-UI-2)
+  const refresh = () => Promise.all([
+    qc.invalidateQueries({ queryKey: ["admin", "reports"] }),
+    qc.invalidateQueries({ queryKey: ["admin", "queues"] }),
+  ]);
 
   const triage = async (action: "hide" | "request-explanation") => {
     if (!selected) { flash("소명 대상 제보를 먼저 지목하세요"); return; }

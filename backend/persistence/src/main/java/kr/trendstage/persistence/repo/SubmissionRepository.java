@@ -18,8 +18,12 @@ public interface SubmissionRepository extends JpaRepository<Submission, UUID> {
     /** 병합 시 VOID 포함 전량 재배정용(감사 추적 연속성, 03 §3). */
     List<Submission> findByTrendItemId(UUID trendItemId);
 
-    /** 서로 다른 플랫폼 코드(근거 링크 판별, SP4 S4). 홈 카드 경로·표시 단계용 — 라벨은 Platform.labelOf. */
-    @Query("select distinct s.platform from Submission s where s.trendItemId = :id and s.result <> :excluded")
+    /**
+     * 서로 다른 플랫폼 코드(근거 링크 판별, SP4 S4)를 처음 본 순서대로. 홈 카드 경로·표시 단계용 — 라벨은 Platform.labelOf.
+     * distinct만 쓰면 순서가 보장되지 않아 경로 문구가 시간순이 아니었다(APP-7).
+     */
+    @Query("select s.platform from Submission s where s.trendItemId = :id and s.result <> :excluded "
+            + "group by s.platform order by min(s.createdAt)")
     List<String> findDistinctPlatforms(@Param("id") UUID trendItemId, @Param("excluded") SubmissionResult excluded);
 
     List<Submission> findByUserIdOrderByCreatedAtDesc(UUID userId);

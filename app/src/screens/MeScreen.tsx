@@ -228,6 +228,19 @@ function SubStat({ label, value, color }: { label: string; value: number; color:
 const REASON_LABEL: Record<string, string> = { DEFAMATION: "명예훼손", BUSINESS_INTERFERENCE: "영업방해", OTHER: "기타" };
 const REPORT_STATUS_LABEL: Record<string, string> = { OPEN: "접수됨", EXPLAINING: "소명 대기", DECIDED: "처리 완료" };
 
+/** 서버는 UTC ISO로 준다 — 표시만 KST "YYYY-MM-DD HH:mm"(관리자 콘솔과 같은 형식, APP-4). */
+function formatKst(iso: string): string {
+  const d = new Date(Date.parse(iso) + 9 * 60 * 60 * 1000);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toISOString().slice(0, 16).replace("T", " ");
+}
+
+/** 받은 신고 상태 — 소명을 냈으면 결정 전이라도 "소명 제출됨"(APP-5). */
+function receivedStatusLabel(report: ReportReceived): string {
+  if (report.status === "EXPLAINING" && report.explanationSubmitted) return "소명 제출됨";
+  return REPORT_STATUS_LABEL[report.status];
+}
+
 function ReceivedRow({ report }: { report: ReportReceived }) {
   const [text, setText] = useState("");
   const submit = useSubmitExplanation();
@@ -237,10 +250,10 @@ function ReceivedRow({ report }: { report: ReportReceived }) {
     <View style={{ padding: 12, borderRadius: 10, backgroundColor: "rgba(20,19,15,0.03)" }}>
       <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
         <Text style={{ fontSize: 13, fontWeight: "600", color: C.ink }}>{REASON_LABEL[report.reason]}</Text>
-        <Muted style={{ fontSize: 11.5 }}>{REPORT_STATUS_LABEL[report.status]}</Muted>
+        <Muted style={{ fontSize: 11.5 }}>{receivedStatusLabel(report)}</Muted>
       </View>
       {!!report.detail && <Muted style={{ fontSize: 12, marginTop: 4 }}>{report.detail}</Muted>}
-      {report.explanationDeadline && <Muted style={{ fontSize: 11, marginTop: 4 }}>소명 기한: {report.explanationDeadline}</Muted>}
+      {report.explanationDeadline && <Muted style={{ fontSize: 11, marginTop: 4 }}>소명 기한: {formatKst(report.explanationDeadline)}</Muted>}
       {canSubmit && (
         <View style={{ marginTop: 8 }}>
           <TextInput value={text} onChangeText={setText} placeholder="소명 내용을 입력하세요" placeholderTextColor="rgba(20,19,15,0.35)"

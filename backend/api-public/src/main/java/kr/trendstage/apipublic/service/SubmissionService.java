@@ -168,7 +168,11 @@ public class SubmissionService {
         String reachLevel = s.getResult() == SubmissionResult.HIT && current != null && current.getReachLevel() != null
                 ? current.getReachLevel().name() : null;
         StringBuilder note = new StringBuilder();
-        if (current != null && current.getScoreT() != null) note.append("T=").append(current.getScoreT().toPlainString()).append(" · ");
+        // T는 이 제보가 판정에 들어갔을 때(HIT·MISS)만 — 판정 전에 VOID된 제보에 항목의 T를 붙이면 오해를 산다(APP-6)
+        boolean judgedIn = s.getResult() == SubmissionResult.HIT || s.getResult() == SubmissionResult.MISS;
+        if (judgedIn && current != null && current.getScoreT() != null) {
+            note.append("T=").append(current.getScoreT().toPlainString()).append(" · ");
+        }
         note.append(rows.isEmpty() ? "VOID · 점수 변동 없음" : rows.get(0).getReason());
         if (rows.size() > 1) note.append(String.format(Locale.US, " · 조정 후 합계 %+.1f", sum.doubleValue()));
         return new Judged(reachLevel, sum.doubleValue(), note.toString());

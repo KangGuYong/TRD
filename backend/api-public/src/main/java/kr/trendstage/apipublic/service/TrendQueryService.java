@@ -7,6 +7,7 @@ import kr.trendstage.apipublic.web.TrendSummaryResponse;
 import kr.trendstage.domain.signal.Platform;
 import kr.trendstage.domain.trend.DisplayStage;
 import kr.trendstage.domain.trend.DailySelectionPicker;
+import kr.trendstage.domain.trend.NameNormalizer;
 import kr.trendstage.domain.trend.StageEvaluator;
 import kr.trendstage.domain.verdict.VerdictResult;
 import kr.trendstage.persistence.entity.DailySelection;
@@ -31,6 +32,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -48,6 +50,7 @@ import java.util.stream.Collectors;
 public class TrendQueryService {
 
     private static final int DAILY_LIMIT = 5;
+    private static final int SEARCH_LIMIT = 20;
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
     private static final DateTimeFormatter PATH_DATE = DateTimeFormatter.ofPattern("MM-dd").withZone(KST);
 
@@ -77,6 +80,40 @@ public class TrendQueryService {
         }
         List<TrendSummaryResponse> all = liveRanked();
         return daily ? all.stream().limit(DAILY_LIMIT).toList() : all;
+    }
+
+    /**
+     * 앱 검색 "이거 아직 써도 돼?"(APP-2). 판정이 끝난 항목도 대상이다. 정렬: 완전일치 → 앞부분 일치 → 포함,
+     * 같은 순위 안에서는 홈과 같은 "지금 행동해야 하는 순". 비교는 제보 이름과 같은 정규화 키로 한다.
+     */
+    @Transactional(readOnly = true)
+    public List<TrendSummaryResponse> search(String q) {
+        String key = NameNormalizer.normalize(q);
+        if (key.isEmpty()) return List.of();
+        String pattern = "%" + key.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%";
+        return trends.searchPublic(pattern).stream()
+                .map(item -> Map.entry(matchRank(item, key), toSummary(item)))
+                .sorted(Comparator.<Map.Entry<Integer, TrendSummaryResponse>>comparingInt(Map.Entry::getKey)
+                        .thenComparingInt(e -> StageEvaluator.actionPriority(DisplayStage.valueOf(e.getValue().stage()))))
+                .limit(SEARCH_LIMIT)
+                .map(Map.Entry::getValue)
+                .toList();
+    }
+
+    /** 0 완전일치 · 1 앞부분 일치 · 2 포함 — 정규화 키와 별칭 중 가장 가까운 것. */
+    private static int matchRank(TrendItem item, String key) {
+        int best = 2;
+        for (String name : withAliases(item)) {
+            if (name.equals(key)) return 0;
+            if (name.startsWith(key)) best = 1;
+        }
+        return best;
+    }
+
+    private static List<String> withAliases(TrendItem item) {
+        List<String> names = new ArrayList<>(List.of(item.getNormalizedKey()));
+        for (String alias : item.getAliases()) names.add(NameNormalizer.normalize(alias));
+        return names;
     }
 
     private List<TrendSummaryResponse> liveRanked() {

@@ -74,6 +74,8 @@ export const useSubmit = () => {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: qk.mySubs });
       qc.invalidateQueries({ queryKey: qk.meSummary });
+      // 홈 목록·검색·상세(단계·경로)도 바뀐다 — "trends"로 시작하는 쿼리 전부(APP-1)
+      qc.invalidateQueries({ queryKey: ["trends"] });
     },
   });
 };

@@ -4,10 +4,10 @@ import { useNavigation } from "@react-navigation/native";
 import { useSearchTrends } from "../api/hooks";
 import { Card, H1, Muted, Screen, StageChip } from "../components/ui";
 import { C, STAGE_COLOR } from "../theme";
-import type { HomeNav } from "../navigation/types";
+import type { SearchNav } from "../navigation/types";
 
 export default function SearchScreen() {
-  const nav = useNavigation<HomeNav>();
+  const nav = useNavigation<SearchNav>();
   const [q, setQ] = useState("");
   const search = useSearchTrends(q);
   const hit = search.data?.items?.[0];

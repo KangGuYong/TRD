@@ -23,6 +23,95 @@ class UserTrendTest extends FunctionalTestBase {
         return read(json, "$.items[*].id");
     }
 
+    /** 다른 테스트 항목과 겹치지 않는 검색 토큰(소문자). */
+    private static String token() {
+        return "zq" + UUID.randomUUID().toString().substring(0, 8);
+    }
+
+    private List<String> search(String q) throws Exception {
+        return listIds(body(mvc.perform(get("/v1/trends").param("q", q)).andExpect(status().isOk())));
+    }
+
+    @Test
+    @DisplayName("USR-TRD-21 홈 카드 경로 문구는 플랫폼을 처음 본 순서대로(APP-7)")
+    void pathTextIsChronological() throws Exception {
+        clock.set(T0);
+        String name = uniq("path");
+        UUID item = itemOf(submit(fx.user(), name, 30, "인스타"));
+        clock.set(T0.plusSeconds(60));
+        submit(fx.user(), name, 30, "디시");
+        clock.set(T0.plusSeconds(120));
+        submit(fx.user(), name, 30, "X");   // 그 외 링크 → 기타
+
+        List<String> path = read(getOk("/v1/trends", ANON), "$.items[?(@.id == '" + item + "')].pathText");
+
+        assertThat(path).containsExactly("인스타 → 디시 → 기타");
+    }
+
+    @Test
+    @DisplayName("USR-TRD-16 검색: 이름에 검색어가 들어간 항목만(APP-2)")
+    void searchMatchesContainedName() throws Exception {
+        clock.set(T0);
+        String t = token();
+        UUID a = itemOf(submit(fx.user(), t + " cookie", 30));
+        UUID b = itemOf(submit(fx.user(), "milk " + t, 30));
+        UUID other = itemOf(submit(fx.user(), uniq("unrelated"), 30));
+
+        assertThat(search(t)).contains(a.toString(), b.toString()).doesNotContain(other.toString());
+    }
+
+    @Test
+    @DisplayName("USR-TRD-17 검색: 검색어도 정규화(대소문자·공백)하고 완전일치 → 앞부분 일치 → 포함 순")
+    void searchRanksExactThenPrefixThenContains() throws Exception {
+        clock.set(T0);
+        String t = token();
+        UUID contains = itemOf(submit(fx.user(), "pre " + t, 30));
+        UUID prefix = itemOf(submit(fx.user(), t + " plus", 30));
+        UUID exact = itemOf(submit(fx.user(), t, 30));
+
+        assertThat(search("  " + t.toUpperCase() + " ")).containsExactly(exact.toString(), prefix.toString(), contains.toString());
+    }
+
+    @Test
+    @DisplayName("USR-TRD-18 검색: 판정된(RESOLVED) 항목은 포함, MERGED·VOID·비공개는 제외")
+    void searchIncludesResolvedButNotMergedVoidOrHidden() throws Exception {
+        clock.set(T0);
+        String t = token();
+        UUID resolved = itemOf(submit(fx.user(), t + " resolved", 30));
+        fx.setState(resolved, "RESOLVED");
+        UUID merged = itemOf(submit(fx.user(), t + " merged", 30));
+        fx.merged(merged, resolved);
+        UUID voided = itemOf(submit(fx.user(), t + " voided", 30));
+        fx.setState(voided, "VOID");
+        UUID hidden = itemOf(submit(fx.user(), t + " hidden", 30));
+        fx.setVisibility(hidden, "TEMP_HIDDEN");
+
+        assertThat(search(t)).containsExactly(resolved.toString());
+    }
+
+    @Test
+    @DisplayName("USR-TRD-19 검색: 병합돼 사라진 이름(별칭)으로도 생존 항목이 나온다")
+    void searchMatchesAliases() throws Exception {
+        clock.set(T0);
+        String t = token();
+        UUID survivor = itemOf(submit(fx.user(), uniq("survivor"), 30));
+        jdbc.update("UPDATE trend_items SET aliases = ARRAY[?] WHERE id = ?", t + " old name", survivor);
+
+        assertThat(search(t + " old")).containsExactly(survivor.toString());
+    }
+
+    @Test
+    @DisplayName("USR-TRD-20 검색: 결과 없음은 빈 목록, %·_는 와일드카드가 아니다")
+    void searchWithoutMatchAndLiteralWildcards() throws Exception {
+        clock.set(T0);
+        String t = token();
+        UUID mine = itemOf(submit(fx.user(), t + " wildcard", 30));
+
+        assertThat(search(token())).isEmpty();
+        assertThat(search("%")).doesNotContain(mine.toString());
+        assertThat(search("_")).doesNotContain(mine.toString());
+    }
+
     @Test
     @DisplayName("USR-TRD-01 목록은 PENDING·JUDGING이고 PUBLIC인 항목만(MERGED·RESOLVED·TEMP_HIDDEN 제외)")
     void listShowsOnlyOpenPublicItems() throws Exception {

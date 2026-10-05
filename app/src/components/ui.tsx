@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useCallback, useRef } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import { SafeAreaView, type Edge } from "react-native-safe-area-context";
 import { C, STAGE_COLOR, STAGE_LABEL, STAGE_TINT, type Stage } from "../theme";
 
@@ -36,16 +37,29 @@ export function Muted({ children, style }: { children: React.ReactNode; style?: 
   return <Text style={[s.muted, style]}>{children}</Text>;
 }
 
-/** 로딩/에러/빈 상태를 한 곳에서. data가 있으면 children(data)를 렌더. */
+/**
+ * 로딩/에러/빈 상태를 한 곳에서. data가 있으면 children(data)를 렌더.
+ * 화면에 다시 들어올 때 데이터가 오래됐으면(staleTime 경과) 다시 불러온다(APP-1) — 탭 화면은 마운트된 채로 남아
+ * 다른 탭이나 관리자 처리로 바뀐 값이 앱을 재시작해야 보이던 문제. 모든 목록·상세가 여기를 거치므로 한 곳에서 처리한다.
+ */
 export function StateView<T>({
   query,
   empty,
   children,
 }: {
-  query: { isLoading: boolean; isError: boolean; error?: unknown; data?: T };
+  query: { isLoading: boolean; isError: boolean; error?: unknown; data?: T; isStale?: boolean; refetch?: () => unknown };
   empty?: (d: T) => boolean;
   children: (d: T) => React.ReactNode;
 }) {
+  const latest = useRef(query);
+  latest.current = query;
+  useFocusEffect(
+    useCallback(() => {
+      const q = latest.current;
+      if (q.isStale && q.refetch) q.refetch();
+    }, []),
+  );
+
   if (query.isLoading) {
     return (
       <View style={s.center}>
