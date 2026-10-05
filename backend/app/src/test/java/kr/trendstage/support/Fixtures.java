@@ -181,6 +181,23 @@ public class Fixtures {
                 + "VALUES (?, ?::grade_level, 0.5, 40, 6, ?)", userId, grade, Timestamp.from(computedAt));
     }
 
+    public String handle(UUID userId) {
+        return jdbc.queryForObject("SELECT handle FROM users WHERE id = ?", String.class, userId);
+    }
+
+    /** 온보딩 완료(선호 카테고리, 알림 9시). */
+    public void preferences(UUID userId, String... categories) {
+        jdbc.update("INSERT INTO user_preferences (user_id, categories, notify_hour) VALUES (?, string_to_array(?, ','), 9)",
+                userId, String.join(",", categories));
+    }
+
+    /** 현행 판정 행만 만든다(상태는 그대로). result = HIT(L1) | MISS. judged_at은 2000년 — 신호 없는 근거가 파라미터 시뮬레이션 창(최근 180일)에 들어가지 않게. */
+    public void verdict(UUID itemId, String result) {
+        String values = "HIT".equals(result) ? "'HIT', 'L1', 0.2" : "'MISS', NULL, 0.1";
+        jdbc.update("INSERT INTO verdicts (trend_item_id, result, reach_level, score_t, judged_at, evidence_json) "
+                + "VALUES (?, " + values + ", TIMESTAMPTZ '2000-01-01 00:00:00+00', '{}'::jsonb)", itemId);
+    }
+
     // ── 병합(SP2) ─────────────────────────────────────────────
 
     /** 처리 대기 병합 큐 행. */

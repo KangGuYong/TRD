@@ -34,8 +34,14 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
         // 로컬 전용 application-local.yml(있다면)이 켜는 SQL·바인딩 로그를 테스트에서는 끈다.
         "logging.level.org.hibernate.SQL=WARN",
         "logging.level.org.hibernate.orm.jdbc.bind=WARN",
-        // sla_watch는 매시 정각에 돈다 — 테스트가 정각을 지나면 공유 DB를 건드려 다른 테스트를 흔든다(Spring '-'는 크론 비활성).
+        // 배치 크론은 전부 끈다 — 실제 시각이 크론에 걸리면 공유 MutableClock으로 DB 전체를 판정·병합·등급 재계산해
+        // 다른 테스트를 흔든다(Spring '-'는 크론 비활성). 테스트는 배치를 직접 호출한다.
         "jobs.sla-watch.cron=-",
+        "jobs.verdict-runner.cron=-",
+        "jobs.cluster-merge.cron=-",
+        "jobs.grade-recalc.cron=-",
+        // 로컬에 임베딩 서비스(TEI, 기본 :6000)가 떠 있어도 붙지 않게 — cluster_merge 수동 실행 결과를 결정적으로.
+        "embedding.service.url=http://127.0.0.1:1",
         // 제보 기기·IP 해시 비밀값(SP4 §4) — 비어 있으면 기동 실패
         "signal.hash-secret=test-signal-secret",
 })
@@ -72,6 +78,14 @@ public abstract class AbstractIntegrationTest {
      */
     protected void releaseBatchLock(String name) {
         jdbc.update("UPDATE shedlock SET lock_until = TIMESTAMP '1970-01-01' WHERE name = ?", name);
+    }
+
+    /**
+     * 앱 유저. Firebase 필터가 SecurityContext에 심는 것과 같은 principal(내부 userId UUID).
+     * /v1 체인은 STATELESS·CSRF 없음이라 이것으로 충분하다 — 토큰 파싱만 건너뛰고 나머지 보안 체인은 그대로 탄다.
+     */
+    protected RequestPostProcessor asUser(UUID userId) {
+        return authentication(new UsernamePasswordAuthenticationToken(userId, null, List.of()));
     }
 
     /**
