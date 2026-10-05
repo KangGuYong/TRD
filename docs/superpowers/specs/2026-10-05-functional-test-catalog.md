@@ -1,6 +1,6 @@
 # 기능 테스트케이스 카탈로그
 
-> 설계: [`2026-10-05-functional-test-suite-design.md`](2026-10-05-functional-test-suite-design.md) · 상태: `TODO` / `PASS` / `BUG-n` / `D-n`(결정 대기, 설계 §5)
+> 설계: [`2026-10-05-functional-test-suite-design.md`](2026-10-05-functional-test-suite-design.md) · 상태: `TODO` / `TODO(BUG 예상)` / `PASS` / `BUG-n`
 >
 > 공통 전제(따로 적지 않음): 시계는 고정 시각 `T0` = 2026-09-21(월) 10:00 KST에서 시작, 유저는 `fx.user()`(등급 L0, 주 2장), 관리자는 `fx.admin(role)` + `asAdmin`. "Problem"은 `{type,status,detail}` 바디. 기본 파라미터: submitterTarget 20, hitThreshold 0.20 → **서로 다른 비시딩 제보자 4명 이상이면 HIT**(7·11·15명부터 L2·L3·L4).
 
@@ -30,7 +30,10 @@
 | USR-SUB-07 | 마감(D+14) 지난 항목 / JUDGING 항목에 제보 | 422 `type=item-closed`, 제보권 차감 없음 | 경계값은 기존 `#closedItemsRejectWithoutCharge`. HTTP 매핑만 확인 | TODO |
 | USR-SUB-08 | 병합된 이름(MERGED 툼스톤)으로 제보 | 201, 생존 항목 id | 기존: `TombstoneJoinTest#submissionOnMergedNameJoinsSurvivor` — 링크 | PASS(기존) |
 | USR-SUB-09 | `GET /v1/submissions/me` | 200, 최신순, 다른 유저 제보 없음, PENDING이면 `judgeInDays` 있음 | — | TODO |
-| USR-SUB-10 | 판정 끝난 제보의 `GET /v1/submissions/me` | `status`=HIT/MISS, `delta` 채워짐, `judgeInDays=null` | JRN-01에서 함께 확인 가능 | TODO |
+| USR-SUB-10 | 판정 끝난 제보의 `GET /v1/submissions/me` | `status`=HIT/MISS, `delta` 채워짐, `judgeInDays=null` | JRN-01에서 함께 확인 | TODO |
+| USR-SUB-11 | NFD로 분해된 한글 이름(macOS 입력) 제보 → NFC 이름 항목 | 같은 항목에 합류 | `NameNormalizer` NFC | TODO |
+| USR-SUB-12 | 같은 유저가 같은 새 이름을 동시에 두 번 제보(네트워크 재시도) | 201 1건 + 409 1건, 500 없음, 제보 1행 | — | TODO |
+| USR-SUB-13 | 이름 정확히 120자 | 201 (121자는 400 — USR-SUB-05) | 경계값 | TODO |
 
 ### USR-TRD 트렌드 조회·투표·인정 — `UserTrendTest`
 
@@ -39,18 +42,18 @@
 | USR-TRD-01 | `GET /v1/trends` | 200, PENDING·JUDGING이고 PUBLIC인 내 항목이 포함되고, MERGED·RESOLVED·TEMP_HIDDEN 항목은 빠짐 | 전역 목록 — 내 id 포함·제외만 단언 | TODO |
 | USR-TRD-02 | 단계(stage) 계산: 플랫폼 1·2·4·6종 제보 | SEED·RISING·PEAK·FADING | 기존 단위 `ReadModelTest` — HTTP는 1개 대표값만 | TODO |
 | USR-TRD-03 | 로그인 + `daily=true` | 200, 최대 5개. 두 번 호출하면 같은 목록. `daily_selections`에 (user, 오늘) 행 | 선호 카테고리 우선은 기존 `DailySelectionPickerTest` | TODO |
-| USR-TRD-04 | 오늘의 5개 선정 후 그중 한 항목이 TEMP_HIDDEN 또는 MERGED가 됨 → 다시 조회 | 그 항목이 빠짐 | 설계 §5 BUG 후보 — 지금은 계속 노출 | TODO |
+| USR-TRD-04 | 오늘의 5개 선정 후 그중 한 항목이 TEMP_HIDDEN 또는 MERGED가 됨 → 다시 조회 | 그 항목이 빠짐 | 설계 §5 — 지금은 계속 노출 | TODO(BUG 예상) |
 | USR-TRD-05 | `GET /v1/trends/{id}` 정상 | 200, `meaning`=가장 이른 제보의 oneLine, `pathText`, `reachedCount`, 투표 0이면 `voteCount=null` | — | TODO |
 | USR-TRD-06 | 상세: 없는 id / MERGED / TEMP_HIDDEN / PERMANENT_HIDDEN | 404 | — | TODO |
 | USR-TRD-07 | 상세: 판정된 항목 | `verdict`="적중했어요"/"빗나갔어요", `verdictWhy`, `reachLevel` | JRN-01·02에서 확인 | TODO |
 | USR-TRD-08 | 상세: 내가 워치한 항목 | `watched=true`(다른 유저 시점에서는 false) | — | TODO |
 | USR-TRD-09 | 투표 `{willTrend:true}` → 다시 `{willTrend:false}` | 둘 다 200, `votes` 1행 유지·값 토글, `voteCount` 문구 갱신 | — | TODO |
 | USR-TRD-10 | 투표: `willTrend` 누락 → 400 / 없는 항목·MERGED → 404 | — | — | TODO |
-| USR-TRD-11 | 투표·인정: 비공개 항목 | D1 결정에 따름 | **D1** | D-1 |
+| USR-TRD-11 | 투표·인정: TEMP_HIDDEN·PERMANENT_HIDDEN 항목 | 404 | D1(결정: 상세와 일치) — 현재 200/201 | TODO(BUG 예상) |
 | USR-TRD-12 | 인정 첫 요청 → 201(바디 없음), 두 번째 → 409 | `endorsements` 1행 | — | TODO |
 | USR-TRD-13 | 인정: 없는 항목·MERGED → 404 | — | — | TODO |
-| USR-TRD-14 | 인정: 그 항목에 제보한 유저 | D2 결정에 따름 | **D2** | D-2 |
-| USR-TRD-15 | 같은 유저의 투표 2건·인정 2건 동시 첫 요청 | 500 없음. 투표는 1행, 인정은 201 1건 + 409 1건 | 설계 §5 BUG 후보 | TODO |
+| USR-TRD-14 | 인정: 그 항목에 제보한 유저 | 409 | D2(결정: OpenAPI대로) — 현재 201 | TODO(BUG 예상) |
+| USR-TRD-15 | 같은 유저의 투표 2건·인정 2건 동시 첫 요청 | 500 없음. 투표는 1행, 인정은 201 1건 + 409 1건 | 설계 §5 | TODO(BUG 예상) |
 
 ### USR-RPT 신고·소명 — `UserReportTest`
 
@@ -63,7 +66,7 @@
 | USR-RPT-05 | `GET /v1/reports/received` — 관리자가 내 제보를 지정해 소명 요청한 신고 | 그 신고가 보임, 신고자 id는 응답에 없음. 제보 없는 유저는 빈 목록 | — | TODO |
 | USR-RPT-06 | 소명 제출: 지정된 제보자 + `EXPLAINING` | 200, `explanation_text` 저장 | — | TODO |
 | USR-RPT-07 | 소명: 없는 신고 → 404 / 지정된 제보자가 아님·`submission_id` 없음 → 403 / `OPEN`·`DECIDED` → 409 / `text` 빈값·2001자 → 400 | — | — | TODO |
-| USR-RPT-08 | 소명: 마감 지난 제출, 마감 전 재제출 | D3 결정에 따름 | **D3** | D-3 |
+| USR-RPT-08 | 소명: 마감(요청 + 48h) 지난 제출 / 마감 전 재제출 | 409 / 200(덮어씀) | D3 — 현재 마감 후도 200 | TODO(BUG 예상) |
 
 ### USR-RD / USR-WCH 읽음·워치 — `UserReadWatchTest`
 
@@ -136,12 +139,12 @@
 | ADM-PRM-01 | OPERATOR `GET /admin/params/draft` (드래프트 없음) | 200, 드래프트 생성(DRAFT), `current*` 값 = 현재 파라미터 | AUDITOR는 기존 `RoleMatrixTest`(생성 안 함) | TODO |
 | ADM-PRM-02 | PUT `{submitterTarget:25, hitThreshold:0.25}` | 200, 값 반영, `simResult` 비워짐, 감사 `PARAM_DRAFT_UPDATE` | — | TODO |
 | ADM-PRM-03 | PUT `submitterTarget=0` → 422 | — | — | TODO |
-| ADM-PRM-04 | PUT `hitThreshold=-0.1` / `1.5` | D5 결정에 따름 | **D5** | D-5 |
+| ADM-PRM-04 | PUT `hitThreshold=-0.1` / `1.5` / `0` | 422 (`0 < hitThreshold ≤ 1`만 허용) | D5 — 현재 200 | TODO(BUG 예상) |
 | ADM-PRM-05 | simulate | 200, `simResult{changed,total,missToHit,hitToMiss,reachChanged}`, 감사 `PARAM_SIMULATE` | — | TODO |
 | ADM-PRM-06 | 시뮬레이션 없이 승인 요청 → 422 / PUT 후(시뮬레이션 지워짐) 승인 요청 → 422 | CLAUDE.md "시뮬레이션 없이 승인 요청 불가" | TODO |
 | ADM-PRM-07 | 시뮬레이션 후 승인 요청(사유 있음) | 200 `status=REVIEW`, `approval_requests` PARAM_APPLY 1행, 감사 `APPROVAL_REQUEST` | 승인 이후는 기존 `ApprovalFlowTest` | TODO |
 | ADM-PRM-08 | 승인 요청: 사유 빈값 → 422 / REVIEW 중 다시 요청 → 409 / REVIEW 중 PUT → 409 | — | — | TODO |
-| ADM-PRM-09 | REVIEW 중 simulate | D4 결정에 따름 | **D4** | D-4 |
+| ADM-PRM-09 | REVIEW 중 simulate | 409, `sim_result` 그대로 | D4 — 현재 200·덮어씀 | TODO(BUG 예상) |
 | ADM-PRM-10 | 역할: REVIEWER는 GET·PUT·simulate·request-approval 모두 403 / AUDITOR는 PUT·simulate·request-approval 403 | — | — | TODO |
 
 ### ADM-RPT 신고 대상 제보 목록 — `AdminReportSubmissionsTest`
@@ -183,7 +186,7 @@
 | ADM-VRD-05 | `days=0`·`8` → 422 / 판정된 항목 → 422 / 없는 항목 → 422 | 1~7일(02와 코드. 05 문서의 "1~90일"은 오류) | TODO |
 | ADM-VRD-06 | JUDGING 항목을 연장해 새 마감이 미래 | 200, 항목 PENDING 복귀 | — | TODO |
 | ADM-VRD-07 | 사유 없이 연장 | 200(서버가 사유 요구 안 함 — 02 §사유 입력) | 현재 동작 고정 | TODO |
-| ADM-VRD-08 | MERGED·VOID 항목 연장 | D8 결정에 따름 | **D8** | D-8 |
+| ADM-VRD-08 | MERGED·VOID 항목 연장 | 422, override 변화 없음 | D8(PENDING·JUDGING만) — 현재 200 | TODO(BUG 예상) |
 | ADM-VRD-09 | 역할: REVIEWER·AUDITOR 연장 → 403 | — | — | TODO |
 
 ---
